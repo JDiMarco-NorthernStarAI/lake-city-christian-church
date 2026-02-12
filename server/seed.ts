@@ -73,7 +73,8 @@ export async function seedDatabase() {
 
     await storage.createEvent({
       title: "Family Sunday",
-      date: "2025-03-02",
+      subtitle: "Lake City Christian Church",
+      date: "SUNDAY MARCH 2ND @ 10:00AM",
       body: "The first Sunday of every month is Family Sunday! Families and kids worship together. The nursery space will remain open.",
       isUpcoming: true,
       imageUrl: null,
@@ -81,7 +82,8 @@ export async function seedDatabase() {
 
     await storage.createEvent({
       title: "Club 419 Wednesday Night",
-      date: "2025-02-19",
+      subtitle: "Middle & High School Students",
+      date: "WEDNESDAY FEB 19TH @ 6:30-8:00PM",
       body: "Students meet every Wednesday from 6:30 PM - 8:00 PM. Join us for food, fellowship, and faith.",
       isUpcoming: true,
       imageUrl: null,
@@ -89,7 +91,8 @@ export async function seedDatabase() {
 
     await storage.createEvent({
       title: "Small Group Session Kickoff",
-      date: "2025-02-15",
+      subtitle: "All Adults Welcome",
+      date: "SATURDAY FEB 15TH @ 6:00PM",
       body: "New 6-week small group session begins! Groups meet in homes around the Middleburg Heights and Strongsville area.",
       isUpcoming: true,
       imageUrl: null,

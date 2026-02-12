@@ -315,7 +315,7 @@ function EventsTab() {
   const { data: events, isLoading } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
-  const [form, setForm] = useState({ title: "", date: "", body: "", isUpcoming: true });
+  const [form, setForm] = useState({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => { await apiRequest("POST", "/api/events", data); },
@@ -348,13 +348,13 @@ function EventsTab() {
 
   function openAdd() {
     setEditing(null);
-    setForm({ title: "", date: "", body: "", isUpcoming: true });
+    setForm({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true });
     setDialogOpen(true);
   }
 
   function openEdit(event: Event) {
     setEditing(event);
-    setForm({ title: event.title, date: event.date, body: event.body, isUpcoming: event.isUpcoming });
+    setForm({ title: event.title, subtitle: event.subtitle || "", date: event.date, body: event.body, imageUrl: event.imageUrl || "", isUpcoming: event.isUpcoming });
     setDialogOpen(true);
   }
 
@@ -365,10 +365,15 @@ function EventsTab() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const payload = {
+      ...form,
+      subtitle: form.subtitle || null,
+      imageUrl: form.imageUrl || null,
+    };
     if (editing) {
-      updateMutation.mutate({ id: editing.id, data: form });
+      updateMutation.mutate({ id: editing.id, data: payload });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   }
 
@@ -387,6 +392,7 @@ function EventsTab() {
         <Table data-testid="table-events">
           <TableHeader>
             <TableRow>
+              <TableHead>Image</TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Upcoming</TableHead>
@@ -396,8 +402,20 @@ function EventsTab() {
           <TableBody>
             {events?.map((event) => (
               <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
-                <TableCell>{event.title}</TableCell>
-                <TableCell>{event.date}</TableCell>
+                <TableCell>
+                  {event.imageUrl ? (
+                    <img src={event.imageUrl} alt="" className="w-12 h-9 object-cover rounded-sm" />
+                  ) : (
+                    <span className="text-muted-foreground text-xs">None</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <span className="font-medium">{event.title}</span>
+                    {event.subtitle && <span className="block text-xs text-muted-foreground">{event.subtitle}</span>}
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs">{event.date}</TableCell>
                 <TableCell>{event.isUpcoming ? "Yes" : "No"}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
@@ -426,12 +444,23 @@ function EventsTab() {
               <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required data-testid="input-event-title" />
             </div>
             <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required data-testid="input-event-date" />
+              <Label>Subtitle</Label>
+              <Input value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="e.g. Middle & High School Students" data-testid="input-event-subtitle" />
             </div>
             <div className="space-y-2">
-              <Label>Body</Label>
+              <Label>Date / Time</Label>
+              <Input value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} placeholder="e.g. SATURDAY MARCH 7TH @ 8:30AM" required data-testid="input-event-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
               <Textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required data-testid="input-event-body" />
+            </div>
+            <div className="space-y-2">
+              <Label>Image URL</Label>
+              <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://example.com/image.jpg" data-testid="input-event-image" />
+              {form.imageUrl && (
+                <img src={form.imageUrl} alt="Preview" className="w-full h-32 object-cover rounded-md mt-2" />
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Checkbox

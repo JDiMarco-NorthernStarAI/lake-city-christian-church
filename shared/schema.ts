@@ -23,6 +23,7 @@ export const sermons = pgTable("sermons", {
 export const events = pgTable("events", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   title: text("title").notNull(),
+  subtitle: text("subtitle"),
   date: text("date").notNull(),
   body: text("body").notNull(),
   imageUrl: text("image_url"),
