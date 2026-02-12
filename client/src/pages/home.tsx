@@ -7,7 +7,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import colorLogoPath from "@assets/color_Logo_1770933488638.png";
 import welcomeImgPath from "@assets/LC_Welcome_Area_01_1770933498064.png";
 import { useQuery } from "@tanstack/react-query";
-import type { Sermon } from "@shared/schema";
+
+interface YouTubeVideo {
+  id: string;
+  title: string;
+  publishedAt: string;
+  thumbnail: string;
+  description: string;
+}
 
 function AnimatedCounter({ target, suffix = "+" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -68,8 +75,8 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 
 export default function Home() {
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const { data: sermons } = useQuery<Sermon[]>({ queryKey: ["/api/sermons"] });
-  const latestSermon = sermons?.[0];
+  const { data: videos } = useQuery<YouTubeVideo[]>({ queryKey: ["/api/youtube/videos"] });
+  const latestVideo = videos?.[0] ?? null;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -246,11 +253,11 @@ export default function Home() {
           >
             Recent Message
           </h2>
-          {latestSermon ? (
+          {latestVideo ? (
             <div className="aspect-video w-full rounded-md overflow-hidden mb-4">
               <iframe
-                src={`https://www.youtube.com/embed/${latestSermon.youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/)?.[1] || ""}`}
-                title={latestSermon.title}
+                src={`https://www.youtube.com/embed/${latestVideo.id}`}
+                title={latestVideo.title}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -262,9 +269,9 @@ export default function Home() {
               <Play className="w-12 h-12 text-muted-foreground/30" />
             </div>
           )}
-          {latestSermon && (
+          {latestVideo && (
             <p className="text-lg font-bold text-foreground mb-1" style={{ fontFamily: "Montserrat, sans-serif" }} data-testid="text-latest-sermon-title-home">
-              {latestSermon.title}
+              {latestVideo.title}
             </p>
           )}
           <Link href="/encounter">

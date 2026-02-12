@@ -6,7 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Play, Search, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { Sermon } from "@shared/schema";
+
+interface YouTubeVideo {
+  id: string;
+  title: string;
+  publishedAt: string;
+  thumbnail: string;
+  description: string;
+}
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -22,28 +29,21 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
   );
 }
 
-function getYouTubeEmbedUrl(url: string): string {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/);
-  return match ? `https://www.youtube.com/embed/${match[1]}` : url;
-}
-
-function getYouTubeThumbnail(url: string): string {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/);
-  return match ? `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg` : "";
-}
-
 export default function Encounter() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: sermons, isLoading } = useQuery<Sermon[]>({
-    queryKey: ["/api/sermons"],
+  const [selectedVideo, setSelectedVideo] = useState<YouTubeVideo | null>(null);
+
+  const { data: videos, isLoading } = useQuery<YouTubeVideo[]>({
+    queryKey: ["/api/youtube/videos"],
   });
 
-  const latestSermon = sermons?.[0];
-  const pastSermons = sermons?.slice(1) || [];
-  const filteredSermons = pastSermons.filter(
-    (s) => s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           (s.series && s.series.toLowerCase().includes(searchTerm.toLowerCase()))
+  const latestVideo = videos?.[0] ?? null;
+  const pastVideos = videos?.slice(1, 6) ?? [];
+  const filteredPast = pastVideos.filter(
+    (v) => v.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const activeVideo = selectedVideo ?? latestVideo;
 
   return (
     <div className="min-h-screen bg-black">
@@ -86,16 +86,16 @@ export default function Encounter() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-latest-sermon-heading"
           >
-            Latest Message
+            {selectedVideo ? selectedVideo.title : "Latest Message"}
           </h2>
           {isLoading ? (
             <Skeleton className="aspect-video w-full rounded-md bg-neutral-800" />
-          ) : latestSermon ? (
+          ) : activeVideo ? (
             <div>
               <div className="aspect-video w-full rounded-md overflow-hidden mb-4">
                 <iframe
-                  src={getYouTubeEmbedUrl(latestSermon.youtubeUrl)}
-                  title={latestSermon.title}
+                  src={`https://www.youtube.com/embed/${activeVideo.id}`}
+                  title={activeVideo.title}
                   className="w-full h-full"
                   allowFullScreen
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -103,16 +103,23 @@ export default function Encounter() {
                 />
               </div>
               <h3 className="text-xl font-bold text-white mb-1" style={{ fontFamily: "Montserrat, sans-serif" }} data-testid="text-latest-sermon-title">
-                {latestSermon.title}
+                {activeVideo.title}
               </h3>
-              <p className="text-white/50 text-sm mb-1">{new Date(latestSermon.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
-              {latestSermon.series && <p className="text-white/40 text-sm">Series: {latestSermon.series}</p>}
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="w-3.5 h-3.5 text-white/40" />
+                <p className="text-white/50 text-sm">
+                  {new Date(activeVideo.publishedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                </p>
+              </div>
+              {activeVideo.description && (
+                <p className="text-white/40 text-sm line-clamp-3">{activeVideo.description}</p>
+              )}
             </div>
           ) : (
             <div className="aspect-video w-full rounded-md bg-neutral-900 flex items-center justify-center border border-neutral-800">
               <div className="text-center">
                 <Play className="w-16 h-16 text-white/30 mx-auto mb-4" />
-                <p className="text-white/40 text-lg">No sermons yet</p>
+                <p className="text-white/40 text-lg">No videos found</p>
               </div>
             </div>
           )}
@@ -135,7 +142,7 @@ export default function Encounter() {
         </FadeInSection>
       </section>
 
-      {(pastSermons.length > 0 || isLoading) && (
+      {(pastVideos.length > 0 || isLoading) && (
         <section className="bg-neutral-950 py-20 md:py-24 px-4 border-t border-neutral-800">
           <FadeInSection className="max-w-5xl mx-auto">
             <h2
@@ -150,7 +157,7 @@ export default function Encounter() {
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                 <Input
-                  placeholder="Search sermons..."
+                  placeholder="Search messages..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 bg-neutral-900 border-neutral-700 text-white placeholder:text-neutral-500"
@@ -160,24 +167,43 @@ export default function Encounter() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSermons.map((sermon) => (
-                <Card key={sermon.id} className="bg-neutral-900 border-neutral-800 hover-elevate overflow-visible" data-testid={`card-sermon-${sermon.id}`}>
-                  <CardContent className="p-0">
-                    <div className="aspect-video w-full overflow-hidden rounded-t-md">
-                      <img
-                        src={getYouTubeThumbnail(sermon.youtubeUrl)}
-                        alt={sermon.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold text-white mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>{sermon.title}</h3>
-                      <p className="text-white/50 text-sm">{new Date(sermon.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
-                      {sermon.series && <p className="text-white/40 text-xs mt-1">{sermon.series}</p>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {isLoading
+                ? Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="aspect-video w-full rounded-md bg-neutral-800" />
+                  ))
+                : filteredPast.map((video) => (
+                    <Card
+                      key={video.id}
+                      className="bg-neutral-900 border-neutral-800 hover-elevate overflow-visible cursor-pointer"
+                      onClick={() => {
+                        setSelectedVideo(video);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      data-testid={`card-video-${video.id}`}
+                    >
+                      <CardContent className="p-0">
+                        <div className="relative aspect-video w-full overflow-hidden rounded-t-md">
+                          <img
+                            src={video.thumbnail}
+                            alt={video.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                            <Play className="w-10 h-10 text-white" />
+                          </div>
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-bold text-white mb-1" style={{ fontFamily: "Montserrat, sans-serif" }}>{video.title}</h3>
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3 text-white/40" />
+                            <p className="text-white/50 text-sm">
+                              {new Date(video.publishedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
             </div>
           </FadeInSection>
         </section>

@@ -8,6 +8,54 @@ import {
   insertContactSchema, insertConnectCardSchema,
 } from "@shared/schema";
 import { seedDatabase } from "./seed";
+import { XMLParser } from "fast-xml-parser";
+
+const YOUTUBE_CHANNEL_ID = "UCHu7KSnAWdDbILKO4gC4JTQ";
+const YOUTUBE_RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`;
+
+interface YouTubeVideo {
+  id: string;
+  title: string;
+  publishedAt: string;
+  thumbnail: string;
+  description: string;
+}
+
+let cachedVideos: YouTubeVideo[] = [];
+let cacheTimestamp = 0;
+const CACHE_DURATION = 10 * 60 * 1000;
+
+async function fetchYouTubeVideos(): Promise<YouTubeVideo[]> {
+  const now = Date.now();
+  if (cachedVideos.length > 0 && now - cacheTimestamp < CACHE_DURATION) {
+    return cachedVideos;
+  }
+
+  try {
+    const response = await fetch(YOUTUBE_RSS_URL);
+    if (!response.ok) throw new Error(`YouTube RSS fetch failed: ${response.status}`);
+    const xml = await response.text();
+
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+    const result = parser.parse(xml);
+    const entries = result?.feed?.entry;
+    if (!entries) return cachedVideos;
+
+    const entryList = Array.isArray(entries) ? entries : [entries];
+    cachedVideos = entryList.map((entry: any) => ({
+      id: entry["yt:videoId"],
+      title: entry.title,
+      publishedAt: entry.published,
+      thumbnail: `https://img.youtube.com/vi/${entry["yt:videoId"]}/maxresdefault.jpg`,
+      description: entry["media:group"]?.["media:description"] || "",
+    }));
+    cacheTimestamp = now;
+    return cachedVideos;
+  } catch (err) {
+    console.error("Error fetching YouTube RSS:", err);
+    return cachedVideos;
+  }
+}
 
 declare module "express-session" {
   interface SessionData {
@@ -93,6 +141,16 @@ export async function registerRoutes(
       return res.status(401).json({ message: "User not found" });
     }
     res.json({ id: user.id, username: user.username, role: user.role });
+  });
+
+  app.get("/api/youtube/videos", async (req, res) => {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 15, 15);
+      const videos = await fetchYouTubeVideos();
+      res.json(videos.slice(0, limit));
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch YouTube videos" });
+    }
   });
 
   app.get("/api/sermons", async (_req, res) => {
