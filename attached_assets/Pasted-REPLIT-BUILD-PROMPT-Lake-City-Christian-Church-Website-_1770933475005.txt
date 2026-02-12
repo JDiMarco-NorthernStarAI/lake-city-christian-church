@@ -1,0 +1,443 @@
+REPLIT BUILD PROMPT: Lake City Christian Church Website
+PROJECT OVERVIEW
+Build a modern, full-stack church website for Lake City Christian Church (LC3 / LCCC) located at 6717 Fry Road, Middleburg Heights, OH. The website must include a built-in admin CMS so non-technical church staff can edit all content (text, images, YouTube videos, events) through a visual UI — no code editing required. The church currently uses a Wix site at lakecitycc.com and wants to move to a custom, modern build.
+Mission Statement: "Lake City Christian Church exists to connect people to a life-changing relationship with Jesus."
+
+TECH STACK
+
+Frontend: React (Next.js preferred) with Tailwind CSS
+Backend: Node.js with Express or Next.js API routes
+Database: SQLite (via Prisma or better-sqlite3) for content, users, events, and sermons — lightweight, no external DB needed
+Auth: Session-based auth with bcrypt password hashing. Admin login + role-based access (Admin = full access, Editor = assigned sections only)
+File Uploads: Local file storage in /public/uploads/ with image upload UI in admin panel
+Deployment: Single Replit project, runs with one command (npm run dev)
+
+
+BRAND & DESIGN SYSTEM
+Color Palette
+RoleHexUsagePrimary Gradient Start#00D4FFLogo, accents, buttons, animated logoPrimary Gradient Mid#0088DDHover states, linksPrimary Gradient End#0033AADeep blue anchorsBackground#FFFFFFMain page backgroundText Primary#111111Headings, bodyText Secondary#6B7280Captions, subtitlesLight Gray#F3F4F6Section backgrounds, cardsDivider#E5E7EBLines, bordersDark (footer, overlays)#0A0A0AFooter, dark hero sections
+Typography
+
+Headings: Bold, modern sans-serif — use Inter (800 weight) or Montserrat (700-800). Large sizes. Minimal words.
+Body: Inter 400/500 at 16-18px base size.
+Script/Logo Font (optional accent): A cursive font similar to what appears in the Lake City logo wordmark can be used sparingly for decorative headings — consider Playfair Display italic or Dancing Script for the "Lake City" text treatment.
+DESIGN PHILOSOPHY: Short, clear directives. Less verbiage. White space is an advantage. Bolder fonts, fewer words. Fresh and clean.
+
+Photography Style
+
+Most church photos should render in black and white — apply CSS filter: grayscale(100%) by default on church photography.
+The water drop logo is the ONE element that uses the Lake City blue gradient — this creates a striking contrast against the B&W aesthetic.
+Photos should be used sparingly — NOT on every page. A few strong images rather than many weak ones.
+The church has provided actual photos (described below) — use these as defaults. Admin can replace them later.
+
+Logo Assets (to include in /public/images/)
+The church has THREE logo files to include:
+
+color_Logo.png — Blue gradient water drop/flame on black background (use for animated hero, favicon)
+White_Logo.png — White water drop/flame on black background (use for dark sections, footer)
+Words_and_Logo.png — Full wordmark: "Lake City Christian Church" in script + logo on black background (use for navbar, main branding)
+
+Church Photos (to include in /public/images/)
+These are actual church photos to use as default content. All are black & white:
+
+LC_Service_01.jpg — Wide shot of congregation standing in worship, exposed beam ceiling, warm lighting
+LC_Welcome_Area_01.png — People socializing in the lobby/welcome area after service
+LC_Welcome_Area_02.jpg — Four people chatting and smiling in the foyer area
+LC_Coffe_Shop.png — Volunteers behind a coffee bar with a chalkboard menu "Lake City Menu"
+LC_Worship_01.png — Worship team on stage: keyboard player, two vocalists, screens showing lyrics
+LC_Mural.jpg — Collage/mural of church life photos with the Lake City logo in center
+Lake_City_Numbers.png — Stats graphic: "30+ Baptisms, 12+ Ministries, 1 Year Since Launch, 50+ Volunteers"
+
+
+ANIMATED LOGO (Homepage Hero)
+Create a CSS/JS animation for the water drop logo on the homepage hero:
+
+The water drop shape draws itself on (SVG path animation or opacity fade-in from top to bottom)
+The water ripple effect at the base animates outward like actual water ripples
+The gradient (cyan → deep blue) shimmers or pulses subtly
+After the animation completes (~2-3 seconds), the full wordmark "Lake City Christian Church" fades in below
+Keep it smooth and elegant — not flashy or over-the-top
+This plays once on page load, then remains static
+Below the animated logo, show the tagline: "Connecting people to a life-changing relationship with Jesus."
+Include a primary CTA button: "Plan Your Visit" and a secondary: "Watch Online"
+
+
+SITE STRUCTURE & NAVIGATION
+Top Navigation Bar
+
+Sticky/fixed nav with the Words_and_Logo.png on the left
+Nav items: Home | Who We Are (dropdown) | Ministries (dropdown) | Give | Plan Visit
+Mobile: hamburger menu
+Keep nav FLAT — minimal dropdowns. Most info should be reachable in 1-2 clicks max.
+
+Desired Page Structure (from church's sitemap):
+HOME
+WHO WE ARE (About Us landing)
+  ├── Our Story
+  ├── What We Believe
+  ├── Leadership Team
+MINISTRIES
+  ├── Kids Ministry (Lake City Kids)
+  ├── Student Ministry (Club 419)
+  ├── City Small Groups (Lake City Groups)
+  ├── Serve & Volunteer (Connect / Serve)
+ENCOUNTER (Sermons / Watch page — YouTube embed)
+ANNOUNCEMENTS (Events / News)
+GIVE (Generosity — external link to Planning Center)
+PLAN VISIT (Plan Your Visit landing page)
+CONTACT
+
+PAGE-BY-PAGE CONTENT & LAYOUT
+1. HOME PAGE
+Hero Section:
+
+Full-width dark background (black or very dark charcoal)
+Animated water drop logo center-stage (see animation spec above)
+Tagline: "Connecting people to a life-changing relationship with Jesus."
+Two buttons: "Plan Your Visit" | "Watch Online"
+
+Service Times Bar:
+
+Clean horizontal bar below hero
+Sunday @ 10:00 AM | 6717 Fry Road, Middleburg Heights, OH
+Keep it bold, simple, scannable
+
+"Lake City in Numbers" Section:
+
+White background, centered layout
+Animated counters on scroll:
+
+30+ Baptisms
+12+ Ministries
+1 Year Since Launch
+50+ Volunteers
+
+
+
+Quick Links Section (3-column card grid):
+
+"I'm New" → links to Plan Visit
+"Get Connected" → links to Connect/Serve
+"Watch Sermons" → links to Encounter
+
+Recent Sermon Section:
+
+Embed latest YouTube video from their channel
+Channel: YouTube @LakeCityChristianChurch (https://www.youtube.com/@LakeCityChristianChurch) — they currently embed videos on their Encounter page
+"See All Sermons" button
+
+Connect Card CTA:
+
+"We'd love to get to know you."
+Simple inline form OR button linking to Connect page
+Dark background section with white text
+
+Footer:
+
+White_Logo.png
+Address: 6717 Fry Road, Middleburg Heights, OH
+Service Time: Sunday @ 10:00 AM
+Social links: Instagram (@lakecitycc), Facebook (https://www.facebook.com/LakeCityCCOhio), YouTube (@LakeCityChristianChurch)
+Quick links: Home, About, Give, Contact
+© Lake City Christian Church
+
+
+2. WHO WE ARE (About Us)
+Hero: B&W photo (LC_Service_01.jpg or LC_Welcome_Area_01.png) with overlay text: "Who We Are"
+Intro Block:
+"Lake City Christian Church exists to connect people to a life-changing relationship with Jesus."
+Brief paragraph about the church's heart — short, punchy. Link to "Our Story" for the full version.
+Sub-navigation cards linking to:
+
+Our Story
+What We Believe
+Leadership Team
+
+
+3. OUR STORY
+Content (from current site):
+"Two and a half decades of church leadership opened his eyes to the need for biblical ministry in today's world. After twenty-five years of leading churches large and small, Trevor transitioned into the role of Executive Director for the Kainos Leadership Network (formerly NOAH), a church planting organization in northeastern Ohio, and answered God's call to plant a highly intentional disciple-making church.
+After months of research, Godly counsel, prayer, fasting, and many late nights, the Littletons acknowledged a call to plant a church. Together with a launch team of mature Christians from various congregations in Northeastern Ohio, members of Kainos Leadership Network and Nexus Church Planting, Lake City Christian Church was born."
+Include: Link to KLN (https://thekln.org/) with text: "KLN Exists to Plant and Equip Disciple Making Churches — Equipping | Networking | Coaching"
+Memorial Section:
+"In Memory of Executive Pastor Joe Hoagland - 2024. Joe was passionate about seeing people's lives changed for Jesus. Joe had served as the Associate Pastor for several churches in Ohio and was currently the Director of Operations for Kainos Leadership Network. Joe was an integral part of the Lake City Launch Team and will be missed beyond measure."
+
+4. WHAT WE BELIEVE
+Clean, readable layout with the full doctrinal statements. Use expandable/accordion sections for each belief to keep the page scannable:
+
+God — "We believe in one God – Father, Son and Holy Spirit."
+God the Father — "We believe in God the Father Almighty, Creator of all things visible and invisible."
+Jesus Christ — Full paragraph about Jesus as God's Son, born fully human and divine, crucified, risen, ascended, returning.
+The Holy Spirit — Personal and active, indwells every Christian.
+The Bible — God's Holy Word, inspired Scripture, final authority for faith and practice.
+Humanity & Sin — People created by God willfully sin and are lost without Jesus Christ.
+Salvation — Forgiveness through the blood of Jesus and God's grace, not earned.
+Our Response — Admitting sin, believing and confessing, repenting, trusting Jesus, being baptized by immersion.
+The Church — Consists of all Christians everywhere.
+The Lord's Supper — Weekly celebration as proclamation of Christ's death, burial, and resurrection.
+The Great Commission — Going out to make disciples of all people groups, baptizing, teaching.
+
+(Full scripture references from the current site should be included — all are available in the existing content on lakecitycc.com/about-7.)
+
+5. LEADERSHIP TEAM
+Lead Pastor Feature:
+Trevor Littleton — Lead Pastor
+"Trevor is passionate about scripture, apologetics and loves watching lives change for Jesus. Trevor graduated from CCU with a BS in Preaching Ministry and a Master of Divinity in Pastoral Leadership, a Master of Business Administration in Executive Coaching from Liberty University and has a Doctor of Ministry in Transformational Leadership from Ashland Theological Seminary. Beyond his heart for ministry, Trevor enjoys weightlifting and boxing, writing books, scouting out new restaurants, and spending time with his ragdoll cat, Ariel. Trevor is married to his wife Shanna. They both have a deep passion for adoption. Their family is made up of 11 children; four biological, five adopted and two surrogate daughters from Ukraine. Together they have a heart for community outreach and are eager to see what God has in store for LC3."
+Team Leaders Grid (photo + name + role):
+
+J.D. McIntosh — Discipleship Pastor
+Michael Batt — Management Team / Tech
+Melissa Batt — Kids Ministry Director
+Joey Ekers — Student Ministry Director
+Shanna Littleton — Communications / Ministry Assistant
+Tim & Jen Orlosky — Small Group Coordinators
+
+(Admin must be able to add/edit/remove team members with photos via the CMS.)
+
+6. MINISTRIES LANDING PAGE
+Simple card grid linking to each ministry sub-page. Each card: icon or photo, ministry name, one-line description, "Learn More" link.
+
+7. LAKE CITY KIDS (Kids Ministry)
+Content from current site:
+Welcome message: "A place where your child will feel comfortable, cared for and loved! We look forward to building relationships with you as we share life together!"
+Age Groups:
+
+Nursery (0-2 years): "Infants and toddlers will have an opportunity for their own style of worship and biblical story in video format along with ample time to play and make new friends."
+Pre-K (2½ - 5 years): "We hope to encourage creativity and exploration through Biblical songs, games, play, crafts and storytelling. Our serve team desires to help build confidence and community as we learn to share and forge new friendships, loving others as God loves us!"
+Kids (K - 5th): "Lake City Kids is where we learn to live out being Big-Small-Bold in a way they can understand. Kids will start BIG with worship, designed to be high energy and fun! Then kids move onto SMALL groups, where they can learn at their own level. By the end of the service, they will learn what it means to be BOLD sharing with others how much God loves us all!"
+
+Additional Info Boxes:
+
+Family Sunday: "The First Sunday of Every Month is Family Sunday! This gives families and kids the opportunity to worship together! The Nursery space will remain open."
+Serve Team: "Volunteers are trained to ensure your child is safe and well cared for during service."
+Special Care Accommodations: "If you have a child with special needs or a disability, we want to encourage you to connect with us and let us know you are coming."
+
+Forms: Child Dedication form and Special Needs notification form (simple contact forms that email the church).
+
+8. STUDENT MINISTRY (Club 419)
+Content from current site:
+"Students have the ability to impact their schools, clubs, families, and other communities in a huge way. The purpose of Club 419 is to equip students to follow Jesus and extend the good news of a life-changing relationship with Jesus to the people they are surrounded by on a daily basis. The name 'Club 419' comes from Matthew 4:19 which says, 'Come, follow me,' Jesus said, 'and I will send you out to fish for people.'"
+Schedule: Students meet Wednesday from 6:30 PM - 8:00 PM
+Meal Sponsorship: "Providing an opportunity for students to sit around the table and cultivate meaningful conversation and grow in friendship." — Link to sponsorship form.
+Student Info Form: Link to registration form for students attending Wednesday gatherings.
+
+9. CITY SMALL GROUPS (Lake City Groups)
+Content from current site:
+"Small group gatherings exist as a way for people to engage in community and develop a closer relationship with Jesus."
+What to Expect:
+
+Groups meet for 6-8 week sessions.
+Gatherings are held in homes or at various locations locally in the Middleburg Heights & Strongsville area.
+Groups share in a time of devotion, reflection, teaching and discipling, share meals and participate in local outreach activities — Together.
+
+CTA: "YES! I AM READY TO JOIN A LAKE CITY SMALL GROUP!" — Registration button.
+
+10. CONNECT / SERVE
+Hero text: "We would like to get to know you better!"
+Body: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus. Join us as we serve together, grow together, and experience the joy of making a lasting impact while connecting people to a life-changing relationship with Jesus."
+Connect Card Form (built into the page):
+
+First Name, Last Name, Address, Email, Phone
+Checkbox interests: "Lake City Christian Church" / "Next Steps" / "Baptism"
+Prayer request text area: "Struggling and need prayer? How can we pray for you?"
+Submit button
+
+Volunteer CTA: "VOLUNTEER AND CONNECT" — Link to volunteer sign-up form.
+
+11. ENCOUNTER (Sermons / Watch Online)
+
+YouTube channel integration — embed videos from their YouTube channel
+Admin should be able to paste a YouTube URL and it auto-embeds
+Show latest sermon prominently at top
+Below: grid/list of past sermons with thumbnails, titles, dates
+Search/filter by date or series name
+"Watch Live" button linking to YouTube livestream
+
+
+12. ANNOUNCEMENTS (Events / News)
+
+Blog/event-style page
+Each announcement: title, date, image (optional), body text
+Admin can create/edit/delete announcements from the CMS
+Show upcoming events in chronological order
+Past events archive below or separate tab
+
+
+13. GIVE (Generosity)
+Content from current site:
+"Reaching the local community and beyond."
+Scripture: "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver. And God is able to bless you abundantly, so that in all things at all times, having all you need, you will abound in every good work." — 2 Corinthians 9:7-8
+CTA Button: "Give Today" — Links to external Planning Center giving page: https://lake-city-christian-church-478123.churchcenter.com/giving
+(This is an EXTERNAL link — do not build a payment system. Just a beautiful page with a button.)
+
+14. PLAN YOUR VISIT
+This should be one of the best pages on the site — it's for first-time guests.
+Include:
+
+"What to Expect on Sunday" — brief, friendly overview
+Service time: Sunday @ 10:00 AM
+Location: 6717 Fry Road, Middleburg Heights, OH with embedded Google Map
+What to wear: casual/come as you are
+Kids programming available
+Coffee bar / welcoming environment
+B&W photos from the church (coffee shop, welcome area, worship)
+Connect Card form or link
+"We can't wait to meet you!" closing CTA
+
+
+15. CONTACT
+
+Church name and logo
+Address: 6717 Fry Road, Middleburg Heights, OH
+Service Time: Sunday @ 10:00 AM
+Social Media: Instagram (@lakecitycc), Facebook (https://www.facebook.com/LakeCityCCOhio), YouTube (@LakeCityChristianChurch)
+Website: www.LakeCityCC.com
+Embedded Google Map
+Simple contact form: Name, Email, Message, Submit
+
+
+ADMIN CMS REQUIREMENTS
+Login & Authentication
+
+Login page at /admin with username/password
+Default admin account: username admin, password lakecity2024 (prompt user to change on first login)
+Session-based auth with secure cookies
+Logout button in admin nav
+
+Role-Based Permissions
+Two roles:
+
+Admin — Can do everything: edit all pages, manage users, upload images, manage events/sermons
+Editor — Can only edit sections they're assigned to (e.g., "Events Editor" can only manage announcements, "Kids Ministry Editor" can only edit the Kids page)
+
+Admin can create new users and assign roles from the Users management page.
+Admin Dashboard
+Clean, simple dashboard with sidebar navigation:
+
+Pages — List of all pages; click to edit
+Sermons — Add/edit/delete sermon entries (YouTube URL + title + date + optional series name)
+Events — Add/edit/delete announcements/events (title + date + image + body)
+Team — Add/edit/remove leadership team members (name, role, bio, photo)
+Media — Image upload library; browse/delete uploaded images
+Users — Manage admin/editor accounts
+Settings — Church name, address, service times, social links, giving URL
+
+Content Editing UI
+For each page, the admin sees:
+
+The page broken into editable sections (hero text, body text, images, etc.)
+Each section has a simple form: text fields for headings/body, image upload button for photos, URL field for YouTube videos
+WYSIWYG is NOT required — simple text inputs and textareas are fine. The goal is simplicity.
+Preview button to see changes before publishing
+Save/Publish button
+
+Image Handling
+
+Admin can upload images (JPG, PNG, WebP) up to 5MB
+Images auto-resize to max 1920px wide on upload
+Uploaded images stored in /public/uploads/
+Admin can choose to apply B&W filter or keep color per image
+
+
+RESPONSIVE DESIGN
+
+Mobile-first approach
+Breakpoints: mobile (<768px), tablet (768-1024px), desktop (>1024px)
+Hamburger menu on mobile
+Hero sections stack vertically on mobile
+Cards go to single column on mobile
+All text readable without zooming
+Touch-friendly button sizes (min 44px tap targets)
+
+
+SOCIAL MEDIA LINKS
+
+Instagram: https://www.instagram.com/lakecitycc
+Facebook: https://www.facebook.com/LakeCityCCOhio
+YouTube: https://www.youtube.com/@LakeCityChristianChurch
+
+
+SEO & META
+
+Proper meta titles and descriptions for each page
+Open Graph tags for social sharing
+Semantic HTML (proper heading hierarchy, alt text on images)
+Sitemap generation
+Fast loading — optimize images, lazy load below-fold content
+
+
+ADDITIONAL FEATURES
+
+Smooth scroll animations — Elements fade/slide in on scroll (subtle, not distracting)
+Counter animation — "Lake City in Numbers" counters animate up when scrolled into view
+Back to top button — Appears after scrolling down
+404 page — Branded, friendly, with link back to home
+Loading screen — Brief splash with animated logo on initial page load (optional)
+
+
+IMPORTANT DESIGN NOTES FROM THE CHURCH
+
+"Streamlined — limited click-throughs for people to get what they need without having to dig for information."
+
+
+"Fresh and clean: white space can work as an advantage with bolder fonts and less verbiage. Short, clear directives."
+
+
+"Engaging/approachable. We want a few photos of our church/people but they do not have to be featured on every page or within every prompt."
+
+
+"We've leaned a lot towards black and white photos."
+
+
+"The watermark has the Lake City blue color we use more often."
+
+Translation for development:
+
+Every page should have ONE clear purpose and ONE clear call-to-action
+Use generous padding/margins (40-80px between sections)
+Headlines should be punchy: 3-7 words max when possible
+Body text: 2-3 sentences per block max
+Photos are accent, not filler — use them intentionally
+The blue gradient logo is the only color pop against the B&W photo aesthetic
+Buttons should use the blue gradient for primary actions, outlined/ghost for secondary
+
+
+FILE STRUCTURE
+/
+├── public/
+│   ├── images/
+│   │   ├── color_Logo.png
+│   │   ├── White_Logo.png
+│   │   ├── Words_and_Logo.png
+│   │   ├── LC_Service_01.jpg
+│   │   ├── LC_Welcome_Area_01.png
+│   │   ├── LC_Welcome_Area_02.jpg
+│   │   ├── LC_Coffe_Shop.png
+│   │   ├── LC_Worship_01.png
+│   │   ├── LC_Mural.jpg
+│   │   └── Lake_City_Numbers.png
+│   └── uploads/         (admin-uploaded images go here)
+├── src/
+│   ├── components/      (Navbar, Footer, Hero, Card, etc.)
+│   ├── pages/           (all public pages + admin pages)
+│   ├── admin/           (CMS dashboard, editors, user management)
+│   ├── api/             (REST endpoints for content CRUD)
+│   ├── lib/             (db connection, auth helpers, utils)
+│   └── styles/          (Tailwind config, global styles)
+├── prisma/ or db/       (SQLite database + schema)
+├── package.json
+└── README.md
+
+GETTING STARTED
+
+Initialize the project with npx create-next-app or Vite + React Router
+Install Tailwind CSS
+Set up SQLite database with initial schema (pages, sections, sermons, events, team_members, users)
+Seed the database with all content from this prompt
+Build all public-facing pages with the content above
+Build the admin CMS
+Add the animated logo
+Test responsive design
+Deploy on Replit
+
+Priority order: Home page → Navigation → Plan Visit → About/Who We Are → Ministries pages → Encounter/Sermons → Admin CMS → Polish/animations
