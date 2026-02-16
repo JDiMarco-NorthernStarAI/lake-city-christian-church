@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { v1Fetch, v1Put } from "@/lib/v1Api";
-import { Loader2, User, ClipboardList, DollarSign, FileText, LogOut, Check, X, Clock } from "lucide-react";
+import { Loader2, User, ClipboardList, DollarSign, FileText, LogOut, Check, X, Clock, Camera } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { v1Post } from "@/lib/v1Api";
 
 type TabKey = "profile" | "signups" | "giving" | "forms";
 
@@ -58,6 +60,7 @@ export default function Account() {
     emergencyContactPhone: "",
   });
 
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [signupSubs, setSignupSubs] = useState<any[]>([]);
   const [donationsList, setDonationsList] = useState<any[]>([]);
   const [formSubs, setFormSubs] = useState<any[]>([]);
@@ -131,6 +134,45 @@ export default function Account() {
       refreshUser();
     } else {
       toast({ title: "Update failed", description: result.error || undefined, variant: "destructive" });
+    }
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please select an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be under 5MB", variant: "destructive" });
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const urlResult = await v1Post("/api/v1/uploads/request-url", {
+        name: file.name,
+        contentType: file.type,
+      });
+      if (!urlResult.success || !urlResult.data) {
+        throw new Error(urlResult.error || "Failed to get upload URL");
+      }
+      const { uploadURL, objectPath } = urlResult.data;
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const photoResult = await v1Put("/api/v1/auth/me/photo", { objectPath });
+      if (!photoResult.success) throw new Error(photoResult.error || "Failed to update photo");
+      toast({ title: "Profile photo updated" });
+      refreshUser();
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
     }
   }
 
@@ -264,6 +306,41 @@ export default function Account() {
               )}
             </CardHeader>
             <CardContent>
+              <div className="flex items-center gap-4 mb-6 pb-6 border-b border-white/10">
+                <div className="relative group">
+                  <Avatar className="w-20 h-20" data-testid="avatar-profile">
+                    {(user as any)?.profilePhotoUrl ? (
+                      <AvatarImage src={(user as any).profilePhotoUrl} alt={user?.name || "Profile"} />
+                    ) : null}
+                    <AvatarFallback className="bg-zinc-800 text-white text-xl">
+                      {user?.name ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : <User className="w-8 h-8" />}
+                    </AvatarFallback>
+                  </Avatar>
+                  <label
+                    className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
+                    data-testid="label-upload-photo"
+                  >
+                    {uploadingPhoto ? (
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    ) : (
+                      <Camera className="w-5 h-5 text-white" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoUpload}
+                      disabled={uploadingPhoto}
+                      data-testid="input-upload-photo"
+                    />
+                  </label>
+                </div>
+                <div>
+                  <p className="text-white font-medium" data-testid="text-photo-name">{user?.name || "Member"}</p>
+                  <p className="text-white/50 text-sm">{user?.email || ""}</p>
+                  <p className="text-white/40 text-xs mt-1">Hover over photo to change</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-white/60 text-xs">Email</Label>

@@ -508,7 +508,7 @@ export async function registerRoutes(
 
   app.post("/api/users", requireFeature("users"), async (req, res) => {
     try {
-      const { username, password, roles } = req.body;
+      const { username, password, roles, email, name, phone, address, city, state, zip, gender, dateOfBirth, maritalStatus, emergencyContactName, emergencyContactPhone, profilePhotoUrl } = req.body;
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password required" });
       }
@@ -521,8 +521,22 @@ export async function registerRoutes(
         username,
         password: hashed,
         roles: userRoles,
+        email: email || null,
+        name: name || null,
+        phone: phone || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        zip: zip || null,
+        gender: gender || null,
+        dateOfBirth: dateOfBirth || null,
+        maritalStatus: maritalStatus || null,
+        emergencyContactName: emergencyContactName || null,
+        emergencyContactPhone: emergencyContactPhone || null,
+        profilePhotoUrl: profilePhotoUrl || null,
       });
-      res.status(201).json({ id: user.id, username: user.username, roles: user.roles });
+      const { password: _, ...safe } = user;
+      res.status(201).json(safe);
     } catch (err: any) {
       if (err.code === "23505") {
         return res.status(400).json({ message: "Username already exists" });
@@ -534,7 +548,7 @@ export async function registerRoutes(
   app.patch("/api/users/:id", requireFeature("users"), async (req, res) => {
     try {
       const userId = Number(req.params.id);
-      const { username, password, roles } = req.body;
+      const { username, password, roles, email, name, phone, address, city, state, zip, gender, dateOfBirth, maritalStatus, emergencyContactName, emergencyContactPhone, profilePhotoUrl } = req.body;
       const updateData: any = {};
 
       if (username) updateData.username = username;
@@ -545,10 +559,24 @@ export async function registerRoutes(
         }
         updateData.roles = roles;
       }
+      if (email !== undefined) updateData.email = email || null;
+      if (name !== undefined) updateData.name = name || null;
+      if (phone !== undefined) updateData.phone = phone || null;
+      if (address !== undefined) updateData.address = address || null;
+      if (city !== undefined) updateData.city = city || null;
+      if (state !== undefined) updateData.state = state || null;
+      if (zip !== undefined) updateData.zip = zip || null;
+      if (gender !== undefined) updateData.gender = gender || null;
+      if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth || null;
+      if (maritalStatus !== undefined) updateData.maritalStatus = maritalStatus || null;
+      if (emergencyContactName !== undefined) updateData.emergencyContactName = emergencyContactName || null;
+      if (emergencyContactPhone !== undefined) updateData.emergencyContactPhone = emergencyContactPhone || null;
+      if (profilePhotoUrl !== undefined) updateData.profilePhotoUrl = profilePhotoUrl || null;
 
       const updated = await storage.updateUser(userId, updateData);
       if (!updated) return res.status(404).json({ message: "User not found" });
-      res.json({ id: updated.id, username: updated.username, roles: updated.roles });
+      const { password: _, ...safe } = updated;
+      res.json(safe);
     } catch (err: any) {
       if (err.code === "23505") {
         return res.status(400).json({ message: "Username already exists" });
@@ -564,6 +592,34 @@ export async function registerRoutes(
     }
     await storage.deleteUser(userId);
     res.json({ message: "Deleted" });
+  });
+
+  app.post("/api/users/:id/photo", requireFeature("users"), async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objStorage = new ObjectStorageService();
+      const uploadURL = await objStorage.getObjectEntityUploadURL();
+      const objectPath = objStorage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err) {
+      console.error("Admin upload URL error:", err);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  app.put("/api/users/:id/photo", requireFeature("users"), async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      const { objectPath } = req.body;
+      if (!objectPath) return res.status(400).json({ message: "objectPath is required" });
+      const updated = await storage.updateUser(userId, { profilePhotoUrl: objectPath });
+      if (!updated) return res.status(404).json({ message: "User not found" });
+      const { password: _, ...safe } = updated;
+      res.json(safe);
+    } catch (err) {
+      res.status(500).json({ message: "Server error" });
+    }
   });
 
   app.get("/api/role-permissions", requireFeature("roles"), async (_req, res) => {

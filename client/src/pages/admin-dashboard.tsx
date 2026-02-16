@@ -20,7 +20,9 @@ import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
   Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy, UserPlus,
+  Camera, Loader2,
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -1401,19 +1403,55 @@ function SettingsTab() {
   );
 }
 
+type AdminUser = {
+  id: number;
+  username: string;
+  roles: string[];
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  gender: string | null;
+  dateOfBirth: string | null;
+  maritalStatus: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  profilePhotoUrl: string | null;
+};
+
 function UsersTab({ currentUser }: { currentUser: { id: number; username: string; roles: string[] } }) {
   const { toast } = useToast();
-  const { data: users, isLoading } = useQuery<{ id: number; username: string; roles: string[] }[]>({
+  const { data: users, isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/users"],
   });
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<{ id: number; username: string; roles: string[] } | null>(null);
-  const [form, setForm] = useState({ username: "", password: "", roles: ["member"] as string[] });
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingUser, setViewingUser] = useState<AdminUser | null>(null);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [form, setForm] = useState({
+    username: "", password: "", email: "", name: "", phone: "",
+    address: "", city: "", state: "", zip: "",
+    gender: "", dateOfBirth: "", maritalStatus: "",
+    emergencyContactName: "", emergencyContactPhone: "",
+    roles: ["member"] as string[],
+  });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const isSuperAdmin = currentUser.roles.includes("super_admin");
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => { await apiRequest("POST", "/api/users", data); },
-    onSuccess: () => {
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/users", data);
+      return res.json();
+    },
+    onSuccess: async (newUser: AdminUser) => {
+      if (photoFile) {
+        await uploadPhotoForUser(newUser.id, photoFile);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "User created" });
       closeDialog();
@@ -1423,7 +1461,10 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/users/${id}`, data); },
-    onSuccess: () => {
+    onSuccess: async () => {
+      if (photoFile && editing) {
+        await uploadPhotoForUser(editing.id, photoFile);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       toast({ title: "User updated" });
       closeDialog();
@@ -1440,21 +1481,72 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  async function uploadPhotoForUser(userId: number, file: File) {
+    try {
+      setUploadingPhoto(true);
+      const uploadRes = await apiRequest("POST", `/api/users/${userId}/photo`);
+      const { uploadURL, objectPath } = await uploadRes.json();
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      await apiRequest("PUT", `/api/users/${userId}/photo`, { objectPath });
+    } catch (err: any) {
+      toast({ title: "Photo upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
   function openAdd() {
     setEditing(null);
-    setForm({ username: "", password: "", roles: ["member"] });
+    setForm({
+      username: "", password: "", email: "", name: "", phone: "",
+      address: "", city: "", state: "", zip: "",
+      gender: "", dateOfBirth: "", maritalStatus: "",
+      emergencyContactName: "", emergencyContactPhone: "",
+      roles: ["member"],
+    });
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setDialogOpen(true);
   }
 
-  function openEdit(user: { id: number; username: string; roles: string[] }) {
+  function openEdit(user: AdminUser) {
     setEditing(user);
-    setForm({ username: user.username, password: "", roles: [...user.roles] });
+    setForm({
+      username: user.username,
+      password: "",
+      email: user.email || "",
+      name: user.name || "",
+      phone: user.phone || "",
+      address: user.address || "",
+      city: user.city || "",
+      state: user.state || "",
+      zip: user.zip || "",
+      gender: user.gender || "",
+      dateOfBirth: user.dateOfBirth || "",
+      maritalStatus: user.maritalStatus || "",
+      emergencyContactName: user.emergencyContactName || "",
+      emergencyContactPhone: user.emergencyContactPhone || "",
+      roles: [...user.roles],
+    });
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setDialogOpen(true);
+  }
+
+  function openView(user: AdminUser) {
+    setViewingUser(user);
+    setViewDialogOpen(true);
   }
 
   function closeDialog() {
     setDialogOpen(false);
     setEditing(null);
+    setPhotoFile(null);
+    setPhotoPreview(null);
   }
 
   function toggleRole(role: string) {
@@ -1465,14 +1557,40 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
     });
   }
 
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const payload: any = {
+      username: form.username,
+      roles: form.roles,
+      email: form.email || null,
+      name: form.name || null,
+      phone: form.phone || null,
+      address: form.address || null,
+      city: form.city || null,
+      state: form.state || null,
+      zip: form.zip || null,
+      gender: form.gender || null,
+      dateOfBirth: form.dateOfBirth || null,
+      maritalStatus: form.maritalStatus || null,
+      emergencyContactName: form.emergencyContactName || null,
+      emergencyContactPhone: form.emergencyContactPhone || null,
+    };
     if (editing) {
-      const data: any = { username: form.username, roles: form.roles };
-      if (form.password) data.password = form.password;
-      updateMutation.mutate({ id: editing.id, data });
+      if (form.password) payload.password = form.password;
+      updateMutation.mutate({ id: editing.id, data: payload });
     } else {
-      createMutation.mutate({ username: form.username, password: form.password, roles: form.roles });
+      payload.password = form.password;
+      createMutation.mutate(payload);
     }
   }
 
@@ -1480,6 +1598,19 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
     if (r === "super_admin" && !isSuperAdmin) return false;
     return true;
   });
+
+  function getPhotoSrc(path: string | null) {
+    if (!path) return undefined;
+    if (path.startsWith("http")) return path;
+    return `/objects${path.startsWith("/") ? path : `/${path}`}`;
+  }
+
+  function getInitials(user: AdminUser) {
+    if (user.name) {
+      return user.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+    }
+    return user.username.slice(0, 2).toUpperCase();
+  }
 
   return (
     <div data-testid="tab-users">
@@ -1491,12 +1622,14 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
       </div>
 
       {isLoading ? (
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground" data-testid="loading-users">Loading...</p>
       ) : (
         <Table data-testid="table-users">
           <TableHeader>
             <TableRow>
-              <TableHead>Username</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
               <TableHead>Roles</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -1504,11 +1637,24 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
           <TableBody>
             {users?.map((u) => (
               <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
-                <TableCell className="font-medium">{u.username}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src={getPhotoSrc(u.profilePhotoUrl)} alt={u.name || u.username} />
+                      <AvatarFallback className="text-xs">{getInitials(u)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="font-medium" data-testid={`text-user-name-${u.id}`}>{u.name || u.username}</div>
+                      {u.name && <div className="text-xs text-muted-foreground" data-testid={`text-user-username-${u.id}`}>@{u.username}</div>}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell data-testid={`text-user-email-${u.id}`}>{u.email || "—"}</TableCell>
+                <TableCell data-testid={`text-user-phone-${u.id}`}>{u.phone || "—"}</TableCell>
                 <TableCell>
                   <div className="flex gap-1 flex-wrap">
                     {u.roles.map((r) => (
-                      <Badge key={r} variant="secondary" className="text-xs">
+                      <Badge key={r} variant="secondary" className="text-xs" data-testid={`badge-role-${u.id}-${r}`}>
                         {ROLE_LABELS[r] || r}
                       </Badge>
                     ))}
@@ -1516,11 +1662,14 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openView(u)} data-testid={`button-view-user-${u.id}`}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
                     <Button size="icon" variant="ghost" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
                       <Pencil className="w-4 h-4" />
                     </Button>
                     {u.id !== currentUser.id && (
-                      <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(u.id)} data-testid={`button-delete-user-${u.id}`}>
+                      <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this user?")) deleteMutation.mutate(u.id); }} data-testid={`button-delete-user-${u.id}`}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     )}
@@ -1532,20 +1681,100 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
         </Table>
       )}
 
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto" data-testid="dialog-view-user">
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+          </DialogHeader>
+          {viewingUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="w-16 h-16">
+                  <AvatarImage src={getPhotoSrc(viewingUser.profilePhotoUrl)} alt={viewingUser.name || viewingUser.username} />
+                  <AvatarFallback>{getInitials(viewingUser)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-lg font-semibold" data-testid="view-user-name">{viewingUser.name || viewingUser.username}</h3>
+                  <p className="text-sm text-muted-foreground" data-testid="view-user-username">@{viewingUser.username}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Email</span>
+                  <p data-testid="view-user-email">{viewingUser.email || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Phone</span>
+                  <p data-testid="view-user-phone">{viewingUser.phone || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Gender</span>
+                  <p data-testid="view-user-gender">{viewingUser.gender || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Date of Birth</span>
+                  <p data-testid="view-user-dob">{viewingUser.dateOfBirth || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Marital Status</span>
+                  <p data-testid="view-user-marital">{viewingUser.maritalStatus || "—"}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Address</span>
+                  <p data-testid="view-user-address">
+                    {[viewingUser.address, viewingUser.city, viewingUser.state, viewingUser.zip].filter(Boolean).join(", ") || "—"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Emergency Contact</span>
+                  <p data-testid="view-user-emergency-name">{viewingUser.emergencyContactName || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Emergency Phone</span>
+                  <p data-testid="view-user-emergency-phone">{viewingUser.emergencyContactPhone || "—"}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Roles</span>
+                  <div className="flex gap-1 flex-wrap mt-1" data-testid="view-user-roles">
+                    {viewingUser.roles.map((r) => (
+                      <Badge key={r} variant="secondary" className="text-xs">{ROLE_LABELS[r] || r}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent data-testid="dialog-user">
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg" data-testid="dialog-user">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit User" : "Add User"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Username</Label>
-              <Input
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
-                required
-                data-testid="input-user-username"
-              />
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Avatar className="w-16 h-16">
+                  <AvatarImage src={photoPreview || getPhotoSrc(editing?.profilePhotoUrl ?? null)} alt="Profile" />
+                  <AvatarFallback>{editing ? getInitials(editing) : "?"}</AvatarFallback>
+                </Avatar>
+                <label className="absolute bottom-0 right-0 cursor-pointer">
+                  <div className="rounded-full bg-primary p-1 text-primary-foreground">
+                    {uploadingPhoto ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} data-testid="input-user-photo" />
+                </label>
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label>Username</Label>
+                <Input
+                  value={form.username}
+                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  required
+                  data-testid="input-user-username"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>{editing ? "New Password (leave blank to keep)" : "Password"}</Label>
@@ -1556,6 +1785,121 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                 required={!editing}
                 data-testid="input-user-password"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  data-testid="input-user-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  data-testid="input-user-name"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                data-testid="input-user-phone"
+              />
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="col-span-2 space-y-2">
+                <Label>Address</Label>
+                <Input
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  data-testid="input-user-address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  data-testid="input-user-city"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>State</Label>
+                <Input
+                  value={form.state}
+                  onChange={(e) => setForm({ ...form, state: e.target.value })}
+                  data-testid="input-user-state"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Zip</Label>
+                <Input
+                  value={form.zip}
+                  onChange={(e) => setForm({ ...form, zip: e.target.value })}
+                  data-testid="input-user-zip"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
+                  <SelectTrigger data-testid="select-user-gender">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date of Birth</Label>
+                <Input
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
+                  data-testid="input-user-dob"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Marital Status</Label>
+              <Select value={form.maritalStatus} onValueChange={(v) => setForm({ ...form, maritalStatus: v })}>
+                <SelectTrigger data-testid="select-user-marital">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Single">Single</SelectItem>
+                  <SelectItem value="Married">Married</SelectItem>
+                  <SelectItem value="Widowed">Widowed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Emergency Contact Name</Label>
+                <Input
+                  value={form.emergencyContactName}
+                  onChange={(e) => setForm({ ...form, emergencyContactName: e.target.value })}
+                  data-testid="input-user-emergency-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Emergency Contact Phone</Label>
+                <Input
+                  value={form.emergencyContactPhone}
+                  onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })}
+                  data-testid="input-user-emergency-phone"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Roles</Label>
@@ -1574,7 +1918,8 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                 ))}
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-user">
+            <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || uploadingPhoto} data-testid="button-submit-user">
+              {(createMutation.isPending || updateMutation.isPending || uploadingPhoto) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editing ? "Update" : "Create"}
             </Button>
           </form>
