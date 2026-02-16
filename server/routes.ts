@@ -20,6 +20,7 @@ import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
 import { XMLParser } from "fast-xml-parser";
 import v1Router from "./v1-routes";
+import { verifyAccessToken } from "./jwt";
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -185,6 +186,39 @@ export async function registerRoutes(
     req.session.destroy(() => {
       res.json({ message: "Logged out" });
     });
+  });
+
+  app.post("/api/auth/bridge", async (req, res) => {
+    try {
+      const auth = req.headers.authorization;
+      if (!auth || !auth.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "No token provided" });
+      }
+      const payload = verifyAccessToken(auth.slice(7));
+      if (!payload) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+      const user = await storage.getUser(payload.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      if (!user.roles.includes("admin") && !user.roles.includes("super_admin")) {
+        return res.status(403).json({ message: "Not an admin" });
+      }
+      req.session.userId = user.id;
+      req.session.roles = user.roles;
+      req.session.save((err) => {
+        if (err) {
+          return res.status(500).json({ message: "Session error" });
+        }
+        const enabledFeatures = storage.getEnabledFeaturesForRoles(user.roles);
+        enabledFeatures.then((features) => {
+          res.json({ id: user.id, username: user.username, roles: user.roles, features });
+        });
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Server error" });
+    }
   });
 
   app.get("/api/auth/me", async (req, res) => {

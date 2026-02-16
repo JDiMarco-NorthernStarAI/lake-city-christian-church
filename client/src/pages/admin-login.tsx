@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ export default function AdminLogin() {
       const res = await apiRequest("POST", "/api/auth/login", data);
       const user = await res.json();
       toast({ title: "Welcome back", description: `Signed in as ${user.username}` });
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation("/admin/dashboard");
     } catch (err: any) {
       toast({

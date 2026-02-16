@@ -80,6 +80,8 @@ export async function seedDatabase() {
     const hashedPassword = await bcrypt.hash("lakecity2024", 10);
     await storage.createUser({
       username: "admin",
+      email: "admin@lakecitychristian.church",
+      name: "Admin",
       password: hashedPassword,
       roles: ["super_admin", "admin"],
     });

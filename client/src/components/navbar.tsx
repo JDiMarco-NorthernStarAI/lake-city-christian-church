@@ -8,9 +8,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, ChevronDown, UserCircle, Shield } from "lucide-react";
+import { Menu, ChevronDown, UserCircle, Shield, LogOut } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 import { useAuth } from "@/hooks/use-auth";
+import { getAccessToken } from "@/lib/v1Api";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -38,10 +40,11 @@ const navItems = [
 ];
 
 export default function Navbar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,6 +53,30 @@ export default function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  async function handleLogout() {
+    await logout();
+    setLocation("/");
+    toast({ title: "Signed out" });
+  }
+
+  async function handleAdminClick(e: React.MouseEvent) {
+    e.preventDefault();
+    try {
+      const token = getAccessToken();
+      if (token) {
+        const res = await fetch("/api/auth/bridge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          window.location.href = "/admin/dashboard";
+          return;
+        }
+      }
+    } catch {}
+    setLocation("/admin/dashboard");
+  }
 
   const isActive = (href: string) => location === href;
 
@@ -141,7 +168,7 @@ export default function Navbar() {
             isAuthenticated ? (
               <>
                 {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin")) && (
-                  <Link href="/admin/dashboard">
+                  <a href="/admin/dashboard" onClick={handleAdminClick}>
                     <Button
                       variant="ghost"
                       className={`text-sm font-medium no-default-hover-elevate no-default-active-elevate ${
@@ -154,7 +181,7 @@ export default function Navbar() {
                       <Shield className="w-4 h-4 mr-1" />
                       Admin
                     </Button>
-                  </Link>
+                  </a>
                 )}
                 <Link href="/account">
                   <Button
@@ -170,6 +197,15 @@ export default function Navbar() {
                     {user?.name?.split(" ")[0] || "Account"}
                   </Button>
                 </Link>
+                <Button
+                  variant="ghost"
+                  className="text-sm font-medium text-white/70 hover:text-white no-default-hover-elevate no-default-active-elevate"
+                  onClick={handleLogout}
+                  data-testid="nav-link-logout"
+                >
+                  <LogOut className="w-4 h-4 mr-1" />
+                  Log Out
+                </Button>
               </>
             ) : (
               <Link href="/login">
@@ -245,16 +281,16 @@ export default function Navbar() {
                     isAuthenticated ? (
                       <>
                         {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin")) && (
-                          <Link
+                          <a
                             href="/admin/dashboard"
-                            onClick={() => setMobileOpen(false)}
+                            onClick={(e) => { setMobileOpen(false); handleAdminClick(e); }}
                             data-testid="mobile-link-admin"
                           >
                             <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
                               <Shield className="w-4 h-4" />
                               Admin
                             </span>
-                          </Link>
+                          </a>
                         )}
                         <Link
                           href="/account"
@@ -266,6 +302,16 @@ export default function Navbar() {
                             My Account
                           </span>
                         </Link>
+                        <button
+                          onClick={() => { setMobileOpen(false); handleLogout(); }}
+                          className="w-full"
+                          data-testid="mobile-link-logout"
+                        >
+                          <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
+                            <LogOut className="w-4 h-4" />
+                            Log Out
+                          </span>
+                        </button>
                       </>
                     ) : (
                       <>
