@@ -1,15 +1,69 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const AVAILABLE_ROLES = [
+  "member",
+  "student_ministry",
+  "kids_ministry",
+  "small_group",
+  "admin",
+  "super_admin",
+] as const;
+
+export const ROLE_LABELS: Record<string, string> = {
+  member: "Member",
+  student_ministry: "Student Ministry",
+  kids_ministry: "Kids Ministry",
+  small_group: "Small Group",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
+
+export const AVAILABLE_FEATURES = [
+  "dashboard",
+  "analytics",
+  "pages",
+  "sermons",
+  "events",
+  "team",
+  "messages",
+  "connect",
+  "settings",
+  "users",
+  "roles",
+] as const;
+
+export const FEATURE_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  analytics: "Analytics",
+  pages: "Page Content",
+  sermons: "Sermons",
+  events: "Events",
+  team: "Team",
+  messages: "Messages",
+  connect: "Connect Cards",
+  settings: "Settings",
+  users: "User Management",
+  roles: "Role Permissions",
+};
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("editor"),
-  assignedSections: text("assigned_sections").array(),
+  roles: text("roles").array().notNull().default(sql`ARRAY['member']::text[]`),
 });
+
+export const rolePermissions = pgTable("role_permissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  role: text("role").notNull(),
+  feature: text("feature").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+}, (table) => [
+  unique().on(table.role, table.feature),
+]);
 
 export const sermons = pgTable("sermons", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -82,6 +136,7 @@ export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({ id:
 export const insertContactSchema = createInsertSchema(contactSubmissions).omit({ id: true, createdAt: true });
 export const insertConnectCardSchema = createInsertSchema(connectCards).omit({ id: true, createdAt: true });
 export const insertSiteSettingSchema = createInsertSchema(siteSettings).omit({ id: true });
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -100,3 +155,5 @@ export type SiteSetting = typeof siteSettings.$inferSelect;
 export const insertPageViewSchema = createInsertSchema(pageViews).omit({ id: true, createdAt: true });
 export type InsertPageView = z.infer<typeof insertPageViewSchema>;
 export type PageView = typeof pageViews.$inferSelect;
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;

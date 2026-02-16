@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and } from "drizzle-orm";
 import {
-  users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews,
+  users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -10,6 +10,7 @@ import {
   type ConnectCard, type InsertConnectCard,
   type SiteSetting, type InsertSiteSetting,
   type PageView, type InsertPageView,
+  type RolePermission, type InsertRolePermission,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -50,6 +51,11 @@ export interface IStorage {
 
   createPageView(view: InsertPageView): Promise<PageView>;
   getPageViewStats(): Promise<{ totalViews: number; uniqueVisitors: number; todayViews: number; topPages: { path: string; count: number }[]; recentDays: { date: string; count: number }[] }>;
+
+  getRolePermissions(): Promise<RolePermission[]>;
+  getRolePermissionsByRole(role: string): Promise<RolePermission[]>;
+  setRolePermission(role: string, feature: string, enabled: boolean): Promise<void>;
+  getEnabledFeaturesForRoles(roles: string[]): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -224,6 +230,51 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { totalViews, uniqueVisitors, todayViews, topPages, recentDays };
+  }
+
+  async getRolePermissions(): Promise<RolePermission[]> {
+    return db.select().from(rolePermissions);
+  }
+
+  async getRolePermissionsByRole(role: string): Promise<RolePermission[]> {
+    return db.select().from(rolePermissions).where(eq(rolePermissions.role, role));
+  }
+
+  async setRolePermission(role: string, feature: string, enabled: boolean): Promise<void> {
+    const [existing] = await db.select().from(rolePermissions)
+      .where(and(eq(rolePermissions.role, role), eq(rolePermissions.feature, feature)));
+    if (existing) {
+      await db.update(rolePermissions)
+        .set({ enabled })
+        .where(and(eq(rolePermissions.role, role), eq(rolePermissions.feature, feature)));
+    } else {
+      await db.insert(rolePermissions).values({ role, feature, enabled });
+    }
+  }
+
+  async getEnabledFeaturesForRoles(roles: string[]): Promise<string[]> {
+    if (roles.includes("super_admin")) {
+      const { AVAILABLE_FEATURES } = await import("@shared/schema");
+      return [...AVAILABLE_FEATURES];
+    }
+
+    const allPerms = await db.select().from(rolePermissions);
+    const enabledFeatures = new Set<string>();
+
+    if (roles.includes("admin")) {
+      const { AVAILABLE_FEATURES } = await import("@shared/schema");
+      for (const f of AVAILABLE_FEATURES) {
+        enabledFeatures.add(f);
+      }
+    }
+
+    for (const perm of allPerms) {
+      if (roles.includes(perm.role) && perm.enabled) {
+        enabledFeatures.add(perm.feature);
+      }
+    }
+
+    return Array.from(enabledFeatures);
   }
 }
 

@@ -19,22 +19,29 @@ import {
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
+  Shield, UserCog,
 } from "lucide-react";
-import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting } from "@shared/schema";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission } from "@shared/schema";
+import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "pages" | "settings";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "pages" | "settings" | "users" | "roles";
 
-const navItems: { id: Tab; label: string; icon: any }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "analytics", label: "Analytics", icon: BarChart3 },
-  { id: "pages", label: "Page Content", icon: FileEdit },
-  { id: "sermons", label: "Sermons", icon: Play },
-  { id: "events", label: "Events", icon: Calendar },
-  { id: "team", label: "Team", icon: Users },
-  { id: "messages", label: "Messages", icon: Mail },
-  { id: "connect", label: "Connect Cards", icon: FileText },
-  { id: "settings", label: "Settings", icon: Settings },
+const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
+  { id: "analytics", label: "Analytics", icon: BarChart3, feature: "analytics" },
+  { id: "pages", label: "Page Content", icon: FileEdit, feature: "pages" },
+  { id: "sermons", label: "Sermons", icon: Play, feature: "sermons" },
+  { id: "events", label: "Events", icon: Calendar, feature: "events" },
+  { id: "team", label: "Team", icon: Users, feature: "team" },
+  { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
+  { id: "connect", label: "Connect Cards", icon: FileText, feature: "connect" },
+  { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
+  { id: "users", label: "Users", icon: UserCog, feature: "users" },
+  { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
 ];
 
 export default function AdminDashboard() {
@@ -42,7 +49,12 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
-  const { data: user, isLoading: authLoading, error: authError } = useQuery({
+  const { data: user, isLoading: authLoading, error: authError } = useQuery<{
+    id: number;
+    username: string;
+    roles: string[];
+    features: string[];
+  }>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
@@ -72,6 +84,9 @@ export default function AdminDashboard() {
   }
 
   if (!user) return null;
+
+  const userFeatures = user.features || [];
+  const navItems = allNavItems.filter((item) => userFeatures.includes(item.feature));
 
   const sidebarStyle = { "--sidebar-width": "16rem" } as React.CSSProperties;
 
@@ -125,6 +140,8 @@ export default function AdminDashboard() {
           {activeTab === "connect" && <ConnectCardsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
+          {activeTab === "users" && <UsersTab currentUser={user} />}
+          {activeTab === "roles" && <RolesTab isSuperAdmin={user.roles.includes("super_admin")} />}
         </div>
       </div>
     </SidebarProvider>
@@ -1228,6 +1245,335 @@ function SettingsTab() {
           <Button onClick={handleSave} data-testid="button-save-settings">
             Save Settings
           </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsersTab({ currentUser }: { currentUser: { id: number; username: string; roles: string[] } }) {
+  const { toast } = useToast();
+  const { data: users, isLoading } = useQuery<{ id: number; username: string; roles: string[] }[]>({
+    queryKey: ["/api/users"],
+  });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<{ id: number; username: string; roles: string[] } | null>(null);
+  const [form, setForm] = useState({ username: "", password: "", roles: ["member"] as string[] });
+  const isSuperAdmin = currentUser.roles.includes("super_admin");
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("POST", "/api/users", data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "User created" });
+      closeDialog();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/users/${id}`, data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "User updated" });
+      closeDialog();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/users/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "User deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function openAdd() {
+    setEditing(null);
+    setForm({ username: "", password: "", roles: ["member"] });
+    setDialogOpen(true);
+  }
+
+  function openEdit(user: { id: number; username: string; roles: string[] }) {
+    setEditing(user);
+    setForm({ username: user.username, password: "", roles: [...user.roles] });
+    setDialogOpen(true);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    setEditing(null);
+  }
+
+  function toggleRole(role: string) {
+    setForm((prev) => {
+      const has = prev.roles.includes(role);
+      const newRoles = has ? prev.roles.filter((r) => r !== role) : [...prev.roles, role];
+      return { ...prev, roles: newRoles.length > 0 ? newRoles : ["member"] };
+    });
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (editing) {
+      const data: any = { username: form.username, roles: form.roles };
+      if (form.password) data.password = form.password;
+      updateMutation.mutate({ id: editing.id, data });
+    } else {
+      createMutation.mutate({ username: form.username, password: form.password, roles: form.roles });
+    }
+  }
+
+  const assignableRoles = AVAILABLE_ROLES.filter((r) => {
+    if (r === "super_admin" && !isSuperAdmin) return false;
+    return true;
+  });
+
+  return (
+    <div data-testid="tab-users">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-2xl font-bold">Users</h1>
+        <Button onClick={openAdd} data-testid="button-add-user">
+          <Plus className="w-4 h-4 mr-2" /> Add User
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading...</p>
+      ) : (
+        <Table data-testid="table-users">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Username</TableHead>
+              <TableHead>Roles</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users?.map((u) => (
+              <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+                <TableCell className="font-medium">{u.username}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1 flex-wrap">
+                    {u.roles.map((r) => (
+                      <Badge key={r} variant="secondary" className="text-xs">
+                        {ROLE_LABELS[r] || r}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    {u.id !== currentUser.id && (
+                      <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(u.id)} data-testid={`button-delete-user-${u.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent data-testid="dialog-user">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit User" : "Add User"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Username</Label>
+              <Input
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                required
+                data-testid="input-user-username"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{editing ? "New Password (leave blank to keep)" : "Password"}</Label>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                required={!editing}
+                data-testid="input-user-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Roles</Label>
+              <div className="space-y-2">
+                {assignableRoles.map((role) => (
+                  <label key={role} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.roles.includes(role)}
+                      onChange={() => toggleRole(role)}
+                      className="rounded"
+                      data-testid={`checkbox-role-${role}`}
+                    />
+                    <span className="text-sm">{ROLE_LABELS[role] || role}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-user">
+              {editing ? "Update" : "Create"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const { toast } = useToast();
+  const { data: permissions, isLoading } = useQuery<RolePermission[]>({
+    queryKey: ["/api/role-permissions"],
+  });
+
+  const [localPerms, setLocalPerms] = useState<Record<string, Record<string, boolean>>>({});
+
+  useEffect(() => {
+    if (permissions) {
+      const map: Record<string, Record<string, boolean>> = {};
+      for (const role of AVAILABLE_ROLES) {
+        if (role === "super_admin") continue;
+        map[role] = {};
+        for (const feature of AVAILABLE_FEATURES) {
+          map[role][feature] = false;
+        }
+      }
+      for (const p of permissions) {
+        if (map[p.role]) {
+          map[p.role][p.feature] = p.enabled;
+        }
+      }
+      setLocalPerms(map);
+    }
+  }, [permissions]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (perms: { role: string; feature: string; enabled: boolean }[]) => {
+      await apiRequest("PUT", "/api/role-permissions", { permissions: perms });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/role-permissions"] });
+      toast({ title: "Permissions saved" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function togglePerm(role: string, feature: string) {
+    setLocalPerms((prev) => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        [feature]: !prev[role]?.[feature],
+      },
+    }));
+  }
+
+  function handleSave() {
+    const perms: { role: string; feature: string; enabled: boolean }[] = [];
+    for (const [role, features] of Object.entries(localPerms)) {
+      for (const [feature, enabled] of Object.entries(features)) {
+        perms.push({ role, feature, enabled });
+      }
+    }
+    saveMutation.mutate(perms);
+  }
+
+  const editableRoles = AVAILABLE_ROLES.filter((r) => r !== "super_admin");
+
+  if (!isSuperAdmin) {
+    return (
+      <div data-testid="tab-roles">
+        <h1 className="text-2xl font-bold mb-6">Role Permissions</h1>
+        <p className="text-muted-foreground">Only super admins can modify role permissions. You can view the current configuration below.</p>
+        {isLoading ? (
+          <p className="text-muted-foreground mt-4">Loading...</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <Table data-testid="table-roles-readonly">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Feature</TableHead>
+                  {editableRoles.map((role) => (
+                    <TableHead key={role} className="text-center">{ROLE_LABELS[role] || role}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {AVAILABLE_FEATURES.map((feature) => (
+                  <TableRow key={feature}>
+                    <TableCell className="font-medium">{FEATURE_LABELS[feature] || feature}</TableCell>
+                    {editableRoles.map((role) => (
+                      <TableCell key={role} className="text-center">
+                        {localPerms[role]?.[feature] ? (
+                          <Badge variant="default" className="text-xs">On</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">Off</Badge>
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="tab-roles">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-2xl font-bold">Role Permissions</h1>
+        <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-permissions">
+          <Save className="w-4 h-4 mr-2" /> Save Permissions
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading...</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table data-testid="table-roles">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Feature</TableHead>
+                {editableRoles.map((role) => (
+                  <TableHead key={role} className="text-center">{ROLE_LABELS[role] || role}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {AVAILABLE_FEATURES.map((feature) => (
+                <TableRow key={feature}>
+                  <TableCell className="font-medium">{FEATURE_LABELS[feature] || feature}</TableCell>
+                  {editableRoles.map((role) => (
+                    <TableCell key={role} className="text-center">
+                      <Switch
+                        checked={localPerms[role]?.[feature] ?? false}
+                        onCheckedChange={() => togglePerm(role, feature)}
+                        data-testid={`switch-${role}-${feature}`}
+                      />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>

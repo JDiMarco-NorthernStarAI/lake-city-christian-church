@@ -1,10 +1,34 @@
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { log } from "./index";
+import { AVAILABLE_ROLES, AVAILABLE_FEATURES } from "@shared/schema";
+
+async function seedRolePermissions() {
+  const existingPerms = await storage.getRolePermissions();
+  if (existingPerms.length > 0) return;
+
+  log("Seeding role permissions...", "seed");
+  const defaultPermissions: Record<string, string[]> = {
+    member: ["dashboard"],
+    student_ministry: ["dashboard", "events", "pages", "messages", "connect"],
+    kids_ministry: ["dashboard", "events", "pages", "messages", "connect"],
+    small_group: ["dashboard", "events", "pages"],
+    admin: [...AVAILABLE_FEATURES],
+  };
+
+  for (const [role, features] of Object.entries(defaultPermissions)) {
+    for (const feature of AVAILABLE_FEATURES) {
+      await storage.setRolePermission(role, feature, features.includes(feature));
+    }
+  }
+}
 
 export async function seedDatabase() {
   try {
     const existingAdmin = await storage.getUserByUsername("admin");
+
+    await seedRolePermissions();
+
     if (existingAdmin) {
       log("Database already seeded", "seed");
       return;
@@ -16,8 +40,7 @@ export async function seedDatabase() {
     await storage.createUser({
       username: "admin",
       password: hashedPassword,
-      role: "admin",
-      assignedSections: null,
+      roles: ["super_admin", "admin"],
     });
 
     await storage.createTeamMember({

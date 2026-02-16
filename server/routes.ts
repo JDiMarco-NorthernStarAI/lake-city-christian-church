@@ -7,6 +7,7 @@ import { db } from "./db";
 import {
   insertSermonSchema, insertEventSchema, insertTeamMemberSchema,
   insertContactSchema, insertConnectCardSchema, siteSettings,
+  AVAILABLE_ROLES, AVAILABLE_FEATURES,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
@@ -62,7 +63,7 @@ async function fetchYouTubeVideos(): Promise<YouTubeVideo[]> {
 declare module "express-session" {
   interface SessionData {
     userId: number;
-    role: string;
+    roles: string[];
   }
 }
 
@@ -73,11 +74,39 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId || req.session.role !== "admin") {
+function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId || !req.session.roles?.includes("super_admin")) {
+    return res.status(403).json({ message: "Forbidden - Super Admin required" });
+  }
+  next();
+}
+
+function requireAdminOrSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  const roles = req.session.roles || [];
+  if (!roles.includes("admin") && !roles.includes("super_admin")) {
     return res.status(403).json({ message: "Forbidden" });
   }
   next();
+}
+
+function requireFeature(feature: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const roles = req.session.roles || [];
+    if (roles.includes("super_admin")) {
+      return next();
+    }
+    const enabledFeatures = await storage.getEnabledFeaturesForRoles(roles);
+    if (enabledFeatures.includes(feature)) {
+      return next();
+    }
+    return res.status(403).json({ message: "Forbidden - insufficient permissions" });
+  };
 }
 
 export async function registerRoutes(
@@ -121,8 +150,9 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
       req.session.userId = user.id;
-      req.session.role = user.role;
-      res.json({ id: user.id, username: user.username, role: user.role });
+      req.session.roles = user.roles;
+      const enabledFeatures = await storage.getEnabledFeaturesForRoles(user.roles);
+      res.json({ id: user.id, username: user.username, roles: user.roles, features: enabledFeatures });
     } catch (err) {
       res.status(500).json({ message: "Server error" });
     }
@@ -142,7 +172,8 @@ export async function registerRoutes(
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
-    res.json({ id: user.id, username: user.username, role: user.role });
+    const enabledFeatures = await storage.getEnabledFeaturesForRoles(user.roles);
+    res.json({ id: user.id, username: user.username, roles: user.roles, features: enabledFeatures });
   });
 
   app.get("/api/youtube/videos", async (req, res) => {
@@ -166,20 +197,20 @@ export async function registerRoutes(
     res.json(sermon);
   });
 
-  app.post("/api/sermons", requireAuth, async (req, res) => {
+  app.post("/api/sermons", requireFeature("sermons"), async (req, res) => {
     const parsed = insertSermonSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const sermon = await storage.createSermon(parsed.data);
     res.status(201).json(sermon);
   });
 
-  app.patch("/api/sermons/:id", requireAuth, async (req, res) => {
+  app.patch("/api/sermons/:id", requireFeature("sermons"), async (req, res) => {
     const updated = await storage.updateSermon(Number(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Not found" });
     res.json(updated);
   });
 
-  app.delete("/api/sermons/:id", requireAuth, async (req, res) => {
+  app.delete("/api/sermons/:id", requireFeature("sermons"), async (req, res) => {
     await storage.deleteSermon(Number(req.params.id));
     res.json({ message: "Deleted" });
   });
@@ -195,20 +226,20 @@ export async function registerRoutes(
     res.json(event);
   });
 
-  app.post("/api/events", requireAuth, async (req, res) => {
+  app.post("/api/events", requireFeature("events"), async (req, res) => {
     const parsed = insertEventSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const event = await storage.createEvent(parsed.data);
     res.status(201).json(event);
   });
 
-  app.patch("/api/events/:id", requireAuth, async (req, res) => {
+  app.patch("/api/events/:id", requireFeature("events"), async (req, res) => {
     const updated = await storage.updateEvent(Number(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Not found" });
     res.json(updated);
   });
 
-  app.delete("/api/events/:id", requireAuth, async (req, res) => {
+  app.delete("/api/events/:id", requireFeature("events"), async (req, res) => {
     await storage.deleteEvent(Number(req.params.id));
     res.json({ message: "Deleted" });
   });
@@ -218,20 +249,20 @@ export async function registerRoutes(
     res.json(data);
   });
 
-  app.post("/api/team", requireAuth, async (req, res) => {
+  app.post("/api/team", requireFeature("team"), async (req, res) => {
     const parsed = insertTeamMemberSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const member = await storage.createTeamMember(parsed.data);
     res.status(201).json(member);
   });
 
-  app.patch("/api/team/:id", requireAuth, async (req, res) => {
+  app.patch("/api/team/:id", requireFeature("team"), async (req, res) => {
     const updated = await storage.updateTeamMember(Number(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Not found" });
     res.json(updated);
   });
 
-  app.delete("/api/team/:id", requireAuth, async (req, res) => {
+  app.delete("/api/team/:id", requireFeature("team"), async (req, res) => {
     await storage.deleteTeamMember(Number(req.params.id));
     res.json({ message: "Deleted" });
   });
@@ -243,7 +274,7 @@ export async function registerRoutes(
     res.status(201).json(submission);
   });
 
-  app.get("/api/contact", requireAuth, async (_req, res) => {
+  app.get("/api/contact", requireFeature("messages"), async (_req, res) => {
     const data = await storage.getContactSubmissions();
     res.json(data);
   });
@@ -255,7 +286,7 @@ export async function registerRoutes(
     res.status(201).json(card);
   });
 
-  app.get("/api/connect", requireAuth, async (_req, res) => {
+  app.get("/api/connect", requireFeature("connect"), async (_req, res) => {
     const data = await storage.getConnectCards();
     res.json(data);
   });
@@ -265,7 +296,7 @@ export async function registerRoutes(
     res.json(data);
   });
 
-  app.put("/api/settings/:key", requireAdmin, async (req, res) => {
+  app.put("/api/settings/:key", requireFeature("settings"), async (req, res) => {
     const { value } = req.body;
     if (!value) return res.status(400).json({ message: "Value required" });
     await storage.setSetting(req.params.key, value);
@@ -289,7 +320,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/content/:page", requireAuth, async (req, res) => {
+  app.put("/api/content/:page", requireFeature("pages"), async (req, res) => {
     try {
       const page = req.params.page;
       const data = req.body;
@@ -334,7 +365,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/analytics/stats", requireAuth, async (_req, res) => {
+  app.get("/api/analytics/stats", requireFeature("analytics"), async (_req, res) => {
     try {
       const stats = await storage.getPageViewStats();
       res.json(stats);
@@ -343,26 +374,29 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/users", requireAdmin, async (_req, res) => {
+  app.get("/api/users", requireFeature("users"), async (_req, res) => {
     const data = await storage.getUsers();
     const safe = data.map(({ password, ...rest }) => rest);
     res.json(safe);
   });
 
-  app.post("/api/users", requireAdmin, async (req, res) => {
+  app.post("/api/users", requireFeature("users"), async (req, res) => {
     try {
-      const { username, password, role, assignedSections } = req.body;
+      const { username, password, roles } = req.body;
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password required" });
+      }
+      const userRoles = Array.isArray(roles) && roles.length > 0 ? roles : ["member"];
+      if (userRoles.includes("super_admin") && !req.session.roles?.includes("super_admin")) {
+        return res.status(403).json({ message: "Only super admins can create super admin users" });
       }
       const hashed = await bcrypt.hash(password, 10);
       const user = await storage.createUser({
         username,
         password: hashed,
-        role: role || "editor",
-        assignedSections: assignedSections || null,
+        roles: userRoles,
       });
-      res.status(201).json({ id: user.id, username: user.username, role: user.role });
+      res.status(201).json({ id: user.id, username: user.username, roles: user.roles });
     } catch (err: any) {
       if (err.code === "23505") {
         return res.status(400).json({ message: "Username already exists" });
@@ -371,9 +405,62 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/users/:id", requireAdmin, async (req, res) => {
-    await storage.deleteUser(Number(req.params.id));
+  app.patch("/api/users/:id", requireFeature("users"), async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      const { username, password, roles } = req.body;
+      const updateData: any = {};
+
+      if (username) updateData.username = username;
+      if (password) updateData.password = await bcrypt.hash(password, 10);
+      if (Array.isArray(roles)) {
+        if (roles.includes("super_admin") && !req.session.roles?.includes("super_admin")) {
+          return res.status(403).json({ message: "Only super admins can assign super admin role" });
+        }
+        updateData.roles = roles;
+      }
+
+      const updated = await storage.updateUser(userId, updateData);
+      if (!updated) return res.status(404).json({ message: "User not found" });
+      res.json({ id: updated.id, username: updated.username, roles: updated.roles });
+    } catch (err: any) {
+      if (err.code === "23505") {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.delete("/api/users/:id", requireFeature("users"), async (req, res) => {
+    const userId = Number(req.params.id);
+    if (userId === req.session.userId) {
+      return res.status(400).json({ message: "Cannot delete your own account" });
+    }
+    await storage.deleteUser(userId);
     res.json({ message: "Deleted" });
+  });
+
+  app.get("/api/role-permissions", requireFeature("roles"), async (_req, res) => {
+    const perms = await storage.getRolePermissions();
+    res.json(perms);
+  });
+
+  app.put("/api/role-permissions", requireSuperAdmin, async (req, res) => {
+    try {
+      const { permissions } = req.body;
+      if (!Array.isArray(permissions)) {
+        return res.status(400).json({ message: "permissions array required" });
+      }
+      for (const p of permissions) {
+        if (p.role && p.feature && typeof p.enabled === "boolean") {
+          if (p.role === "super_admin") continue;
+          await storage.setRolePermission(p.role, p.feature, p.enabled);
+        }
+      }
+      res.json({ message: "Permissions updated" });
+    } catch (err) {
+      res.status(500).json({ message: "Error updating permissions" });
+    }
   });
 
   return httpServer;
