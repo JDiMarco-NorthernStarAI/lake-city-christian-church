@@ -10,8 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import SocialAuthButtons from "@/components/social-auth-buttons";
+import { usePageContent } from "@/hooks/use-page-content";
 
 export default function Register() {
+  const content = usePageContent("register", {
+    title: "Create Account",
+    subtitle: "Join the Lake City Christian Church community",
+  });
   const [, navigate] = useLocation();
   const { register } = useAuth();
   const { toast } = useToast();
@@ -83,10 +88,10 @@ export default function Register() {
               style={{ fontFamily: "Montserrat, sans-serif" }}
               data-testid="text-register-title"
             >
-              Create Account
+              {content.title}
             </CardTitle>
             <p className="text-white/60 text-sm mt-1">
-              Join the Lake City Christian Church community
+              {content.subtitle}
             </p>
           </CardHeader>
           <CardContent>

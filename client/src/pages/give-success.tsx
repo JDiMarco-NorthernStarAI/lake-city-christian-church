@@ -3,8 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, Heart, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import { usePageContent } from "@/hooks/use-page-content";
 
 export default function GiveSuccess() {
+  const content = usePageContent("give-success", {
+    hero_title: "Thank You!",
+    heading: "Your Donation Was Successful",
+    message: "Thank you for your generous gift to Lake City Christian Church. Your support helps us connect people to a life-changing relationship with Jesus.",
+    receipt_note: "A receipt has been sent to your email address. Your donation may be tax-deductible.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[50vh] bg-black overflow-hidden">
@@ -18,7 +25,7 @@ export default function GiveSuccess() {
             transition={{ duration: 0.8 }}
             data-testid="text-success-title"
           >
-            Thank You!
+            {content.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -48,16 +55,15 @@ export default function GiveSuccess() {
                 style={{ fontFamily: "Montserrat, sans-serif" }}
                 data-testid="text-success-heading"
               >
-                Your Donation Was Successful
+                {content.heading}
               </h2>
 
               <p className="text-muted-foreground mb-2" data-testid="text-success-message">
-                Thank you for your generous gift to Lake City Christian Church.
-                Your support helps us connect people to a life-changing relationship with Jesus.
+                {content.message}
               </p>
 
               <p className="text-sm text-muted-foreground mb-8">
-                A receipt has been sent to your email address. Your donation may be tax-deductible.
+                {content.receipt_note}
               </p>
 
               <div className="flex flex-col gap-3">

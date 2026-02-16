@@ -1270,6 +1270,47 @@ const pageConfigs: PageConfig[] = [
       { key: "hero_title", label: "Hero Title", type: "input", placeholder: "What's Happening" },
     ],
   },
+  {
+    id: "login",
+    label: "Login",
+    fields: [
+      { key: "title", label: "Title", type: "input", placeholder: "Sign In" },
+      { key: "subtitle", label: "Subtitle", type: "input", placeholder: "Welcome back to Lake City Christian Church" },
+    ],
+  },
+  {
+    id: "register",
+    label: "Register",
+    fields: [
+      { key: "title", label: "Title", type: "input", placeholder: "Create Account" },
+      { key: "subtitle", label: "Subtitle", type: "input", placeholder: "Join the Lake City Christian Church community" },
+    ],
+  },
+  {
+    id: "signups",
+    label: "Sign Ups",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Sign Ups" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea", placeholder: "Browse and register for upcoming events, classes, and volunteer opportunities" },
+    ],
+  },
+  {
+    id: "give-success",
+    label: "Give - Success",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Thank You!" },
+      { key: "heading", label: "Heading", type: "input", placeholder: "Your Donation Was Successful" },
+      { key: "message", label: "Message", type: "textarea", placeholder: "Thank you for your generous gift to Lake City Christian Church. Your support helps us connect people to a life-changing relationship with Jesus." },
+      { key: "receipt_note", label: "Receipt Note", type: "input", placeholder: "A receipt has been sent to your email address. Your donation may be tax-deductible." },
+    ],
+  },
+  {
+    id: "account",
+    label: "My Account",
+    fields: [
+      { key: "title", label: "Page Title", type: "input", placeholder: "My Account" },
+    ],
+  },
 ];
 
 function PagesTab() {

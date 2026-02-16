@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, MapPin, Users, ClipboardList, ArrowRight } from "lucide-react";
 import type { SignupEvent } from "@shared/schema";
 import { SIGNUP_CATEGORY_LABELS } from "@shared/schema";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -68,6 +69,10 @@ function truncateText(text: string | null | undefined, maxLength: number): strin
 }
 
 export default function Signups() {
+  const content = usePageContent("signups", {
+    hero_title: "Sign Ups",
+    hero_subtitle: "Browse and register for upcoming events, classes, and volunteer opportunities",
+  });
   const [, navigate] = useLocation();
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -94,7 +99,7 @@ export default function Signups() {
             transition={{ duration: 0.8 }}
             data-testid="text-signups-hero-title"
           >
-            Sign Ups
+            {content.hero_title}
           </motion.h1>
           <motion.p
             className="text-lg text-gray-300 max-w-2xl mx-auto mb-6"
@@ -103,7 +108,7 @@ export default function Signups() {
             transition={{ duration: 0.8, delay: 0.2 }}
             data-testid="text-signups-hero-subtitle"
           >
-            Browse and register for upcoming events, classes, and volunteer opportunities
+            {content.hero_subtitle}
           </motion.p>
           <motion.div
             className="w-12 h-0.5 mx-auto bg-white/40"

@@ -9,8 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import SocialAuthButtons from "@/components/social-auth-buttons";
+import { usePageContent } from "@/hooks/use-page-content";
 
 export default function Login() {
+  const content = usePageContent("login", {
+    title: "Sign In",
+    subtitle: "Welcome back to Lake City Christian Church",
+  });
   const [, navigate] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
@@ -50,10 +55,10 @@ export default function Login() {
               style={{ fontFamily: "Montserrat, sans-serif" }}
               data-testid="text-login-title"
             >
-              Sign In
+              {content.title}
             </CardTitle>
             <p className="text-white/60 text-sm mt-1">
-              Welcome back to Lake City Christian Church
+              {content.subtitle}
             </p>
           </CardHeader>
           <CardContent>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { usePageContent } from "@/hooks/use-page-content";
 import { v1Fetch, v1Put } from "@/lib/v1Api";
 import { Loader2, User, ClipboardList, DollarSign, FileText, LogOut, Check, X, Clock, Camera } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -41,6 +42,9 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function Account() {
+  const pageContent = usePageContent("account", {
+    title: "My Account",
+  });
   const [, navigate] = useLocation();
   const { user, isLoading, isAuthenticated, logout, refreshUser } = useAuth();
   const { toast } = useToast();
@@ -236,7 +240,7 @@ export default function Account() {
               style={{ fontFamily: "Montserrat, sans-serif" }}
               data-testid="text-account-title"
             >
-              My Account
+              {pageContent.title}
             </h1>
             <p className="text-white/50 text-sm mt-1">
               Welcome, {user?.name || user?.email || "Member"}
