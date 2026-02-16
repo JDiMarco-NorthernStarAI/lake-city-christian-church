@@ -270,6 +270,37 @@ export async function registerRoutes(
     res.json({ message: "Updated" });
   });
 
+  app.post("/api/analytics/pageview", async (req, res) => {
+    try {
+      const { path } = req.body;
+      if (!path || typeof path !== "string") {
+        return res.status(400).json({ message: "Path required" });
+      }
+      const forwarded = req.headers["x-forwarded-for"];
+      const ip = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress || "unknown";
+      const crypto = await import("crypto");
+      const ipHash = crypto.createHash("sha256").update(ip).digest("hex").substring(0, 16);
+      await storage.createPageView({
+        path,
+        referrer: req.headers.referer || null,
+        userAgent: req.headers["user-agent"] || null,
+        ipHash,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error tracking pageview" });
+    }
+  });
+
+  app.get("/api/analytics/stats", requireAuth, async (_req, res) => {
+    try {
+      const stats = await storage.getPageViewStats();
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching analytics" });
+    }
+  });
+
   app.get("/api/users", requireAdmin, async (_req, res) => {
     const data = await storage.getUsers();
     const safe = data.map(({ password, ...rest }) => rest);

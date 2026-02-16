@@ -18,15 +18,16 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp,
 } from "lucide-react";
 import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 
-type Tab = "dashboard" | "sermons" | "events" | "team" | "messages" | "connect" | "settings";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "settings";
 
 const navItems: { id: Tab; label: string; icon: any }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "sermons", label: "Sermons", icon: Play },
   { id: "events", label: "Events", icon: Calendar },
   { id: "team", label: "Team", icon: Users },
@@ -115,6 +116,7 @@ export default function AdminDashboard() {
 
         <div className="flex-1 overflow-auto p-6">
           {activeTab === "dashboard" && <DashboardTab />}
+          {activeTab === "analytics" && <AnalyticsTab />}
           {activeTab === "sermons" && <SermonsTab />}
           {activeTab === "events" && <EventsTab />}
           {activeTab === "team" && <TeamTab />}
@@ -158,6 +160,140 @@ function DashboardTab() {
           </Card>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AnalyticsTab() {
+  const { data: stats, isLoading } = useQuery<{
+    totalViews: number;
+    uniqueVisitors: number;
+    todayViews: number;
+    topPages: { path: string; count: number }[];
+    recentDays: { date: string; count: number }[];
+  }>({ queryKey: ["/api/analytics/stats"] });
+
+  if (isLoading) return <p className="text-muted-foreground">Loading analytics...</p>;
+  if (!stats) return <p className="text-muted-foreground">No analytics data available.</p>;
+
+  const maxDayCount = Math.max(...stats.recentDays.map(d => d.count), 1);
+
+  const pageNames: Record<string, string> = {
+    "/": "Home",
+    "/about": "About",
+    "/about/story": "Our Story",
+    "/about/beliefs": "What We Believe",
+    "/about/leadership": "Leadership",
+    "/ministries": "Ministries",
+    "/ministries/kids": "Kids Ministry",
+    "/ministries/students": "Students",
+    "/ministries/small-groups": "Small Groups",
+    "/ministries/connect-serve": "Connect & Serve",
+    "/encounter": "Encounter (Sermons)",
+    "/announcements": "What's Happening",
+    "/give": "Give",
+    "/plan-a-visit": "Plan a Visit",
+    "/contact": "Contact",
+  };
+
+  return (
+    <div data-testid="tab-analytics">
+      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Page Views</CardTitle>
+            <Eye className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="stat-total-views">{stats.totalViews.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unique Visitors</CardTitle>
+            <Users className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="stat-unique-visitors">{stats.uniqueVisitors.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Views</CardTitle>
+            <TrendingUp className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="stat-today-views">{stats.todayViews.toLocaleString()}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg">Page Views - Last 30 Days</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-1 h-48" data-testid="chart-views">
+            {stats.recentDays.map((day) => {
+              const height = maxDayCount > 0 ? (day.count / maxDayCount) * 100 : 0;
+              const dateObj = new Date(day.date + "T12:00:00");
+              const label = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <div key={day.date} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                  <div
+                    className="w-full rounded-t-sm"
+                    style={{
+                      height: `${Math.max(height, 2)}%`,
+                      background: "linear-gradient(to top, #0033AA, #00D4FF)",
+                      minHeight: day.count > 0 ? "4px" : "2px",
+                    }}
+                    data-testid={`bar-${day.date}`}
+                  />
+                  <div className="invisible group-hover:visible absolute -top-8 bg-popover border rounded-md px-2 py-1 text-xs whitespace-nowrap z-10">
+                    {label}: {day.count} views
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+            <span>{new Date(stats.recentDays[0]?.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+            <span>Today</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Top Pages</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats.topPages.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No page view data yet. Analytics will appear as visitors browse your site.</p>
+          ) : (
+            <Table data-testid="table-top-pages">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Page</TableHead>
+                  <TableHead>Path</TableHead>
+                  <TableHead className="text-right">Views</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.topPages.map((page) => (
+                  <TableRow key={page.path} data-testid={`row-page-${page.path.replace(/\//g, "-")}`}>
+                    <TableCell className="font-medium">{pageNames[page.path] || page.path}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{page.path}</TableCell>
+                    <TableCell className="text-right">{page.count.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

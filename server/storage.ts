@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, desc, asc } from "drizzle-orm";
 import {
-  users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings,
+  users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -9,6 +9,7 @@ import {
   type ContactSubmission, type InsertContact,
   type ConnectCard, type InsertConnectCard,
   type SiteSetting, type InsertSiteSetting,
+  type PageView, type InsertPageView,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -46,6 +47,9 @@ export interface IStorage {
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
   getAllSettings(): Promise<SiteSetting[]>;
+
+  createPageView(view: InsertPageView): Promise<PageView>;
+  getPageViewStats(): Promise<{ totalViews: number; uniqueVisitors: number; todayViews: number; topPages: { path: string; count: number }[]; recentDays: { date: string; count: number }[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -180,6 +184,46 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSettings(): Promise<SiteSetting[]> {
     return db.select().from(siteSettings);
+  }
+
+  async createPageView(view: InsertPageView): Promise<PageView> {
+    const [created] = await db.insert(pageViews).values(view).returning();
+    return created;
+  }
+
+  async getPageViewStats() {
+    const allViews = await db.select().from(pageViews);
+    
+    const totalViews = allViews.length;
+    const uniqueIps = new Set(allViews.map(v => v.ipHash).filter(Boolean));
+    const uniqueVisitors = uniqueIps.size;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayViews = allViews.filter(v => new Date(v.createdAt) >= today).length;
+    
+    const pageCounts: Record<string, number> = {};
+    for (const v of allViews) {
+      pageCounts[v.path] = (pageCounts[v.path] || 0) + 1;
+    }
+    const topPages = Object.entries(pageCounts)
+      .map(([path, count]) => ({ path, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    
+    const recentDays: { date: string; count: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split("T")[0];
+      const count = allViews.filter(v => {
+        const vDate = new Date(v.createdAt).toISOString().split("T")[0];
+        return vDate === dateStr;
+      }).length;
+      recentDays.push({ date: dateStr, count });
+    }
+    
+    return { totalViews, uniqueVisitors, todayViews, topPages, recentDays };
   }
 }
 

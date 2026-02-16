@@ -23,6 +23,7 @@ import PlanVisit from "@/pages/plan-visit";
 import Contact from "@/pages/contact";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 function Router() {
   return (
@@ -52,6 +53,7 @@ function Router() {
 function App() {
   const [location] = useLocation();
   const isAdmin = location.startsWith("/admin");
+  useAnalytics();
 
   return (
     <QueryClientProvider client={queryClient}>
