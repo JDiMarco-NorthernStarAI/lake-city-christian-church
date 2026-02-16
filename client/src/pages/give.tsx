@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Heart, RefreshCw, Loader2, CheckCircle, ArrowRight } from "lucide-react";
 import { usePageContent } from "@/hooks/use-page-content";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import type { DonationFund } from "@shared/schema";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -30,6 +31,7 @@ const PRESET_AMOUNTS = [25, 50, 100, 250, 500, 1000];
 
 export default function Give() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const c = usePageContent("give", {
     hero_title: "Give",
     hero_subtitle: "Reaching the local community and beyond.",
@@ -43,6 +45,13 @@ export default function Give() {
   const [fundSlug, setFundSlug] = useState("general");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      if (user.name && !donorName) setDonorName(user.name);
+      if (user.email && !donorEmail) setDonorEmail(user.email);
+    }
+  }, [user]);
 
   const { data: funds = [] } = useQuery<DonationFund[]>({
     queryKey: ["/api/public/donation-funds"],
@@ -58,8 +67,17 @@ export default function Give() {
         window.location.href = data.url;
       }
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create checkout session. Please try again.", variant: "destructive" });
+    onError: (error: any) => {
+      let msg = "Failed to create checkout session. Please try again.";
+      try {
+        const raw = error.message || "";
+        const jsonPart = raw.includes("{") ? raw.substring(raw.indexOf("{")) : "";
+        if (jsonPart) {
+          const parsed = JSON.parse(jsonPart);
+          if (parsed.message) msg = parsed.message;
+        }
+      } catch {}
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 

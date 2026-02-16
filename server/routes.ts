@@ -990,6 +990,9 @@ export async function registerRoutes(
 
   app.post("/api/public/donations/create-checkout", async (req, res) => {
     try {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ message: "Online donations are not configured yet. Please contact the church office." });
+      }
       const parsed = createCheckoutSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid data" });
 
