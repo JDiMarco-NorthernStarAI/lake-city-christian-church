@@ -23,12 +23,12 @@ const navItems = [
       { label: "Ministries", href: "/ministries" },
     ],
   },
-  { label: "Sign Ups", href: "/signups" },
   { label: "Give", href: "/give" },
   {
     label: "Plan Your Visit",
     href: "/plan-visit",
     children: [
+      { label: "Sign Ups", href: "/signups" },
       { label: "Contact", href: "/contact" },
       { label: "Announcements", href: "/announcements" },
       { label: "Watch", href: "/encounter" },
