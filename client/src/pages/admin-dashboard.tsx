@@ -41,7 +41,6 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
   { id: "events", label: "Events", icon: Calendar, feature: "events" },
   { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
-  { id: "submissions", label: "Submissions", icon: Inbox, feature: "forms" },
   { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
   { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
   { id: "pages", label: "Page Content", icon: FileEdit, feature: "pages" },
@@ -50,6 +49,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "signups", label: "Sign Ups", icon: UserPlus, feature: "signups" },
   { id: "sms", label: "SMS Messaging", icon: MessageSquare, feature: "sms" },
+  { id: "submissions", label: "Submissions", icon: Inbox, feature: "forms" },
   { id: "team", label: "Team", icon: Users, feature: "team" },
   { id: "users", label: "Users", icon: UserCog, feature: "users" },
 ];
