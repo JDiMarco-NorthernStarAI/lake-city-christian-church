@@ -143,7 +143,7 @@ export default function StudentMinistry() {
                 <p className="text-muted-foreground leading-relaxed">
                   {c.student_info_description}
                 </p>
-                <a href={c.student_info_url} target="_blank" rel="noopener noreferrer">
+                <Link href="/forms/student-info">
                   <Button
                     size="lg"
                     className="text-white border-transparent"
@@ -151,9 +151,9 @@ export default function StudentMinistry() {
                     data-testid="button-student-info-form"
                   >
                     Fill Out Form
-                    <ExternalLink className="w-4 h-4 ml-2" />
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
-                </a>
+                </Link>
               </CardContent>
             </Card>
           </div>
