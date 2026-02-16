@@ -139,7 +139,11 @@ export const users = pgTable("users", {
   city: text("city"),
   state: text("state"),
   zip: text("zip"),
+  gender: text("gender"),
   dateOfBirth: text("date_of_birth"),
+  maritalStatus: text("marital_status"),
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
   profilePhotoUrl: text("profile_photo_url"),
   authProvider: text("auth_provider").default("email"),
   authProviderId: text("auth_provider_id"),
@@ -388,7 +392,11 @@ export const updateProfileSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zip: z.string().optional(),
+  gender: z.enum(["Male", "Female"]).nullable().optional(),
   dateOfBirth: z.string().optional(),
+  maritalStatus: z.enum(["Single", "Married", "Widowed"]).nullable().optional(),
+  emergencyContactName: z.string().optional(),
+  emergencyContactPhone: z.string().optional(),
 });
 
 export const createChildSchema = z.object({

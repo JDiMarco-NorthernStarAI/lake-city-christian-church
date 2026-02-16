@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { v1Fetch, v1Put } from "@/lib/v1Api";
@@ -50,6 +51,11 @@ export default function Account() {
     city: "",
     state: "",
     zip: "",
+    gender: "" as string,
+    dateOfBirth: "",
+    maritalStatus: "" as string,
+    emergencyContactName: "",
+    emergencyContactPhone: "",
   });
 
   const [signupSubs, setSignupSubs] = useState<any[]>([]);
@@ -66,6 +72,11 @@ export default function Account() {
         city: user.city || "",
         state: user.state || "",
         zip: user.zip || "",
+        gender: (user as any).gender || "",
+        dateOfBirth: (user as any).dateOfBirth || "",
+        maritalStatus: (user as any).maritalStatus || "",
+        emergencyContactName: (user as any).emergencyContactName || "",
+        emergencyContactPhone: (user as any).emergencyContactPhone || "",
       });
     }
   }, [user]);
@@ -104,7 +115,15 @@ export default function Account() {
 
   async function saveProfile() {
     setSaving(true);
-    const result = await v1Put("/api/v1/auth/me", profileForm);
+    const payload = {
+      ...profileForm,
+      gender: profileForm.gender || null,
+      maritalStatus: profileForm.maritalStatus || null,
+      dateOfBirth: profileForm.dateOfBirth || undefined,
+      emergencyContactName: profileForm.emergencyContactName || undefined,
+      emergencyContactPhone: profileForm.emergencyContactPhone || undefined,
+    };
+    const result = await v1Put("/api/v1/auth/me", payload);
     setSaving(false);
     if (result.success) {
       toast({ title: "Profile updated" });
@@ -279,64 +298,159 @@ export default function Account() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/60 text-xs">Address</Label>
+                  <Label className="text-white/60 text-xs">Gender</Label>
                   {editing ? (
-                    <Input
-                      value={profileForm.address}
-                      onChange={(e) => setProfileForm((f) => ({ ...f, address: e.target.value }))}
-                      className="bg-zinc-800 border-white/10 text-white"
-                      data-testid="input-profile-address"
-                      autoComplete="street-address"
-                    />
+                    <Select
+                      value={profileForm.gender || ""}
+                      onValueChange={(v) => setProfileForm((f) => ({ ...f, gender: v }))}
+                    >
+                      <SelectTrigger className="bg-zinc-800 border-white/10 text-white" data-testid="select-profile-gender">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male</SelectItem>
+                        <SelectItem value="Female">Female</SelectItem>
+                      </SelectContent>
+                    </Select>
                   ) : (
-                    <p className="text-white text-sm" data-testid="text-profile-address">{user?.address || "—"}</p>
+                    <p className="text-white text-sm" data-testid="text-profile-gender">{(user as any)?.gender || "—"}</p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/60 text-xs">City</Label>
+                  <Label className="text-white/60 text-xs">Date of Birth</Label>
                   {editing ? (
                     <Input
-                      value={profileForm.city}
-                      onChange={(e) => setProfileForm((f) => ({ ...f, city: e.target.value }))}
+                      type="date"
+                      value={profileForm.dateOfBirth}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, dateOfBirth: e.target.value }))}
                       className="bg-zinc-800 border-white/10 text-white"
-                      data-testid="input-profile-city"
-                      autoComplete="address-level2"
+                      data-testid="input-profile-dob"
                     />
                   ) : (
-                    <p className="text-white text-sm" data-testid="text-profile-city">{user?.city || "—"}</p>
+                    <p className="text-white text-sm" data-testid="text-profile-dob">{formatDate((user as any)?.dateOfBirth)}</p>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-white/60 text-xs">State</Label>
+                <div className="space-y-2">
+                  <Label className="text-white/60 text-xs">Marital Status</Label>
+                  {editing ? (
+                    <Select
+                      value={profileForm.maritalStatus || ""}
+                      onValueChange={(v) => setProfileForm((f) => ({ ...f, maritalStatus: v }))}
+                    >
+                      <SelectTrigger className="bg-zinc-800 border-white/10 text-white" data-testid="select-profile-marital">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Single">Single</SelectItem>
+                        <SelectItem value="Married">Married</SelectItem>
+                        <SelectItem value="Widowed">Widowed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-white text-sm" data-testid="text-profile-marital">{(user as any)?.maritalStatus || "—"}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/10">
+                <h3 className="text-white/80 text-sm font-medium mb-4" style={{ fontFamily: "Montserrat, sans-serif" }}>Address</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label className="text-white/60 text-xs">Street Address</Label>
                     {editing ? (
                       <Input
-                        value={profileForm.state}
-                        onChange={(e) => setProfileForm((f) => ({ ...f, state: e.target.value }))}
+                        value={profileForm.address}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, address: e.target.value }))}
                         className="bg-zinc-800 border-white/10 text-white"
-                        data-testid="input-profile-state"
-                        autoComplete="address-level1"
+                        data-testid="input-profile-address"
+                        autoComplete="street-address"
                       />
                     ) : (
-                      <p className="text-white text-sm" data-testid="text-profile-state">{user?.state || "—"}</p>
+                      <p className="text-white text-sm" data-testid="text-profile-address">{user?.address || "—"}</p>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-white/60 text-xs">ZIP</Label>
+                    <Label className="text-white/60 text-xs">City</Label>
                     {editing ? (
                       <Input
-                        value={profileForm.zip}
-                        onChange={(e) => setProfileForm((f) => ({ ...f, zip: e.target.value }))}
+                        value={profileForm.city}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, city: e.target.value }))}
                         className="bg-zinc-800 border-white/10 text-white"
-                        data-testid="input-profile-zip"
-                        autoComplete="postal-code"
+                        data-testid="input-profile-city"
+                        autoComplete="address-level2"
                       />
                     ) : (
-                      <p className="text-white text-sm" data-testid="text-profile-zip">{user?.zip || "—"}</p>
+                      <p className="text-white text-sm" data-testid="text-profile-city">{user?.city || "—"}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white/60 text-xs">State</Label>
+                      {editing ? (
+                        <Input
+                          value={profileForm.state}
+                          onChange={(e) => setProfileForm((f) => ({ ...f, state: e.target.value }))}
+                          className="bg-zinc-800 border-white/10 text-white"
+                          data-testid="input-profile-state"
+                          autoComplete="address-level1"
+                        />
+                      ) : (
+                        <p className="text-white text-sm" data-testid="text-profile-state">{user?.state || "—"}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white/60 text-xs">ZIP</Label>
+                      {editing ? (
+                        <Input
+                          value={profileForm.zip}
+                          onChange={(e) => setProfileForm((f) => ({ ...f, zip: e.target.value }))}
+                          className="bg-zinc-800 border-white/10 text-white"
+                          data-testid="input-profile-zip"
+                          autoComplete="postal-code"
+                        />
+                      ) : (
+                        <p className="text-white text-sm" data-testid="text-profile-zip">{user?.zip || "—"}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/10">
+                <h3 className="text-white/80 text-sm font-medium mb-4" style={{ fontFamily: "Montserrat, sans-serif" }}>Emergency Contact</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-white/60 text-xs">Contact Name</Label>
+                    {editing ? (
+                      <Input
+                        value={profileForm.emergencyContactName}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, emergencyContactName: e.target.value }))}
+                        className="bg-zinc-800 border-white/10 text-white"
+                        data-testid="input-profile-emergency-name"
+                        placeholder="Full name"
+                      />
+                    ) : (
+                      <p className="text-white text-sm" data-testid="text-profile-emergency-name">{(user as any)?.emergencyContactName || "—"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white/60 text-xs">Contact Phone</Label>
+                    {editing ? (
+                      <Input
+                        value={profileForm.emergencyContactPhone}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, emergencyContactPhone: e.target.value }))}
+                        className="bg-zinc-800 border-white/10 text-white"
+                        data-testid="input-profile-emergency-phone"
+                        placeholder="Phone number"
+                        autoComplete="tel"
+                      />
+                    ) : (
+                      <p className="text-white text-sm" data-testid="text-profile-emergency-phone">{(user as any)?.emergencyContactPhone || "—"}</p>
                     )}
                   </div>
                 </div>
               </div>
+
               <div className="mt-6 pt-4 border-t border-white/10">
                 <p className="text-white/40 text-xs">
                   Member since {formatDate(user?.createdAt as any)}
