@@ -1,9 +1,10 @@
 import { db } from "./db";
-import { eq, desc, asc, and, isNull, sql } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, sql, inArray, ne } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
   pushSubscriptions, notificationLogs,
+  smsGroups, smsGroupMembers, userTags, smsMessages, smsRecipients, smsOptOuts, smsTemplates, smsSettings, smsIncomingMessages,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -23,6 +24,15 @@ import {
   type Donation, type InsertDonation,
   type PushSubscription, type InsertPushSubscription,
   type NotificationLog, type InsertNotificationLog,
+  type SmsGroup, type InsertSmsGroup,
+  type SmsGroupMember, type InsertSmsGroupMember,
+  type UserTag, type InsertUserTag,
+  type SmsMessage, type InsertSmsMessage,
+  type SmsRecipient, type InsertSmsRecipient,
+  type SmsOptOut, type InsertSmsOptOut,
+  type SmsTemplate, type InsertSmsTemplate,
+  type SmsSettings, type InsertSmsSettings,
+  type SmsIncomingMessage, type InsertSmsIncomingMessage,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -145,6 +155,68 @@ export interface IStorage {
 
   createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
   getNotificationLogs(): Promise<NotificationLog[]>;
+
+  // SMS Groups
+  getSmsGroups(): Promise<SmsGroup[]>;
+  getSmsGroup(id: number): Promise<SmsGroup | undefined>;
+  createSmsGroup(group: InsertSmsGroup): Promise<SmsGroup>;
+  updateSmsGroup(id: number, data: Partial<InsertSmsGroup>): Promise<SmsGroup | undefined>;
+  deleteSmsGroup(id: number): Promise<void>;
+
+  // SMS Group Members
+  getSmsGroupMembers(groupId: number): Promise<SmsGroupMember[]>;
+  addSmsGroupMember(member: InsertSmsGroupMember): Promise<SmsGroupMember>;
+  removeSmsGroupMember(groupId: number, userId: number): Promise<void>;
+
+  // User Tags
+  getUserTags(userId: number): Promise<UserTag[]>;
+  getAllTags(): Promise<{ tag: string; count: number }[]>;
+  addUserTag(tag: InsertUserTag): Promise<UserTag>;
+  removeUserTag(userId: number, tag: string): Promise<void>;
+  getUsersByTag(tag: string): Promise<User[]>;
+
+  // SMS Messages
+  getSmsMessages(): Promise<SmsMessage[]>;
+  getSmsMessage(id: number): Promise<SmsMessage | undefined>;
+  createSmsMessage(message: InsertSmsMessage): Promise<SmsMessage>;
+  updateSmsMessage(id: number, data: Partial<InsertSmsMessage>): Promise<SmsMessage | undefined>;
+  deleteSmsMessage(id: number): Promise<void>;
+
+  // SMS Recipients
+  getSmsRecipients(messageId: number): Promise<SmsRecipient[]>;
+  getSmsRecipient(id: number): Promise<SmsRecipient | undefined>;
+  getSmsRecipientByTwilioSid(sid: string): Promise<SmsRecipient | undefined>;
+  createSmsRecipient(recipient: InsertSmsRecipient): Promise<SmsRecipient>;
+  updateSmsRecipient(id: number, data: Partial<InsertSmsRecipient>): Promise<SmsRecipient | undefined>;
+
+  // SMS Opt Outs
+  getSmsOptOuts(): Promise<SmsOptOut[]>;
+  getSmsOptOutByPhone(phone: string): Promise<SmsOptOut | undefined>;
+  createSmsOptOut(optOut: InsertSmsOptOut): Promise<SmsOptOut>;
+  removeSmsOptOut(phoneNumber: string, method: string): Promise<void>;
+  isPhoneOptedOut(phone: string): Promise<boolean>;
+
+  // SMS Templates
+  getSmsTemplates(): Promise<SmsTemplate[]>;
+  getSmsTemplate(id: number): Promise<SmsTemplate | undefined>;
+  createSmsTemplate(template: InsertSmsTemplate): Promise<SmsTemplate>;
+  updateSmsTemplate(id: number, data: Partial<InsertSmsTemplate>): Promise<SmsTemplate | undefined>;
+  deleteSmsTemplate(id: number): Promise<void>;
+  incrementSmsTemplateUseCount(id: number): Promise<void>;
+
+  // SMS Settings
+  getSmsSettings(): Promise<SmsSettings | undefined>;
+  upsertSmsSettings(data: Partial<InsertSmsSettings>): Promise<SmsSettings>;
+
+  // SMS Incoming Messages
+  getSmsIncomingMessages(): Promise<SmsIncomingMessage[]>;
+  getSmsIncomingMessagesRequiringResponse(): Promise<SmsIncomingMessage[]>;
+  createSmsIncomingMessage(msg: InsertSmsIncomingMessage): Promise<SmsIncomingMessage>;
+  markSmsIncomingResponded(id: number, respondedBy: number): Promise<SmsIncomingMessage | undefined>;
+
+  // Group Member Resolution
+  resolveGroupMembers(groupId: number): Promise<User[]>;
+  getEligibleSmsRecipients(userIds: number[]): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -688,6 +760,273 @@ export class DatabaseStorage implements IStorage {
 
   async getNotificationLogs(): Promise<NotificationLog[]> {
     return db.select().from(notificationLogs).orderBy(desc(notificationLogs.sentAt));
+  }
+
+  // ======== SMS GROUPS ========
+
+  async getSmsGroups(): Promise<SmsGroup[]> {
+    return db.select().from(smsGroups).where(eq(smsGroups.isActive, true)).orderBy(asc(smsGroups.name));
+  }
+
+  async getSmsGroup(id: number): Promise<SmsGroup | undefined> {
+    const [group] = await db.select().from(smsGroups).where(eq(smsGroups.id, id));
+    return group;
+  }
+
+  async createSmsGroup(group: InsertSmsGroup): Promise<SmsGroup> {
+    const [created] = await db.insert(smsGroups).values(group).returning();
+    return created;
+  }
+
+  async updateSmsGroup(id: number, data: Partial<InsertSmsGroup>): Promise<SmsGroup | undefined> {
+    const [updated] = await db.update(smsGroups).set({ ...data, updatedAt: new Date() }).where(eq(smsGroups.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSmsGroup(id: number): Promise<void> {
+    await db.update(smsGroups).set({ isActive: false, updatedAt: new Date() }).where(eq(smsGroups.id, id));
+  }
+
+  // ======== SMS GROUP MEMBERS ========
+
+  async getSmsGroupMembers(groupId: number): Promise<SmsGroupMember[]> {
+    return db.select().from(smsGroupMembers).where(eq(smsGroupMembers.groupId, groupId));
+  }
+
+  async addSmsGroupMember(member: InsertSmsGroupMember): Promise<SmsGroupMember> {
+    const [created] = await db.insert(smsGroupMembers).values(member).returning();
+    return created;
+  }
+
+  async removeSmsGroupMember(groupId: number, userId: number): Promise<void> {
+    await db.delete(smsGroupMembers).where(and(eq(smsGroupMembers.groupId, groupId), eq(smsGroupMembers.userId, userId)));
+  }
+
+  // ======== USER TAGS ========
+
+  async getUserTags(userId: number): Promise<UserTag[]> {
+    return db.select().from(userTags).where(eq(userTags.userId, userId)).orderBy(asc(userTags.tag));
+  }
+
+  async getAllTags(): Promise<{ tag: string; count: number }[]> {
+    const result = await db.select({ tag: userTags.tag, count: sql<number>`count(*)` }).from(userTags).groupBy(userTags.tag).orderBy(asc(userTags.tag));
+    return result.map(r => ({ tag: r.tag, count: Number(r.count) }));
+  }
+
+  async addUserTag(tag: InsertUserTag): Promise<UserTag> {
+    const [created] = await db.insert(userTags).values({ ...tag, tag: tag.tag.toLowerCase() }).returning();
+    return created;
+  }
+
+  async removeUserTag(userId: number, tag: string): Promise<void> {
+    await db.delete(userTags).where(and(eq(userTags.userId, userId), eq(userTags.tag, tag.toLowerCase())));
+  }
+
+  async getUsersByTag(tag: string): Promise<User[]> {
+    const tagged = await db.select({ userId: userTags.userId }).from(userTags).where(eq(userTags.tag, tag.toLowerCase()));
+    if (tagged.length === 0) return [];
+    return db.select().from(users).where(and(inArray(users.id, tagged.map(t => t.userId)), isNull(users.deletedAt)));
+  }
+
+  // ======== SMS MESSAGES ========
+
+  async getSmsMessages(): Promise<SmsMessage[]> {
+    return db.select().from(smsMessages).orderBy(desc(smsMessages.createdAt));
+  }
+
+  async getSmsMessage(id: number): Promise<SmsMessage | undefined> {
+    const [msg] = await db.select().from(smsMessages).where(eq(smsMessages.id, id));
+    return msg;
+  }
+
+  async createSmsMessage(message: InsertSmsMessage): Promise<SmsMessage> {
+    const [created] = await db.insert(smsMessages).values(message).returning();
+    return created;
+  }
+
+  async updateSmsMessage(id: number, data: Partial<InsertSmsMessage>): Promise<SmsMessage | undefined> {
+    const [updated] = await db.update(smsMessages).set({ ...data, updatedAt: new Date() }).where(eq(smsMessages.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSmsMessage(id: number): Promise<void> {
+    await db.delete(smsRecipients).where(eq(smsRecipients.messageId, id));
+    await db.delete(smsMessages).where(eq(smsMessages.id, id));
+  }
+
+  // ======== SMS RECIPIENTS ========
+
+  async getSmsRecipients(messageId: number): Promise<SmsRecipient[]> {
+    return db.select().from(smsRecipients).where(eq(smsRecipients.messageId, messageId));
+  }
+
+  async getSmsRecipient(id: number): Promise<SmsRecipient | undefined> {
+    const [r] = await db.select().from(smsRecipients).where(eq(smsRecipients.id, id));
+    return r;
+  }
+
+  async getSmsRecipientByTwilioSid(sid: string): Promise<SmsRecipient | undefined> {
+    const [r] = await db.select().from(smsRecipients).where(eq(smsRecipients.twilioMessageSid, sid));
+    return r;
+  }
+
+  async createSmsRecipient(recipient: InsertSmsRecipient): Promise<SmsRecipient> {
+    const [created] = await db.insert(smsRecipients).values(recipient).returning();
+    return created;
+  }
+
+  async updateSmsRecipient(id: number, data: Partial<InsertSmsRecipient>): Promise<SmsRecipient | undefined> {
+    const [updated] = await db.update(smsRecipients).set({ ...data, updatedAt: new Date() }).where(eq(smsRecipients.id, id)).returning();
+    return updated;
+  }
+
+  // ======== SMS OPT OUTS ========
+
+  async getSmsOptOuts(): Promise<SmsOptOut[]> {
+    return db.select().from(smsOptOuts).where(isNull(smsOptOuts.optedBackInAt)).orderBy(desc(smsOptOuts.optedOutAt));
+  }
+
+  async getSmsOptOutByPhone(phone: string): Promise<SmsOptOut | undefined> {
+    const [opt] = await db.select().from(smsOptOuts).where(and(eq(smsOptOuts.phoneNumber, phone), isNull(smsOptOuts.optedBackInAt)));
+    return opt;
+  }
+
+  async createSmsOptOut(optOut: InsertSmsOptOut): Promise<SmsOptOut> {
+    const [created] = await db.insert(smsOptOuts).values(optOut).returning();
+    return created;
+  }
+
+  async removeSmsOptOut(phoneNumber: string, method: string): Promise<void> {
+    await db.update(smsOptOuts).set({ optedBackInAt: new Date(), optInMethod: method }).where(and(eq(smsOptOuts.phoneNumber, phoneNumber), isNull(smsOptOuts.optedBackInAt)));
+  }
+
+  async isPhoneOptedOut(phone: string): Promise<boolean> {
+    const opt = await this.getSmsOptOutByPhone(phone);
+    return !!opt;
+  }
+
+  // ======== SMS TEMPLATES ========
+
+  async getSmsTemplates(): Promise<SmsTemplate[]> {
+    return db.select().from(smsTemplates).where(eq(smsTemplates.isActive, true)).orderBy(asc(smsTemplates.name));
+  }
+
+  async getSmsTemplate(id: number): Promise<SmsTemplate | undefined> {
+    const [t] = await db.select().from(smsTemplates).where(eq(smsTemplates.id, id));
+    return t;
+  }
+
+  async createSmsTemplate(template: InsertSmsTemplate): Promise<SmsTemplate> {
+    const [created] = await db.insert(smsTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateSmsTemplate(id: number, data: Partial<InsertSmsTemplate>): Promise<SmsTemplate | undefined> {
+    const [updated] = await db.update(smsTemplates).set({ ...data, updatedAt: new Date() }).where(eq(smsTemplates.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSmsTemplate(id: number): Promise<void> {
+    await db.update(smsTemplates).set({ isActive: false, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
+  }
+
+  async incrementSmsTemplateUseCount(id: number): Promise<void> {
+    await db.update(smsTemplates).set({ useCount: sql`${smsTemplates.useCount} + 1` }).where(eq(smsTemplates.id, id));
+  }
+
+  // ======== SMS SETTINGS ========
+
+  async getSmsSettings(): Promise<SmsSettings | undefined> {
+    const [s] = await db.select().from(smsSettings).limit(1);
+    return s;
+  }
+
+  async upsertSmsSettings(data: Partial<InsertSmsSettings>): Promise<SmsSettings> {
+    const existing = await this.getSmsSettings();
+    if (existing) {
+      const [updated] = await db.update(smsSettings).set({ ...data, updatedAt: new Date() }).where(eq(smsSettings.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(smsSettings).values(data as InsertSmsSettings).returning();
+    return created;
+  }
+
+  // ======== SMS INCOMING MESSAGES ========
+
+  async getSmsIncomingMessages(): Promise<SmsIncomingMessage[]> {
+    return db.select().from(smsIncomingMessages).orderBy(desc(smsIncomingMessages.createdAt));
+  }
+
+  async getSmsIncomingMessagesRequiringResponse(): Promise<SmsIncomingMessage[]> {
+    return db.select().from(smsIncomingMessages).where(and(eq(smsIncomingMessages.requiresResponse, true), eq(smsIncomingMessages.responded, false))).orderBy(desc(smsIncomingMessages.createdAt));
+  }
+
+  async createSmsIncomingMessage(msg: InsertSmsIncomingMessage): Promise<SmsIncomingMessage> {
+    const [created] = await db.insert(smsIncomingMessages).values(msg).returning();
+    return created;
+  }
+
+  async markSmsIncomingResponded(id: number, respondedBy: number): Promise<SmsIncomingMessage | undefined> {
+    const [updated] = await db.update(smsIncomingMessages).set({ responded: true, respondedBy, respondedAt: new Date() }).where(eq(smsIncomingMessages.id, id)).returning();
+    return updated;
+  }
+
+  // ======== GROUP MEMBER RESOLUTION ========
+
+  async resolveGroupMembers(groupId: number): Promise<User[]> {
+    const group = await this.getSmsGroup(groupId);
+    if (!group) return [];
+
+    if (group.groupType === "custom") {
+      const members = await this.getSmsGroupMembers(groupId);
+      if (members.length === 0) return [];
+      return db.select().from(users).where(and(inArray(users.id, members.map(m => m.userId)), isNull(users.deletedAt), eq(users.isActive, true)));
+    }
+
+    const filter = group.filterCriteria as any;
+    if (!filter) return [];
+
+    let allUsers = await db.select().from(users).where(and(isNull(users.deletedAt), eq(users.isActive, true)));
+
+    if (filter.roles?.length) {
+      allUsers = allUsers.filter(u => u.roles.some((r: string) => filter.roles.includes(r)));
+    }
+    if (filter.hasChildren === true) {
+      const parents = await db.select({ parentUserId: children.parentUserId }).from(children).where(isNull(children.deletedAt));
+      const parentIds = new Set(parents.map(p => p.parentUserId));
+      allUsers = allUsers.filter(u => parentIds.has(u.id));
+    }
+    if (filter.tags?.length) {
+      const tagged = await db.select({ userId: userTags.userId }).from(userTags).where(inArray(userTags.tag, filter.tags));
+      const taggedIds = new Set(tagged.map(t => t.userId));
+      allUsers = allUsers.filter(u => taggedIds.has(u.id));
+    }
+    if (filter.includeUserIds?.length) {
+      const includeSet = new Set(filter.includeUserIds);
+      allUsers = allUsers.filter(u => includeSet.has(u.id));
+    }
+    if (filter.excludeUserIds?.length) {
+      const excludeSet = new Set(filter.excludeUserIds);
+      allUsers = allUsers.filter(u => !excludeSet.has(u.id));
+    }
+    if (filter.phoneVerifiedOnly) {
+      allUsers = allUsers.filter(u => u.phoneVerified);
+    }
+
+    return allUsers;
+  }
+
+  async getEligibleSmsRecipients(userIds: number[]): Promise<User[]> {
+    if (userIds.length === 0) return [];
+    return db.select().from(users).where(
+      and(
+        inArray(users.id, userIds),
+        isNull(users.deletedAt),
+        eq(users.isActive, true),
+        eq(users.smsOptIn, true),
+        eq(users.phoneType, "mobile"),
+      )
+    );
   }
 }
 

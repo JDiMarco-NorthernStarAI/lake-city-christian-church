@@ -27,8 +27,10 @@ import { Badge } from "@/components/ui/badge";
 import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund } from "@shared/schema";
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
+import AdminSmsTab from "@/pages/admin-sms";
+import { MessageSquare } from "lucide-react";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "pages" | "settings" | "users" | "roles";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "pages" | "settings" | "users" | "roles";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -42,6 +44,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
   { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
   { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
+  { id: "sms", label: "SMS Messaging", icon: MessageSquare, feature: "sms" },
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "users", label: "Users", icon: UserCog, feature: "users" },
   { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
@@ -144,6 +147,7 @@ export default function AdminDashboard() {
           {activeTab === "forms" && <FormsTab />}
           {activeTab === "donations" && <DonationsTab />}
           {activeTab === "notifications" && <NotificationsTab />}
+          {activeTab === "sms" && <AdminSmsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}

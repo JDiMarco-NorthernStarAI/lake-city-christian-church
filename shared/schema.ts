@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, unique, decimal, jsonb, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, unique, decimal, jsonb, serial, time } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -33,6 +33,7 @@ export const AVAILABLE_FEATURES = [
   "forms",
   "donations",
   "notifications",
+  "sms",
   "settings",
   "users",
   "roles",
@@ -50,6 +51,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   forms: "Form Builder",
   donations: "Donations",
   notifications: "Notifications",
+  sms: "SMS / Text Messages",
   settings: "Settings",
   users: "User Management",
   roles: "Role Permissions",
@@ -77,6 +79,16 @@ export const DONATION_FREQUENCIES = ["one_time", "weekly", "monthly"] as const;
 export const DONATION_STATUSES = ["pending", "completed", "failed", "refunded"] as const;
 
 export const NOTIFICATION_TYPES = ["general", "sermon", "event", "announcement"] as const;
+
+export const SMS_GROUP_TYPES = ["all", "role_based", "ministry", "custom", "event_based"] as const;
+export const SMS_MESSAGE_TYPES = ["broadcast", "individual", "scheduled", "automated"] as const;
+export const SMS_DELIVERY_CHANNELS = ["sms", "push", "both"] as const;
+export const SMS_MESSAGE_STATUSES = ["draft", "scheduled", "sending", "sent", "partially_sent", "failed", "cancelled"] as const;
+export const SMS_RECIPIENT_STATUSES = ["pending", "queued", "sent", "delivered", "failed", "undelivered", "opted_out"] as const;
+export const SMS_OPT_OUT_METHODS = ["reply_stop", "manual", "admin", "user_preference"] as const;
+export const SMS_OPT_IN_METHODS = ["reply_start", "manual", "admin", "user_preference"] as const;
+export const SMS_TEMPLATE_CATEGORIES = ["reminder", "announcement", "welcome", "emergency", "custom"] as const;
+export const PHONE_TYPES = ["mobile", "landline", "voip", "unknown"] as const;
 
 export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   general: "General",
@@ -129,6 +141,14 @@ export const users = pgTable("users", {
   profilePhotoUrl: text("profile_photo_url"),
   authProvider: text("auth_provider").default("email"),
   authProviderId: text("auth_provider_id"),
+  smsOptIn: boolean("sms_opt_in").notNull().default(true),
+  smsOptedInAt: timestamp("sms_opted_in_at"),
+  smsOptedOutAt: timestamp("sms_opted_out_at"),
+  phoneType: text("phone_type").notNull().default("unknown"),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  phoneVerifiedAt: timestamp("phone_verified_at"),
+  phoneCarrier: text("phone_carrier"),
+  phoneCountryCode: text("phone_country_code").notNull().default("US"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -493,6 +513,226 @@ export const sendNotificationSchema = z.object({
   body: z.string().min(1, "Message is required"),
   type: z.enum(NOTIFICATION_TYPES).optional(),
   url: z.string().optional(),
+});
+
+// ======== SMS / TEXT MESSAGING TABLES ========
+
+export const smsGroups = pgTable("sms_groups", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  description: text("description"),
+  groupType: text("group_type").notNull().default("custom"),
+  filterCriteria: jsonb("filter_criteria"),
+  isActive: boolean("is_active").notNull().default(true),
+  memberCount: integer("member_count").notNull().default(0),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const smsGroupMembers = pgTable("sms_group_members", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  groupId: integer("group_id").notNull(),
+  userId: integer("user_id").notNull(),
+  addedBy: integer("added_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  unique().on(table.groupId, table.userId),
+]);
+
+export const userTags = pgTable("user_tags", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id").notNull(),
+  tag: text("tag").notNull(),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  unique().on(table.userId, table.tag),
+]);
+
+export const smsMessages = pgTable("sms_messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  groupId: integer("group_id"),
+  senderId: integer("sender_id").notNull(),
+  messageBody: text("message_body").notNull(),
+  messageType: text("message_type").notNull().default("broadcast"),
+  deliveryChannel: text("delivery_channel").notNull().default("sms"),
+  scheduledFor: timestamp("scheduled_for"),
+  sentAt: timestamp("sent_at"),
+  status: text("status").notNull().default("draft"),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  smsDeliveredCount: integer("sms_delivered_count").notNull().default(0),
+  smsFailedCount: integer("sms_failed_count").notNull().default(0),
+  pushDeliveredCount: integer("push_delivered_count").notNull().default(0),
+  pushFailedCount: integer("push_failed_count").notNull().default(0),
+  estimatedCost: text("estimated_cost"),
+  actualCost: text("actual_cost"),
+  segmentCount: integer("segment_count").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const smsRecipients = pgTable("sms_recipients", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  messageId: integer("message_id").notNull(),
+  userId: integer("user_id").notNull(),
+  phoneNumber: text("phone_number"),
+  channel: text("channel").notNull().default("sms"),
+  twilioMessageSid: text("twilio_message_sid"),
+  status: text("status").notNull().default("pending"),
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  cost: text("cost"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const smsOptOuts = pgTable("sms_opt_outs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  phoneNumber: text("phone_number").notNull().unique(),
+  userId: integer("user_id"),
+  optedOutAt: timestamp("opted_out_at").notNull().defaultNow(),
+  optOutMethod: text("opt_out_method").notNull().default("manual"),
+  optedBackInAt: timestamp("opted_back_in_at"),
+  optInMethod: text("opt_in_method"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const smsTemplates = pgTable("sms_templates", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  variables: jsonb("variables"),
+  category: text("category").notNull().default("custom"),
+  isActive: boolean("is_active").notNull().default(true),
+  useCount: integer("use_count").notNull().default(0),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const smsSettings = pgTable("sms_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  twilioPhoneNumber: text("twilio_phone_number"),
+  churchNamePrefix: text("church_name_prefix").notNull().default("Lake City Christian: "),
+  dailyLimit: integer("daily_limit").notNull().default(1000),
+  monthlyLimit: integer("monthly_limit").notNull().default(10000),
+  quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(true),
+  quietHoursStart: text("quiet_hours_start").notNull().default("21:00"),
+  quietHoursEnd: text("quiet_hours_end").notNull().default("08:00"),
+  quietHoursTimezone: text("quiet_hours_timezone").notNull().default("America/New_York"),
+  autoReplyEnabled: boolean("auto_reply_enabled").notNull().default(true),
+  autoReplyMessage: text("auto_reply_message").notNull().default("Thanks for your message! For immediate assistance, please call the church office. This is an automated system that does not receive replies."),
+  optOutConfirmation: text("opt_out_confirmation").notNull().default("You've been unsubscribed from Lake City Christian Church texts. Reply START to resubscribe."),
+  optInConfirmation: text("opt_in_confirmation").notNull().default("You're now subscribed to Lake City Christian Church texts. Reply STOP to unsubscribe."),
+  includeOptOutFooter: boolean("include_opt_out_footer").notNull().default(true),
+  messagesSentToday: integer("messages_sent_today").notNull().default(0),
+  messagesSentThisMonth: integer("messages_sent_this_month").notNull().default(0),
+  costThisMonth: text("cost_this_month").notNull().default("0.00"),
+  lastDailyReset: timestamp("last_daily_reset"),
+  lastMonthlyReset: timestamp("last_monthly_reset"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const smsIncomingMessages = pgTable("sms_incoming_messages", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  fromNumber: text("from_number").notNull(),
+  userId: integer("user_id"),
+  messageBody: text("message_body").notNull(),
+  twilioMessageSid: text("twilio_message_sid"),
+  isOptOut: boolean("is_opt_out").notNull().default(false),
+  isOptIn: boolean("is_opt_in").notNull().default(false),
+  requiresResponse: boolean("requires_response").notNull().default(false),
+  responded: boolean("responded").notNull().default(false),
+  respondedBy: integer("responded_by"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ======== SMS INSERT SCHEMAS & TYPES ========
+
+export const insertSmsGroupSchema = createInsertSchema(smsGroups).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSmsGroupMemberSchema = createInsertSchema(smsGroupMembers).omit({ id: true, createdAt: true });
+export const insertUserTagSchema = createInsertSchema(userTags).omit({ id: true, createdAt: true });
+export const insertSmsMessageSchema = createInsertSchema(smsMessages).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSmsRecipientSchema = createInsertSchema(smsRecipients).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSmsOptOutSchema = createInsertSchema(smsOptOuts).omit({ id: true, createdAt: true });
+export const insertSmsTemplateSchema = createInsertSchema(smsTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSmsSettingsSchema = createInsertSchema(smsSettings).omit({ id: true, updatedAt: true });
+export const insertSmsIncomingMessageSchema = createInsertSchema(smsIncomingMessages).omit({ id: true, createdAt: true });
+
+export type SmsGroup = typeof smsGroups.$inferSelect;
+export type InsertSmsGroup = z.infer<typeof insertSmsGroupSchema>;
+export type SmsGroupMember = typeof smsGroupMembers.$inferSelect;
+export type InsertSmsGroupMember = z.infer<typeof insertSmsGroupMemberSchema>;
+export type UserTag = typeof userTags.$inferSelect;
+export type InsertUserTag = z.infer<typeof insertUserTagSchema>;
+export type SmsMessage = typeof smsMessages.$inferSelect;
+export type InsertSmsMessage = z.infer<typeof insertSmsMessageSchema>;
+export type SmsRecipient = typeof smsRecipients.$inferSelect;
+export type InsertSmsRecipient = z.infer<typeof insertSmsRecipientSchema>;
+export type SmsOptOut = typeof smsOptOuts.$inferSelect;
+export type InsertSmsOptOut = z.infer<typeof insertSmsOptOutSchema>;
+export type SmsTemplate = typeof smsTemplates.$inferSelect;
+export type InsertSmsTemplate = z.infer<typeof insertSmsTemplateSchema>;
+export type SmsSettings = typeof smsSettings.$inferSelect;
+export type InsertSmsSettings = z.infer<typeof insertSmsSettingsSchema>;
+export type SmsIncomingMessage = typeof smsIncomingMessages.$inferSelect;
+export type InsertSmsIncomingMessage = z.infer<typeof insertSmsIncomingMessageSchema>;
+
+// ======== SMS VALIDATION SCHEMAS ========
+
+export const createSmsGroupSchema = z.object({
+  name: z.string().min(1, "Group name is required"),
+  description: z.string().optional(),
+  groupType: z.enum(SMS_GROUP_TYPES),
+  filterCriteria: z.object({
+    roles: z.array(z.string()).optional(),
+    ministries: z.array(z.string()).optional(),
+    events: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+    includeUserIds: z.array(z.number()).optional(),
+    excludeUserIds: z.array(z.number()).optional(),
+    hasChildren: z.boolean().nullable().optional(),
+    phoneVerifiedOnly: z.boolean().optional(),
+  }).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const createSmsTemplateSchema = z.object({
+  name: z.string().min(1, "Template name is required"),
+  body: z.string().min(1, "Template body is required").max(1600, "Max 1600 characters"),
+  variables: z.array(z.string()).optional(),
+  category: z.enum(SMS_TEMPLATE_CATEGORIES),
+  isActive: z.boolean().optional(),
+});
+
+export const sendSmsMessageSchema = z.object({
+  groupId: z.number().int().optional().nullable(),
+  userIds: z.array(z.number().int()).optional().nullable(),
+  messageBody: z.string().min(1, "Message is required").max(1600, "Max 1600 characters"),
+  deliveryChannel: z.enum(SMS_DELIVERY_CHANNELS),
+  templateId: z.number().int().optional().nullable(),
+  personalize: z.boolean().optional(),
+  respectQuietHours: z.boolean().optional(),
+  scheduleFor: z.string().optional().nullable(),
+});
+
+export const updateSmsSettingsSchema = z.object({
+  churchNamePrefix: z.string().optional(),
+  dailyLimit: z.number().int().positive().optional(),
+  monthlyLimit: z.number().int().positive().optional(),
+  quietHoursEnabled: z.boolean().optional(),
+  quietHoursStart: z.string().optional(),
+  quietHoursEnd: z.string().optional(),
+  quietHoursTimezone: z.string().optional(),
+  autoReplyEnabled: z.boolean().optional(),
+  autoReplyMessage: z.string().optional(),
+  optOutConfirmation: z.string().optional(),
+  optInConfirmation: z.string().optional(),
+  includeOptOutFooter: z.boolean().optional(),
 });
 
 export const socialAuthSchema = z.object({

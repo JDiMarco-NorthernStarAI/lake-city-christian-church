@@ -23,11 +23,52 @@ async function seedRolePermissions() {
   }
 }
 
+async function seedSmsDefaults() {
+  try {
+    const existing = await storage.getSmsSettings();
+    if (existing) return;
+
+    await storage.upsertSmsSettings({
+      twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || null,
+      churchNamePrefix: "LC3: ",
+      dailyLimit: 1000,
+      monthlyLimit: 10000,
+      quietHoursEnabled: true,
+      quietHoursStart: "21:00",
+      quietHoursEnd: "08:00",
+      quietHoursTimezone: "America/New_York",
+      autoReplyEnabled: true,
+      autoReplyMessage: "Thanks for your message! For immediate assistance, please call the church office at (440) 234-2108.",
+      includeOptOutFooter: true,
+    });
+
+    const groups = await storage.getSmsGroups();
+    if (groups.length === 0) {
+      await storage.createSmsGroup({ name: "All Members", description: "All registered church members", groupType: "all", filterCriteria: {}, createdBy: 1 });
+      await storage.createSmsGroup({ name: "Kids Ministry Parents", description: "Parents with children in Kids Ministry", groupType: "ministry", filterCriteria: { hasChildren: true }, createdBy: 1 });
+      await storage.createSmsGroup({ name: "Student Ministry", description: "Student ministry leaders and families", groupType: "role", filterCriteria: { roles: ["student_ministry"] }, createdBy: 1 });
+      await storage.createSmsGroup({ name: "Small Group Leaders", description: "Small group coordinators and leaders", groupType: "role", filterCriteria: { roles: ["small_group"] }, createdBy: 1 });
+    }
+
+    const templates = await storage.getSmsTemplates();
+    if (templates.length === 0) {
+      await storage.createSmsTemplate({ name: "Sunday Reminder", body: "Hey {{first_name}}! Just a reminder that we'd love to see you this Sunday at 10:00 AM. See you there!", category: "reminder", createdBy: 1 });
+      await storage.createSmsTemplate({ name: "Event Announcement", body: "Hi {{first_name}}, we have an exciting event coming up! Check our website for details.", category: "event", createdBy: 1 });
+      await storage.createSmsTemplate({ name: "Weather Cancellation", body: "Due to weather, all activities at Lake City Christian Church are cancelled today. Stay safe!", category: "emergency", createdBy: 1 });
+    }
+
+    log("SMS defaults seeded", "seed");
+  } catch (e) {
+    log(`SMS seed error: ${e}`, "seed");
+  }
+}
+
 export async function seedDatabase() {
   try {
     const existingAdmin = await storage.getUserByUsername("admin");
 
     await seedRolePermissions();
+    await seedSmsDefaults();
 
     if (existingAdmin) {
       log("Database already seeded", "seed");
