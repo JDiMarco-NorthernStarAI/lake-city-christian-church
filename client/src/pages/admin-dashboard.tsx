@@ -2335,6 +2335,7 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
     placeholder: "",
     helpText: "",
     options: "",
+    optionItems: [{ label: "", capacity: "" }] as { label: string; capacity: string }[],
   });
 
   const { data: formWithFields, isLoading } = useQuery<Form & { fields: FormField[] }>({
@@ -2447,22 +2448,25 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
 
   function openAddField() {
     setEditingField(null);
-    setFieldForm({ label: "", fieldType: "text", required: false, placeholder: "", helpText: "", options: "" });
+    setFieldForm({ label: "", fieldType: "text", required: false, placeholder: "", helpText: "", options: "", optionItems: [{ label: "", capacity: "" }] });
     setFieldDialogOpen(true);
   }
 
   function openEditField(field: FormField) {
     setEditingField(field);
     let opts = "";
+    const items: { label: string; capacity: string }[] = [];
     if (Array.isArray(field.options)) {
-      opts = (field.options as any[]).map((o: any) => {
-        if (typeof o === "string") return o;
-        if (o && typeof o === "object" && o.label) {
-          return o.capacity ? `${o.label}|${o.capacity}` : o.label;
+      for (const o of field.options as any[]) {
+        if (typeof o === "string") {
+          items.push({ label: o, capacity: "" });
+        } else if (o && typeof o === "object" && o.label) {
+          items.push({ label: o.label, capacity: o.capacity ? String(o.capacity) : "" });
         }
-        return String(o);
-      }).join("\n");
+      }
+      opts = items.map((i) => i.capacity ? `${i.label}|${i.capacity}` : i.label).join("\n");
     }
+    if (items.length === 0) items.push({ label: "", capacity: "" });
     setFieldForm({
       label: field.label,
       fieldType: field.fieldType,
@@ -2470,6 +2474,7 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
       placeholder: field.placeholder || "",
       helpText: field.helpText || "",
       options: opts,
+      optionItems: items,
     });
     setFieldDialogOpen(true);
   }
@@ -2479,18 +2484,20 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
     const optionTypes = ["select", "radio", "checkbox_group"];
     let parsedOptions: any = null;
     if (optionTypes.includes(fieldForm.fieldType)) {
-      parsedOptions = fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean).map((line) => {
-        const pipeIdx = line.lastIndexOf("|");
-        if (pipeIdx > 0) {
-          const label = line.substring(0, pipeIdx).trim();
-          const capStr = line.substring(pipeIdx + 1).trim();
-          const cap = parseInt(capStr, 10);
-          if (label && !isNaN(cap) && cap > 0) {
-            return { label, capacity: cap };
-          }
-        }
-        return { label: line };
-      });
+      if (fieldForm.fieldType === "checkbox_group") {
+        parsedOptions = fieldForm.optionItems
+          .filter((item) => item.label.trim())
+          .map((item) => {
+            const cap = parseInt(item.capacity, 10);
+            return item.capacity && !isNaN(cap) && cap > 0
+              ? { label: item.label.trim(), capacity: cap }
+              : { label: item.label.trim() };
+          });
+      } else {
+        parsedOptions = fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean).map((line) => {
+          return { label: line };
+        });
+      }
     }
     const data: any = {
       label: fieldForm.label,
@@ -2744,16 +2751,73 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
                 data-testid="input-field-help-text"
               />
             </div>
-            {showOptionsField && (
+            {showOptionsField && fieldForm.fieldType === "checkbox_group" && (
+              <div className="space-y-2">
+                <Label>Items</Label>
+                <p className="text-xs text-muted-foreground">
+                  Add items people can sign up for. Set a quantity limit or leave blank for unlimited.
+                </p>
+                <div className="space-y-2">
+                  {fieldForm.optionItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2" data-testid={`option-item-${idx}`}>
+                      <Input
+                        value={item.label}
+                        onChange={(e) => {
+                          const updated = [...fieldForm.optionItems];
+                          updated[idx] = { ...updated[idx], label: e.target.value };
+                          setFieldForm({ ...fieldForm, optionItems: updated });
+                        }}
+                        placeholder="Item name (e.g., Milk)"
+                        className="flex-1"
+                        data-testid={`input-option-label-${idx}`}
+                      />
+                      <Input
+                        value={item.capacity}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, "");
+                          const updated = [...fieldForm.optionItems];
+                          updated[idx] = { ...updated[idx], capacity: val };
+                          setFieldForm({ ...fieldForm, optionItems: updated });
+                        }}
+                        placeholder="Qty"
+                        className="w-20"
+                        data-testid={`input-option-capacity-${idx}`}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          const updated = fieldForm.optionItems.filter((_, i) => i !== idx);
+                          if (updated.length === 0) updated.push({ label: "", capacity: "" });
+                          setFieldForm({ ...fieldForm, optionItems: updated });
+                        }}
+                        disabled={fieldForm.optionItems.length <= 1}
+                        data-testid={`button-remove-option-${idx}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFieldForm({ ...fieldForm, optionItems: [...fieldForm.optionItems, { label: "", capacity: "" }] })}
+                    data-testid="button-add-option-item"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Item
+                  </Button>
+                </div>
+              </div>
+            )}
+            {showOptionsField && fieldForm.fieldType !== "checkbox_group" && (
               <div className="space-y-2">
                 <Label>Options (one per line)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Add a limit by using the format: Option|limit (e.g., Milk|3 means max 3 sign-ups for Milk). Leave off the |number for unlimited.
-                </p>
                 <Textarea
                   value={fieldForm.options}
                   onChange={(e) => setFieldForm({ ...fieldForm, options: e.target.value })}
-                  placeholder={"Milk|3\nCookies|5\nNapkins"}
+                  placeholder={"Option 1\nOption 2\nOption 3"}
                   data-testid="input-field-options"
                 />
               </div>

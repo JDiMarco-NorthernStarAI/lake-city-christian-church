@@ -124,7 +124,7 @@ export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
   select: "Dropdown",
   radio: "Radio Buttons",
   checkbox: "Checkbox (Yes/No)",
-  checkbox_group: "Checkbox Group",
+  checkbox_group: "Limited Items Signup",
 };
 
 export const users = pgTable("users", {
