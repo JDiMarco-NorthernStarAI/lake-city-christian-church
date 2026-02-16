@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund, SignupEvent, SignupSubmission } from "@shared/schema";
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES, SIGNUP_CATEGORIES, SIGNUP_CATEGORY_LABELS, SIGNUP_EVENT_STATUSES, SIGNUP_VISIBILITY, SIGNUP_DISPLAY_TYPES } from "@shared/schema";
+import { clearTokens } from "@/lib/v1Api";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 import AdminSmsTab from "@/pages/admin-sms";
 import { MessageSquare, Inbox } from "lucide-react";
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
   async function handleLogout() {
     try {
       await apiRequest("POST", "/api/auth/logout");
+      clearTokens();
       queryClient.clear();
       setLocation("/");
     } catch {
