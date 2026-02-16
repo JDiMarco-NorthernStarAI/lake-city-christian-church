@@ -26,8 +26,13 @@ Preferred communication style: Simple, everyday language.
 ### Backend
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript, executed via TSX
-- **API Pattern**: RESTful JSON API under `/api/*` prefix
-- **Authentication**: Session-based auth using express-session with connect-pg-simple for session storage in PostgreSQL. Passwords hashed with bcryptjs. Role-based access control (admin = full access, editor = assigned sections only).
+- **API Pattern**: Two API layers:
+  - `/api/*` — Legacy endpoints for web admin dashboard (session-based auth)
+  - `/api/v1/*` — Versioned RESTful API for web app, iOS, and Android (JWT-based auth)
+- **Authentication (Web Admin)**: Session-based auth using express-session with connect-pg-simple for session storage in PostgreSQL.
+- **Authentication (V1 API)**: JWT access tokens (15-minute expiry) + refresh tokens (30-day expiry, hashed and stored in database). Supports device tracking and multi-device logout.
+- **RBAC**: 6 roles (member, student_ministry, kids_ministry, small_group, admin, super_admin) with configurable feature permissions via rolePermissions table. Users can have multiple roles simultaneously; enabled features are the union of all role permissions. super_admin always has full access.
+- **Passwords**: Hashed with bcryptjs (12 rounds for v1 API, 10 rounds for legacy admin).
 - **Development**: Vite dev server middleware integrated into Express for HMR during development
 - **Production Build**: Vite builds client to `dist/public`, esbuild bundles server to `dist/index.cjs`
 
@@ -37,6 +42,7 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` — shared between client and server
 - **Schema Push**: `npm run db:push` uses drizzle-kit push (no migration files needed for dev)
 - **Tables**: users, sermons, events, team_members, contact_submissions, connect_cards, site_settings, plus session table auto-created by connect-pg-simple
+- **V1 API Tables**: refresh_tokens (JWT refresh token storage with device tracking), event_signups (event registration with waitlist support), children (kids ministry registration)
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface with a database-backed implementation using Drizzle
@@ -57,6 +63,8 @@ client/               # Frontend React application
 server/               # Backend Express application
   index.ts            # Entry point, Express setup
   routes.ts           # API route definitions
+  v1-routes.ts        # V1 API routes (JWT auth, events, children, users)
+  jwt.ts              # JWT token generation, verification, and hashing utilities
   storage.ts          # Database storage interface and implementation
   db.ts               # Drizzle/PostgreSQL connection
   seed.ts             # Initial data seeding
@@ -95,6 +103,7 @@ migrations/           # Drizzle migration output directory
 - `express` + `express-session` — HTTP server and session management
 - `connect-pg-simple` — PostgreSQL session store
 - `bcryptjs` — Password hashing
+- `jsonwebtoken` — JWT token generation and verification for v1 API
 - `@tanstack/react-query` — Client-side data fetching/caching
 - `framer-motion` — Animations
 - `wouter` — Client-side routing

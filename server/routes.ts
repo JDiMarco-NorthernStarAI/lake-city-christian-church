@@ -12,6 +12,7 @@ import {
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
 import { XMLParser } from "fast-xml-parser";
+import v1Router from "./v1-routes";
 
 const YOUTUBE_CHANNEL_ID = "UCHu7KSnAWdDbILKO4gC4JTQ";
 const YOUTUBE_RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`;
@@ -134,6 +135,8 @@ export async function registerRoutes(
   );
 
   await seedDatabase();
+
+  app.use("/api/v1", v1Router);
 
   app.post("/api/auth/login", async (req, res) => {
     try {

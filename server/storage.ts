@@ -1,7 +1,8 @@
 import { db } from "./db";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, sql } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
+  refreshTokens, eventSignups, children,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -11,15 +12,29 @@ import {
   type SiteSetting, type InsertSiteSetting,
   type PageView, type InsertPageView,
   type RolePermission, type InsertRolePermission,
+  type RefreshToken, type InsertRefreshToken,
+  type EventSignup, type InsertEventSignup,
+  type Child, type InsertChild,
 } from "@shared/schema";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
+  getActiveUsers(): Promise<User[]>;
   updateUser(id: number, data: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: number): Promise<void>;
+  softDeleteUser(id: number): Promise<User | undefined>;
+  restoreUser(id: number): Promise<User | undefined>;
+
+  createRefreshToken(token: InsertRefreshToken): Promise<RefreshToken>;
+  getRefreshTokenByHash(tokenHash: string): Promise<RefreshToken | undefined>;
+  updateRefreshTokenLastUsed(id: number): Promise<void>;
+  deleteRefreshToken(id: number): Promise<void>;
+  deleteRefreshTokensByUserId(userId: number): Promise<void>;
+  getRefreshTokensByUserId(userId: number): Promise<RefreshToken[]>;
 
   getSermons(): Promise<Sermon[]>;
   getSermon(id: number): Promise<Sermon | undefined>;
@@ -28,10 +43,27 @@ export interface IStorage {
   deleteSermon(id: number): Promise<void>;
 
   getEvents(): Promise<Event[]>;
+  getActiveEvents(): Promise<Event[]>;
   getEvent(id: number): Promise<Event | undefined>;
   createEvent(event: InsertEvent): Promise<Event>;
   updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event | undefined>;
   deleteEvent(id: number): Promise<void>;
+  softDeleteEvent(id: number): Promise<Event | undefined>;
+
+  createEventSignup(signup: InsertEventSignup): Promise<EventSignup>;
+  getEventSignup(eventId: number, userId: number): Promise<EventSignup | undefined>;
+  getEventSignups(eventId: number): Promise<EventSignup[]>;
+  getUserSignups(userId: number): Promise<EventSignup[]>;
+  updateEventSignup(id: number, data: Partial<InsertEventSignup>): Promise<EventSignup | undefined>;
+  deleteEventSignup(id: number): Promise<void>;
+  getEventSignupCount(eventId: number): Promise<number>;
+
+  createChild(child: InsertChild): Promise<Child>;
+  getChild(id: number): Promise<Child | undefined>;
+  getChildrenByParent(parentUserId: number): Promise<Child[]>;
+  getAllChildren(): Promise<Child[]>;
+  updateChild(id: number, data: Partial<InsertChild>): Promise<Child | undefined>;
+  softDeleteChild(id: number): Promise<Child | undefined>;
 
   getTeamMembers(): Promise<TeamMember[]>;
   getTeamMember(id: number): Promise<TeamMember | undefined>;
@@ -69,6 +101,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
   async createUser(user: InsertUser): Promise<User> {
     const [created] = await db.insert(users).values(user).returning();
     return created;
@@ -78,13 +115,53 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(users);
   }
 
+  async getActiveUsers(): Promise<User[]> {
+    return db.select().from(users).where(isNull(users.deletedAt));
+  }
+
   async updateUser(id: number, data: Partial<InsertUser>): Promise<User | undefined> {
-    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    const [updated] = await db.update(users).set({ ...data, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return updated;
   }
 
   async deleteUser(id: number): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
+  }
+
+  async softDeleteUser(id: number): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async restoreUser(id: number): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ deletedAt: null, isActive: true, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async createRefreshToken(token: InsertRefreshToken): Promise<RefreshToken> {
+    const [created] = await db.insert(refreshTokens).values(token).returning();
+    return created;
+  }
+
+  async getRefreshTokenByHash(tokenHash: string): Promise<RefreshToken | undefined> {
+    const [token] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash));
+    return token;
+  }
+
+  async updateRefreshTokenLastUsed(id: number): Promise<void> {
+    await db.update(refreshTokens).set({ lastUsedAt: new Date() }).where(eq(refreshTokens.id, id));
+  }
+
+  async deleteRefreshToken(id: number): Promise<void> {
+    await db.delete(refreshTokens).where(eq(refreshTokens.id, id));
+  }
+
+  async deleteRefreshTokensByUserId(userId: number): Promise<void> {
+    await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+  }
+
+  async getRefreshTokensByUserId(userId: number): Promise<RefreshToken[]> {
+    return db.select().from(refreshTokens).where(eq(refreshTokens.userId, userId)).orderBy(desc(refreshTokens.lastUsedAt));
   }
 
   async getSermons(): Promise<Sermon[]> {
@@ -114,6 +191,10 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(events).orderBy(desc(events.date));
   }
 
+  async getActiveEvents(): Promise<Event[]> {
+    return db.select().from(events).where(and(eq(events.isActive, true), isNull(events.deletedAt))).orderBy(desc(events.date));
+  }
+
   async getEvent(id: number): Promise<Event | undefined> {
     const [event] = await db.select().from(events).where(eq(events.id, id));
     return event;
@@ -125,12 +206,79 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEvent(id: number, data: Partial<InsertEvent>): Promise<Event | undefined> {
-    const [updated] = await db.update(events).set(data).where(eq(events.id, id)).returning();
+    const [updated] = await db.update(events).set({ ...data, updatedAt: new Date() }).where(eq(events.id, id)).returning();
     return updated;
   }
 
   async deleteEvent(id: number): Promise<void> {
     await db.delete(events).where(eq(events.id, id));
+  }
+
+  async softDeleteEvent(id: number): Promise<Event | undefined> {
+    const [updated] = await db.update(events).set({ deletedAt: new Date(), isActive: false, updatedAt: new Date() }).where(eq(events.id, id)).returning();
+    return updated;
+  }
+
+  async createEventSignup(signup: InsertEventSignup): Promise<EventSignup> {
+    const [created] = await db.insert(eventSignups).values(signup).returning();
+    return created;
+  }
+
+  async getEventSignup(eventId: number, userId: number): Promise<EventSignup | undefined> {
+    const [signup] = await db.select().from(eventSignups)
+      .where(and(eq(eventSignups.eventId, eventId), eq(eventSignups.userId, userId)));
+    return signup;
+  }
+
+  async getEventSignups(eventId: number): Promise<EventSignup[]> {
+    return db.select().from(eventSignups).where(eq(eventSignups.eventId, eventId)).orderBy(desc(eventSignups.createdAt));
+  }
+
+  async getUserSignups(userId: number): Promise<EventSignup[]> {
+    return db.select().from(eventSignups).where(eq(eventSignups.userId, userId)).orderBy(desc(eventSignups.createdAt));
+  }
+
+  async updateEventSignup(id: number, data: Partial<InsertEventSignup>): Promise<EventSignup | undefined> {
+    const [updated] = await db.update(eventSignups).set({ ...data, updatedAt: new Date() }).where(eq(eventSignups.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEventSignup(id: number): Promise<void> {
+    await db.delete(eventSignups).where(eq(eventSignups.id, id));
+  }
+
+  async getEventSignupCount(eventId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(eventSignups)
+      .where(and(eq(eventSignups.eventId, eventId), eq(eventSignups.status, "registered")));
+    return result[0]?.count ?? 0;
+  }
+
+  async createChild(child: InsertChild): Promise<Child> {
+    const [created] = await db.insert(children).values(child).returning();
+    return created;
+  }
+
+  async getChild(id: number): Promise<Child | undefined> {
+    const [child] = await db.select().from(children).where(eq(children.id, id));
+    return child;
+  }
+
+  async getChildrenByParent(parentUserId: number): Promise<Child[]> {
+    return db.select().from(children).where(and(eq(children.parentUserId, parentUserId), isNull(children.deletedAt)));
+  }
+
+  async getAllChildren(): Promise<Child[]> {
+    return db.select().from(children).where(isNull(children.deletedAt));
+  }
+
+  async updateChild(id: number, data: Partial<InsertChild>): Promise<Child | undefined> {
+    const [updated] = await db.update(children).set({ ...data, updatedAt: new Date() }).where(eq(children.id, id)).returning();
+    return updated;
+  }
+
+  async softDeleteChild(id: number): Promise<Child | undefined> {
+    const [updated] = await db.update(children).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(children.id, id)).returning();
+    return updated;
   }
 
   async getTeamMembers(): Promise<TeamMember[]> {
