@@ -126,7 +126,7 @@ export default function OurStory() {
           <Link href="/about">
             <Button variant="ghost" data-testid="link-back-to-about">
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Back to Who We Are
+              Back to About Us
             </Button>
           </Link>
         </div>

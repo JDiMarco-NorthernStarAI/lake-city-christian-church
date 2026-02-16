@@ -14,7 +14,7 @@ import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 const navItems = [
   { label: "Home", href: "/" },
   {
-    label: "Who We Are",
+    label: "About Us",
     href: "/about",
     children: [
       { label: "Our Story", href: "/our-story" },

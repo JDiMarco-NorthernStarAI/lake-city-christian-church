@@ -59,7 +59,7 @@ export default function About() {
             transition={{ duration: 0.8 }}
             data-testid="text-about-hero-title"
           >
-            Who We Are
+            About Us
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
