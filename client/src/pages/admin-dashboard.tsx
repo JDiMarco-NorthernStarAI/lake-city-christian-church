@@ -1059,13 +1059,7 @@ function PagesTab() {
   });
 
   function handleSave() {
-    const toSave: Record<string, string> = {};
-    for (const [key, value] of Object.entries(values)) {
-      if (value.trim()) {
-        toSave[key] = value.trim();
-      }
-    }
-    saveMutation.mutate(toSave);
+    saveMutation.mutate(values);
   }
 
   return (

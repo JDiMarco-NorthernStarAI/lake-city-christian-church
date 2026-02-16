@@ -3,10 +3,12 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
+import { db } from "./db";
 import {
   insertSermonSchema, insertEventSchema, insertTeamMemberSchema,
-  insertContactSchema, insertConnectCardSchema,
+  insertContactSchema, insertConnectCardSchema, siteSettings,
 } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
 import { XMLParser } from "fast-xml-parser";
 
@@ -296,7 +298,12 @@ export async function registerRoutes(
       }
       for (const [key, value] of Object.entries(data)) {
         if (typeof value === "string") {
-          await storage.setSetting(`content.${page}.${key}`, value);
+          const settingKey = `content.${page}.${key}`;
+          if (value.trim() === "") {
+            await db.delete(siteSettings).where(eq(siteSettings.key, settingKey));
+          } else {
+            await storage.setSetting(settingKey, value);
+          }
         }
       }
       res.json({ message: "Content updated" });
