@@ -8,6 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
+  socialLogin: (provider: string, idToken: string, fullName?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -76,6 +77,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: result.error || "Registration failed" };
   }, []);
 
+  const socialLogin = useCallback(async (provider: string, idToken: string, fullName?: string) => {
+    const body: Record<string, string> = { provider, idToken };
+    if (fullName) body.fullName = fullName;
+    const result = await v1Post("/api/v1/auth/social", body);
+    if (result.success && result.data) {
+      setTokens(result.data.accessToken, result.data.refreshToken);
+      setUser(result.data.user);
+      return { success: true };
+    }
+    return { success: false, error: result.error || "Social login failed" };
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await v1Post("/api/v1/auth/logout", {});
@@ -96,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         login,
         register,
+        socialLogin,
         logout,
         refreshUser,
       }}

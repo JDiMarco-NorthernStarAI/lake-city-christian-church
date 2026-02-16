@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import SocialAuthButtons from "@/components/social-auth-buttons";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -93,6 +94,7 @@ export default function Login() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign In"}
               </Button>
             </form>
+            <SocialAuthButtons mode="login" onSuccess={() => navigate("/account")} />
             <div className="mt-6 text-center">
               <p className="text-white/50 text-sm">
                 Don't have an account?{" "}

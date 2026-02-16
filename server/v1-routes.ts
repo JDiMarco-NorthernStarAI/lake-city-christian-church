@@ -1341,6 +1341,13 @@ async function handleSocialAuth(provider: string, providerId: string, email: str
   return { user: safeUser, accessToken, refreshToken: refreshTokenRaw };
 }
 
+v1Router.get("/auth/config", (_req, res) => {
+  apiResponse(res, 200, {
+    googleClientId: process.env.GOOGLE_CLIENT_ID || null,
+    appleClientId: process.env.APPLE_CLIENT_ID || null,
+  });
+});
+
 v1Router.post("/auth/social", async (req, res) => {
   try {
     const parsed = socialAuthSchema.safeParse(req.body);
