@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { ArrowLeft, ExternalLink } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 import { Button } from "@/components/ui/button";
 import muralImgPath from "@assets/LC_Mural_1770933498062.jpg";
 
@@ -19,6 +20,16 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 }
 
 export default function OurStory() {
+  const c = usePageContent("our-story", {
+    hero_title: "Our Story",
+    story_p1: "Two and a half decades of church leadership opened his eyes to the need for biblical ministry in today's world. After twenty-five years of leading churches large and small, Trevor transitioned into the role of Executive Director for the Kainos Leadership Network (formerly NOAH), a church planting organization in northeastern Ohio, and answered God's call to plant a highly intentional disciple-making church.",
+    story_p2: "After months of research, Godly counsel, prayer, fasting, and many late nights, the Littletons acknowledged a call to plant a church. Together with a launch team of mature Christians from various congregations in Northeastern Ohio, members of Kainos Leadership Network and Nexus Church Planting, Lake City Christian Church was born.",
+    kln_heading: "Kainos Leadership Network",
+    kln_description: "KLN Exists to Plant and Equip Disciple Making Churches",
+    memorial_heading: "In Memory of Executive Pastor Joe Hoagland",
+    memorial_year: "2024",
+    memorial_description: "Joe was passionate about seeing people's lives changed for Jesus. Joe had served as the Associate Pastor for several churches in Ohio and was currently the Director of Operations for Kainos Leadership Network. Joe was an integral part of the Lake City Launch Team and will be missed beyond measure.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center bg-black py-24 md:py-32 px-4">
@@ -31,7 +42,7 @@ export default function OurStory() {
             transition={{ duration: 0.8 }}
             data-testid="text-our-story-hero-title"
           >
-            Our Story
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -46,10 +57,10 @@ export default function OurStory() {
       <section className="bg-white py-20 md:py-24 px-4">
         <FadeInSection className="max-w-3xl mx-auto">
           <p className="text-lg leading-relaxed text-foreground mb-8">
-            Two and a half decades of church leadership opened his eyes to the need for biblical ministry in today's world. After twenty-five years of leading churches large and small, Trevor transitioned into the role of Executive Director for the Kainos Leadership Network (formerly NOAH), a church planting organization in northeastern Ohio, and answered God's call to plant a highly intentional disciple-making church.
+            {c.story_p1}
           </p>
           <p className="text-lg leading-relaxed text-foreground mb-8">
-            After months of research, Godly counsel, prayer, fasting, and many late nights, the Littletons acknowledged a call to plant a church. Together with a launch team of mature Christians from various congregations in Northeastern Ohio, members of Kainos Leadership Network and Nexus Church Planting, Lake City Christian Church was born.
+            {c.story_p2}
           </p>
         </FadeInSection>
       </section>
@@ -61,10 +72,10 @@ export default function OurStory() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-kln-heading"
           >
-            Kainos Leadership Network
+            {c.kln_heading}
           </h2>
           <p className="text-muted-foreground text-lg mb-8">
-            KLN Exists to Plant and Equip Disciple Making Churches
+            {c.kln_description}
           </p>
           <a
             href="https://thekln.org/"
@@ -110,13 +121,13 @@ export default function OurStory() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-memorial-heading"
           >
-            In Memory of Executive Pastor Joe Hoagland
+            {c.memorial_heading}
           </h2>
           <p className="text-white/50 text-sm mb-8" style={{ fontFamily: "Montserrat, sans-serif" }}>
-            2024
+            {c.memorial_year}
           </p>
           <p className="text-white/80 text-lg leading-relaxed">
-            Joe was passionate about seeing people's lives changed for Jesus. Joe had served as the Associate Pastor for several churches in Ohio and was currently the Director of Operations for Kainos Leadership Network. Joe was an integral part of the Lake City Launch Team and will be missed beyond measure.
+            {c.memorial_description}
           </p>
         </FadeInSection>
       </section>

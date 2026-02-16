@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { usePageContent } from "@/hooks/use-page-content";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Users, CheckCircle } from "lucide-react";
 
@@ -25,6 +26,12 @@ const expectations = [
 ];
 
 export default function SmallGroups() {
+  const c = usePageContent("small-groups", {
+    hero_title: "City Small Groups",
+    intro_text: "Small group gatherings exist as a way for people to engage in community and develop a closer relationship with Jesus.",
+    cta_heading: "Find Your Group",
+    cta_description: "Take the next step and connect with a small group near you.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -38,7 +45,7 @@ export default function SmallGroups() {
             transition={{ duration: 0.8 }}
             data-testid="text-groups-hero-title"
           >
-            City Small Groups
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -54,7 +61,7 @@ export default function SmallGroups() {
         <FadeInSection className="max-w-3xl mx-auto text-center">
           <Users className="w-10 h-10 text-blue-500 mx-auto mb-6" />
           <p className="text-muted-foreground text-lg leading-relaxed" data-testid="text-groups-body">
-            Small group gatherings exist as a way for people to engage in community and develop a closer relationship with Jesus.
+            {c.intro_text}
           </p>
         </FadeInSection>
       </section>
@@ -90,10 +97,10 @@ export default function SmallGroups() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-groups-cta"
           >
-            Find Your Group
+            {c.cta_heading}
           </h2>
           <p className="text-muted-foreground text-lg mb-8">
-            Take the next step and connect with a small group near you.
+            {c.cta_description}
           </p>
           <Link href="/contact">
             <Button

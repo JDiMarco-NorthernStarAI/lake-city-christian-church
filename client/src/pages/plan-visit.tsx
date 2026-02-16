@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, MapPin, Palette, Baby, ArrowRight } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 import worshipImgPath from "@assets/LC_Worship_01_1770933498065.png";
 import coffeeImgPath from "@assets/LC_Coffe_Shop_1770933498062.png";
 import welcomeImgPath from "@assets/LC_Welcome_Area_02_1770933498065.jpg";
@@ -21,30 +22,25 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
   );
 }
 
-const expectItems = [
-  {
-    icon: Clock,
-    title: "Service Time",
-    description: "Sunday @ 10:00 AM",
-  },
-  {
-    icon: MapPin,
-    title: "Location",
-    description: "6717 Fry Road, Middleburg Heights, OH",
-  },
-  {
-    icon: Palette,
-    title: "What to Wear",
-    description: "Come as you are — casual and comfortable.",
-  },
-  {
-    icon: Baby,
-    title: "Kids",
-    description: "Safe, fun programming for all ages during service.",
-  },
+const expectItemsMeta = [
+  { icon: Clock, title: "Service Time", key: "service_time" },
+  { icon: MapPin, title: "Location", key: "location" },
+  { icon: Palette, title: "What to Wear", key: "dress_code" },
+  { icon: Baby, title: "Kids", key: "kids_info" },
 ];
 
 export default function PlanVisit() {
+  const c = usePageContent("plan-a-visit", {
+    hero_title: "Plan Your Visit",
+    hero_subtitle: "We'd love to meet you",
+    service_time: "Sunday @ 10:00 AM",
+    location: "6717 Fry Road, Middleburg Heights, OH",
+    dress_code: "Come as you are — casual and comfortable.",
+    kids_info: "Safe, fun programming for all ages during service.",
+    cta_heading: "We Can't Wait to Meet You!",
+    cta_description: "Have questions or want to learn more? We'd love to connect with you before your visit.",
+  });
+
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -64,7 +60,7 @@ export default function PlanVisit() {
             transition={{ duration: 0.8 }}
             data-testid="text-plan-visit-hero-title"
           >
-            Plan Your Visit
+            {c.hero_title}
           </motion.h1>
           <motion.p
             className="text-lg md:text-xl text-white/60 mb-4"
@@ -73,7 +69,7 @@ export default function PlanVisit() {
             transition={{ duration: 0.8, delay: 0.2 }}
             data-testid="text-plan-visit-hero-subtitle"
           >
-            We'd love to meet you
+            {c.hero_subtitle}
           </motion.p>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -95,7 +91,7 @@ export default function PlanVisit() {
             What to Expect
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {expectItems.map((item, index) => (
+            {expectItemsMeta.map((item, index) => (
               <FadeInSection key={item.title} delay={index * 0.1}>
                 <Card className="text-center h-full" data-testid={`card-expect-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
                   <CardContent className="pt-8 pb-6">
@@ -111,7 +107,7 @@ export default function PlanVisit() {
                     >
                       {item.title}
                     </h3>
-                    <p className="text-muted-foreground text-sm">{item.description}</p>
+                    <p className="text-muted-foreground text-sm">{c[item.key]}</p>
                   </CardContent>
                 </Card>
               </FadeInSection>
@@ -197,10 +193,10 @@ export default function PlanVisit() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-cta-heading"
           >
-            We Can't Wait to Meet You!
+            {c.cta_heading}
           </h2>
           <p className="text-white/70 text-lg mb-8">
-            Have questions or want to learn more? We'd love to connect with you before your visit.
+            {c.cta_description}
           </p>
           <Link href="/connect-serve">
             <Button

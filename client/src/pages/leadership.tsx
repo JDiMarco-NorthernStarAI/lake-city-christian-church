@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import type { TeamMember } from "@shared/schema";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -22,6 +23,11 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 }
 
 export default function Leadership() {
+  const c = usePageContent("leadership", {
+    hero_title: "Leadership Team",
+    intro_text: "",
+  });
+
   const { data: members, isLoading } = useQuery<TeamMember[]>({
     queryKey: ["/api/team"],
   });
@@ -41,7 +47,7 @@ export default function Leadership() {
             transition={{ duration: 0.8 }}
             data-testid="text-leadership-hero-title"
           >
-            Leadership Team
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"

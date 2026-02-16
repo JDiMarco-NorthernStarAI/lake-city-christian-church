@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Baby, ArrowRight, Calendar, Users, Heart } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -55,6 +56,13 @@ const infoItems = [
 ];
 
 export default function KidsMinistry() {
+  const c = usePageContent("kids-ministry", {
+    hero_title: "Lake City Kids",
+    welcome_heading: "Welcome to Lake City Kids",
+    welcome_description: "A place where your child will feel comfortable, cared for and loved! We look forward to building relationships with you as we share life together!",
+    cta_heading: "Have Questions?",
+    cta_description: "We would love to hear from you and help your family get connected.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -68,7 +76,7 @@ export default function KidsMinistry() {
             transition={{ duration: 0.8 }}
             data-testid="text-kids-hero-title"
           >
-            Lake City Kids
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -88,10 +96,10 @@ export default function KidsMinistry() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-kids-welcome"
           >
-            Welcome to Lake City Kids
+            {c.welcome_heading}
           </h2>
           <p className="text-muted-foreground text-lg leading-relaxed">
-            A place where your child will feel comfortable, cared for and loved! We look forward to building relationships with you as we share life together!
+            {c.welcome_description}
           </p>
         </FadeInSection>
       </section>
@@ -161,10 +169,10 @@ export default function KidsMinistry() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-kids-cta"
           >
-            Have Questions?
+            {c.cta_heading}
           </h2>
           <p className="text-muted-foreground text-lg mb-8">
-            We would love to hear from you and help your family get connected.
+            {c.cta_description}
           </p>
           <Link href="/contact">
             <Button

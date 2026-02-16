@@ -13,6 +13,7 @@ import { SiInstagram, SiFacebook, SiYoutube } from "react-icons/si";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePageContent } from "@/hooks/use-page-content";
 
 const contactFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -38,6 +39,13 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 
 export default function Contact() {
   const [successMessage, setSuccessMessage] = useState(false);
+  const c = usePageContent("contact", {
+    hero_title: "Contact Us",
+    address: "6717 Fry Road\nMiddleburg Heights, OH",
+    service_time: "Sunday @ 10:00 AM",
+    email: "info@lakecitycc.org",
+    phone: "(216) 555-0123",
+  });
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -82,7 +90,7 @@ export default function Contact() {
             transition={{ duration: 0.8 }}
             data-testid="text-contact-hero-title"
           >
-            Contact Us
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -122,9 +130,7 @@ export default function Contact() {
                         <div>
                           <h3 className="font-semibold text-foreground mb-1" data-testid="text-address-label">Address</h3>
                           <p className="text-muted-foreground" data-testid="text-address-value">
-                            6717 Fry Road
-                            <br />
-                            Middleburg Heights, OH
+                            {c.address.split("\n").map((line, i) => (<span key={i}>{line}{i === 0 && <br />}</span>))}
                           </p>
                         </div>
                       </div>
@@ -140,7 +146,7 @@ export default function Contact() {
                         <Clock className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />
                         <div>
                           <h3 className="font-semibold text-foreground mb-1" data-testid="text-service-time-label">Service Time</h3>
-                          <p className="text-muted-foreground" data-testid="text-service-time-value">Sunday @ 10:00 AM</p>
+                          <p className="text-muted-foreground" data-testid="text-service-time-value">{c.service_time}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -155,7 +161,7 @@ export default function Contact() {
                         <Mail className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />
                         <div>
                           <h3 className="font-semibold text-foreground mb-1" data-testid="text-email-label">Email</h3>
-                          <p className="text-muted-foreground" data-testid="text-email-value">info@lakecitycc.org</p>
+                          <p className="text-muted-foreground" data-testid="text-email-value">{c.email}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -170,7 +176,7 @@ export default function Contact() {
                         <Phone className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />
                         <div>
                           <h3 className="font-semibold text-foreground mb-1" data-testid="text-phone-label">Phone</h3>
-                          <p className="text-muted-foreground" data-testid="text-phone-value">(216) 555-0123</p>
+                          <p className="text-muted-foreground" data-testid="text-phone-value">{c.phone}</p>
                         </div>
                       </div>
                     </CardContent>

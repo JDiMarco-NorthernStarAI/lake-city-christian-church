@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Event } from "@shared/schema";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -20,6 +21,10 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 }
 
 export default function Announcements() {
+  const c = usePageContent("announcements", {
+    hero_title: "What's Happening?",
+  });
+
   const { data: events, isLoading } = useQuery<Event[]>({
     queryKey: ["/api/events"],
   });
@@ -39,7 +44,7 @@ export default function Announcements() {
             transition={{ duration: 0.8 }}
             data-testid="text-announcements-hero-title"
           >
-            What's Happening?
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-12 h-0.5 mx-auto bg-white/40"

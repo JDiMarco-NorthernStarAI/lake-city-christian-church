@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -17,6 +18,13 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 }
 
 export default function Give() {
+  const c = usePageContent("give", {
+    hero_title: "Give",
+    hero_subtitle: "Reaching the local community and beyond.",
+    scripture_text: "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver. And God is able to bless you abundantly, so that in all things at all times, having all you need, you will abound in every good work.",
+    scripture_ref: "2 Corinthians 9:7-8",
+  });
+
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[50vh] bg-black overflow-hidden">
@@ -30,7 +38,7 @@ export default function Give() {
             transition={{ duration: 0.8 }}
             data-testid="text-give-hero-title"
           >
-            Give
+            {c.hero_title}
           </motion.h1>
           <motion.p
             className="text-lg md:text-xl text-white/60 mb-4"
@@ -39,7 +47,7 @@ export default function Give() {
             transition={{ duration: 0.8, delay: 0.2 }}
             data-testid="text-give-hero-subtitle"
           >
-            Reaching the local community and beyond.
+            {c.hero_subtitle}
           </motion.p>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -58,10 +66,10 @@ export default function Give() {
               className="text-xl md:text-2xl text-foreground/80 italic leading-relaxed mb-6"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver. And God is able to bless you abundantly, so that in all things at all times, having all you need, you will abound in every good work."
+              "{c.scripture_text}"
             </p>
             <cite className="text-muted-foreground text-base not-italic font-medium">
-              — 2 Corinthians 9:7-8
+              — {c.scripture_ref}
             </cite>
           </blockquote>
 

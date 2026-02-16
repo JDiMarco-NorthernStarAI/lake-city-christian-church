@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { BookOpen, Heart, Users, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import serviceImgPath from "@assets/LC_Service_01_1770933498063.jpg";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -40,6 +41,11 @@ const subPages = [
 ];
 
 export default function About() {
+  const c = usePageContent("about", {
+    hero_title: "About Us",
+    mission_heading: "Lake City Christian Church exists to connect people to a life-changing relationship with Jesus.",
+    mission_description: "We are a community of Christ-followers committed to making disciples, serving our neighbors, and growing together in faith. Whether you are exploring faith for the first time or looking for a church to call home, we would love to walk alongside you.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -59,7 +65,7 @@ export default function About() {
             transition={{ duration: 0.8 }}
             data-testid="text-about-hero-title"
           >
-            About Us
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -78,10 +84,10 @@ export default function About() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-about-mission"
           >
-            Lake City Christian Church exists to connect people to a life-changing relationship with Jesus.
+            {c.mission_heading}
           </h2>
           <p className="text-muted-foreground text-lg leading-relaxed">
-            We are a community of Christ-followers committed to making disciples, serving our neighbors, and growing together in faith. Whether you are exploring faith for the first time or looking for a church to call home, we would love to walk alongside you.
+            {c.mission_description}
           </p>
         </FadeInSection>
       </section>

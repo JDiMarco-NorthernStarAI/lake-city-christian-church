@@ -18,16 +18,17 @@ import {
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
-  Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp,
+  Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
 } from "lucide-react";
 import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "settings";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "pages" | "settings";
 
 const navItems: { id: Tab; label: string; icon: any }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "pages", label: "Page Content", icon: FileEdit },
   { id: "sermons", label: "Sermons", icon: Play },
   { id: "events", label: "Events", icon: Calendar },
   { id: "team", label: "Team", icon: Users },
@@ -122,6 +123,7 @@ export default function AdminDashboard() {
           {activeTab === "team" && <TeamTab />}
           {activeTab === "messages" && <MessagesTab />}
           {activeTab === "connect" && <ConnectCardsTab />}
+          {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
         </div>
       </div>
@@ -834,6 +836,310 @@ function ConnectCardsTab() {
           </TableBody>
         </Table>
       )}
+    </div>
+  );
+}
+
+type PageFieldConfig = {
+  key: string;
+  label: string;
+  type: "input" | "textarea";
+};
+
+type PageConfig = {
+  id: string;
+  label: string;
+  fields: PageFieldConfig[];
+};
+
+const pageConfigs: PageConfig[] = [
+  {
+    id: "home",
+    label: "Home",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_tagline", label: "Hero Tagline", type: "input" },
+      { key: "service_time", label: "Service Time", type: "input" },
+      { key: "service_location", label: "Service Location", type: "input" },
+      { key: "numbers_heading", label: "By the Numbers - Heading", type: "input" },
+      { key: "connect_heading", label: "Connect Section - Heading", type: "input" },
+      { key: "connect_description", label: "Connect Section - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "about",
+    label: "About Us",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "mission_heading", label: "Mission Heading", type: "input" },
+      { key: "mission_description", label: "Mission Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "our-story",
+    label: "Our Story",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "story_p1", label: "Story - Paragraph 1", type: "textarea" },
+      { key: "story_p2", label: "Story - Paragraph 2", type: "textarea" },
+      { key: "kln_heading", label: "KLN Section - Heading", type: "input" },
+      { key: "kln_description", label: "KLN Section - Description", type: "textarea" },
+      { key: "memorial_heading", label: "Memorial - Heading", type: "input" },
+      { key: "memorial_year", label: "Memorial - Year", type: "input" },
+      { key: "memorial_description", label: "Memorial - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "what-we-believe",
+    label: "What We Believe",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "intro_text", label: "Intro Text", type: "textarea" },
+    ],
+  },
+  {
+    id: "leadership",
+    label: "Leadership",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "intro_text", label: "Intro Text", type: "textarea" },
+    ],
+  },
+  {
+    id: "ministries",
+    label: "Ministries",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+    ],
+  },
+  {
+    id: "kids-ministry",
+    label: "Kids Ministry",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "welcome_heading", label: "Welcome Heading", type: "input" },
+      { key: "welcome_description", label: "Welcome Description", type: "textarea" },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "student-ministry",
+    label: "Student Ministry",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "input" },
+      { key: "scripture_text", label: "Scripture Quote", type: "textarea" },
+      { key: "scripture_ref", label: "Scripture Reference", type: "input" },
+      { key: "description", label: "Description", type: "textarea" },
+      { key: "schedule", label: "Meeting Schedule", type: "input" },
+      { key: "meal_heading", label: "Meal Section - Heading", type: "input" },
+      { key: "meal_description", label: "Meal Section - Description", type: "textarea" },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "small-groups",
+    label: "Small Groups",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "intro_text", label: "Intro Text", type: "textarea" },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "connect-serve",
+    label: "Connect & Serve",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "intro_heading", label: "Intro Heading", type: "input" },
+      { key: "intro_description", label: "Intro Description", type: "textarea" },
+      { key: "volunteer_heading", label: "Volunteer Section - Heading", type: "input" },
+      { key: "volunteer_description", label: "Volunteer Section - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "give",
+    label: "Give",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },
+      { key: "scripture_text", label: "Scripture Quote", type: "textarea" },
+      { key: "scripture_ref", label: "Scripture Reference", type: "input" },
+    ],
+  },
+  {
+    id: "plan-a-visit",
+    label: "Plan a Visit",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },
+      { key: "service_time", label: "Service Time", type: "input" },
+      { key: "location", label: "Location", type: "input" },
+      { key: "dress_code", label: "Dress Code", type: "textarea" },
+      { key: "kids_info", label: "Kids Info", type: "textarea" },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+    ],
+  },
+  {
+    id: "contact",
+    label: "Contact",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "address", label: "Address", type: "input" },
+      { key: "service_time", label: "Service Time", type: "input" },
+      { key: "email", label: "Email", type: "input" },
+      { key: "phone", label: "Phone", type: "input" },
+    ],
+  },
+  {
+    id: "encounter",
+    label: "Encounter (Sermons)",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },
+    ],
+  },
+  {
+    id: "announcements",
+    label: "Announcements",
+    fields: [
+      { key: "hero_title", label: "Hero Title", type: "input" },
+    ],
+  },
+];
+
+function PagesTab() {
+  const [selectedPage, setSelectedPage] = useState(pageConfigs[0].id);
+  const { toast } = useToast();
+
+  const config = pageConfigs.find((p) => p.id === selectedPage)!;
+
+  const { data: content, isLoading } = useQuery<Record<string, string>>({
+    queryKey: ["/api/content", selectedPage],
+    queryFn: async () => {
+      const res = await fetch(`/api/content/${selectedPage}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+  });
+
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [initialized, setInitialized] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (content && initialized !== selectedPage) {
+      const newValues: Record<string, string> = {};
+      config.fields.forEach((f) => {
+        newValues[f.key] = content[f.key] || "";
+      });
+      setValues(newValues);
+      setInitialized(selectedPage);
+    }
+  }, [content, selectedPage, initialized, config.fields]);
+
+  useEffect(() => {
+    setInitialized(null);
+  }, [selectedPage]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: Record<string, string>) => {
+      await apiRequest("PUT", `/api/content/${selectedPage}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/content", selectedPage] });
+      toast({ title: "Saved", description: `${config.label} content updated.` });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save. Please try again.", variant: "destructive" });
+    },
+  });
+
+  function handleSave() {
+    const toSave: Record<string, string> = {};
+    for (const [key, value] of Object.entries(values)) {
+      if (value.trim()) {
+        toSave[key] = value.trim();
+      }
+    }
+    saveMutation.mutate(toSave);
+  }
+
+  return (
+    <div data-testid="tab-pages">
+      <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Page Content</h1>
+      <p className="text-muted-foreground mb-6">Edit the text content on each page of the website. Leave a field blank to use the default text.</p>
+
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="md:w-56 shrink-0">
+          <div className="space-y-1">
+            {pageConfigs.map((page) => (
+              <button
+                key={page.id}
+                onClick={() => setSelectedPage(page.id)}
+                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between gap-2 transition-colors ${
+                  selectedPage === page.id
+                    ? "bg-primary text-primary-foreground"
+                    : "hover-elevate text-foreground"
+                }`}
+                data-testid={`button-page-${page.id}`}
+              >
+                <span>{page.label}</span>
+                {selectedPage === page.id && <ChevronRight className="w-4 h-4" />}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle style={{ fontFamily: "Montserrat, sans-serif" }}>{config.label}</CardTitle>
+              <Button
+                onClick={handleSave}
+                disabled={saveMutation.isPending}
+                data-testid="button-save-page-content"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saveMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <p className="text-muted-foreground">Loading...</p>
+              ) : (
+                <div className="space-y-5">
+                  {config.fields.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      <Label data-testid={`label-${field.key}`}>{field.label}</Label>
+                      {field.type === "textarea" ? (
+                        <Textarea
+                          value={values[field.key] || ""}
+                          onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                          placeholder={`Default text will be used if left blank`}
+                          rows={3}
+                          className="resize-none"
+                          data-testid={`input-content-${field.key}`}
+                        />
+                      ) : (
+                        <Input
+                          value={values[field.key] || ""}
+                          onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                          placeholder={`Default text will be used if left blank`}
+                          data-testid={`input-content-${field.key}`}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ArrowRight, Baby, GraduationCap, Users, HandHeart } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -45,6 +46,9 @@ const ministries = [
 ];
 
 export default function Ministries() {
+  const c = usePageContent("ministries", {
+    hero_title: "Ministries",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -58,7 +62,7 @@ export default function Ministries() {
             transition={{ duration: 0.8 }}
             data-testid="text-ministries-hero-title"
           >
-            Ministries
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"

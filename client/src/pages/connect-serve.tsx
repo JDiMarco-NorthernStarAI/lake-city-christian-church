@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
+import { usePageContent } from "@/hooks/use-page-content";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,13 @@ const connectFormSchema = z.object({
 type ConnectFormValues = z.infer<typeof connectFormSchema>;
 
 export default function ConnectServe() {
+  const c = usePageContent("connect-serve", {
+    hero_title: "Connect & Serve",
+    intro_heading: "We would like to get to know you better!",
+    intro_description: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus. Join us as we serve together, grow together, and experience the joy of making a lasting impact while connecting people to a life-changing relationship with Jesus.",
+    volunteer_heading: "Ready to Serve?",
+    volunteer_description: "There is a place for everyone to serve at Lake City. Whether you love greeting people, working with kids, or serving behind the scenes, we would love to have you on the team.",
+  });
   const [submitted, setSubmitted] = useState(false);
 
   const form = useForm<ConnectFormValues>({
@@ -102,7 +110,7 @@ export default function ConnectServe() {
             transition={{ duration: 0.8 }}
             data-testid="text-connect-serve-hero-title"
           >
-            Connect & Serve
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -121,10 +129,10 @@ export default function ConnectServe() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-connect-intro-heading"
           >
-            We would like to get to know you better!
+            {c.intro_heading}
           </h2>
           <p className="text-muted-foreground text-lg leading-relaxed">
-            We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus. Join us as we serve together, grow together, and experience the joy of making a lasting impact while connecting people to a life-changing relationship with Jesus.
+            {c.intro_description}
           </p>
         </FadeInSection>
       </section>
@@ -314,10 +322,10 @@ export default function ConnectServe() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-volunteer-heading"
           >
-            Ready to Serve?
+            {c.volunteer_heading}
           </h2>
           <p className="text-white/70 text-lg mb-8 max-w-xl mx-auto">
-            There is a place for everyone to serve at Lake City. Whether you love greeting people, working with kids, or serving behind the scenes, we would love to have you on the team.
+            {c.volunteer_description}
           </p>
           <Link href="/contact">
             <Button

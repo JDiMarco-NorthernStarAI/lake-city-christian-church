@@ -270,6 +270,41 @@ export async function registerRoutes(
     res.json({ message: "Updated" });
   });
 
+  app.get("/api/content/:page", async (req, res) => {
+    try {
+      const page = req.params.page;
+      const prefix = `content.${page}.`;
+      const allSettings = await storage.getAllSettings();
+      const pageContent: Record<string, string> = {};
+      for (const s of allSettings) {
+        if (s.key.startsWith(prefix)) {
+          pageContent[s.key.slice(prefix.length)] = s.value;
+        }
+      }
+      res.json(pageContent);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching content" });
+    }
+  });
+
+  app.put("/api/content/:page", requireAuth, async (req, res) => {
+    try {
+      const page = req.params.page;
+      const data = req.body;
+      if (!data || typeof data !== "object") {
+        return res.status(400).json({ message: "Invalid content data" });
+      }
+      for (const [key, value] of Object.entries(data)) {
+        if (typeof value === "string") {
+          await storage.setSetting(`content.${page}.${key}`, value);
+        }
+      }
+      res.json({ message: "Content updated" });
+    } catch (err) {
+      res.status(500).json({ message: "Error saving content" });
+    }
+  });
+
   app.post("/api/analytics/pageview", async (req, res) => {
     try {
       const { path } = req.body;

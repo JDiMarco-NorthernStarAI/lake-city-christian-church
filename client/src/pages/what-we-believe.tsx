@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import { usePageContent } from "@/hooks/use-page-content";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -77,6 +78,10 @@ const beliefs = [
 ];
 
 export default function WhatWeBelieve() {
+  const c = usePageContent("what-we-believe", {
+    hero_title: "What We Believe",
+    intro_text: "These are the core convictions that shape our faith and guide our community. We hold to the essentials of the Christian faith as revealed in Scripture.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center bg-black py-24 md:py-32 px-4">
@@ -89,7 +94,7 @@ export default function WhatWeBelieve() {
             transition={{ duration: 0.8 }}
             data-testid="text-believe-hero-title"
           >
-            What We Believe
+            {c.hero_title}
           </motion.h1>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -104,7 +109,7 @@ export default function WhatWeBelieve() {
       <section className="bg-white py-20 md:py-24 px-4">
         <FadeInSection className="max-w-3xl mx-auto text-center mb-12">
           <p className="text-lg text-muted-foreground leading-relaxed">
-            These are the core convictions that shape our faith and guide our community. We hold to the essentials of the Christian faith as revealed in Scripture.
+            {c.intro_text}
           </p>
         </FadeInSection>
 

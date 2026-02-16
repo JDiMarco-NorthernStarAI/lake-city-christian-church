@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Play, Search, Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { usePageContent } from "@/hooks/use-page-content";
 
 interface YouTubeVideo {
   id: string;
@@ -30,6 +31,11 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 }
 
 export default function Encounter() {
+  const c = usePageContent("encounter", {
+    hero_title: "Encounter",
+    hero_subtitle: "Watch & Listen",
+  });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<YouTubeVideo | null>(null);
 
@@ -58,7 +64,7 @@ export default function Encounter() {
             transition={{ duration: 0.8 }}
             data-testid="text-encounter-hero-title"
           >
-            Encounter
+            {c.hero_title}
           </motion.h1>
           <motion.p
             className="text-lg md:text-xl text-white/60 mb-4"
@@ -67,7 +73,7 @@ export default function Encounter() {
             transition={{ duration: 0.8, delay: 0.2 }}
             data-testid="text-encounter-hero-subtitle"
           >
-            Watch & Listen
+            {c.hero_subtitle}
           </motion.p>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"

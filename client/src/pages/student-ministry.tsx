@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { usePageContent } from "@/hooks/use-page-content";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Clock, GraduationCap, UtensilsCrossed } from "lucide-react";
 
@@ -19,6 +20,18 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 }
 
 export default function StudentMinistry() {
+  const c = usePageContent("student-ministry", {
+    hero_title: "Club 419",
+    hero_subtitle: "Student Ministry",
+    scripture_text: '"Come, follow me," Jesus said, "and I will send you out to fish for people."',
+    scripture_ref: "Matthew 4:19",
+    description: "Students have the ability to impact their schools, clubs, families, and other communities in a huge way. The purpose of Club 419 is to equip students to follow Jesus and extend the good news of a life-changing relationship with Jesus to the people they are surrounded by on a daily basis.",
+    schedule: "Wednesday 6:30 PM - 8:00 PM",
+    meal_heading: "Meal Sponsorship",
+    meal_description: "Providing an opportunity for students to sit around the table and cultivate meaningful conversation and grow in friendship.",
+    cta_heading: "Get Involved",
+    cta_description: "We would love for your student to be a part of Club 419.",
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -32,7 +45,7 @@ export default function StudentMinistry() {
             transition={{ duration: 0.8 }}
             data-testid="text-student-hero-title"
           >
-            Club 419
+            {c.hero_title}
           </motion.h1>
           <motion.p
             className="text-lg md:text-xl text-white/80 mb-4"
@@ -41,7 +54,7 @@ export default function StudentMinistry() {
             transition={{ duration: 0.8, delay: 0.2 }}
             data-testid="text-student-hero-subtitle"
           >
-            Student Ministry
+            {c.hero_subtitle}
           </motion.p>
           <motion.div
             className="w-16 h-1 mx-auto rounded-full"
@@ -60,11 +73,11 @@ export default function StudentMinistry() {
             className="text-xl md:text-2xl font-medium italic text-foreground mb-8 leading-relaxed"
             data-testid="text-student-scripture"
           >
-            "Come, follow me," Jesus said, "and I will send you out to fish for people."
-            <span className="block text-base text-muted-foreground mt-2 not-italic">&mdash; Matthew 4:19</span>
+            {c.scripture_text}
+            <span className="block text-base text-muted-foreground mt-2 not-italic">&mdash; {c.scripture_ref}</span>
           </blockquote>
           <p className="text-muted-foreground text-lg leading-relaxed">
-            Students have the ability to impact their schools, clubs, families, and other communities in a huge way. The purpose of Club 419 is to equip students to follow Jesus and extend the good news of a life-changing relationship with Jesus to the people they are surrounded by on a daily basis.
+            {c.description}
           </p>
         </FadeInSection>
       </section>
@@ -80,7 +93,7 @@ export default function StudentMinistry() {
             </CardHeader>
             <CardContent className="text-center">
               <p className="text-lg font-semibold text-foreground" data-testid="text-student-schedule">
-                Wednesday 6:30 PM - 8:00 PM
+                {c.schedule}
               </p>
             </CardContent>
           </Card>
@@ -95,10 +108,10 @@ export default function StudentMinistry() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-student-meal"
           >
-            Meal Sponsorship
+            {c.meal_heading}
           </h2>
           <p className="text-muted-foreground text-lg leading-relaxed">
-            Providing an opportunity for students to sit around the table and cultivate meaningful conversation and grow in friendship.
+            {c.meal_description}
           </p>
         </FadeInSection>
       </section>
@@ -110,10 +123,10 @@ export default function StudentMinistry() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-student-cta"
           >
-            Get Involved
+            {c.cta_heading}
           </h2>
           <p className="text-muted-foreground text-lg mb-8">
-            We would love for your student to be a part of Club 419.
+            {c.cta_description}
           </p>
           <Link href="/contact">
             <Button

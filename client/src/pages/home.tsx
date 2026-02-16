@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import colorLogoPath from "@assets/color_Logo_1770933488638.png";
 import welcomeImgPath from "@assets/LC_Welcome_Area_01_1770933498064.png";
 import { useQuery } from "@tanstack/react-query";
+import { usePageContent } from "@/hooks/use-page-content";
 
 interface YouTubeVideo {
   id: string;
@@ -77,6 +78,15 @@ export default function Home() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const { data: videos } = useQuery<YouTubeVideo[]>({ queryKey: ["/api/youtube/videos"] });
   const latestVideo = videos?.[0] ?? null;
+  const c = usePageContent("home", {
+    hero_title: "Lake City Christian Church",
+    hero_tagline: "Connecting people to a life-changing relationship with Jesus.",
+    service_time: "Sunday @ 10:00 AM",
+    service_location: "6717 Fry Road, Middleburg Heights, OH",
+    numbers_heading: "Lake City in Numbers",
+    connect_heading: "Get Connected",
+    connect_description: "We would love for you to be a part of what God is doing at Lake City.",
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -140,7 +150,7 @@ export default function Home() {
           transition={{ duration: 1, delay: 2 }}
           data-testid="text-hero-title"
         >
-          Lake City Christian Church
+          {c.hero_title}
         </motion.h1>
 
         <motion.p
@@ -150,7 +160,7 @@ export default function Home() {
           transition={{ duration: 1, delay: 2.5 }}
           data-testid="text-hero-tagline"
         >
-          Connecting people to a life-changing relationship with Jesus.
+          {c.hero_tagline}
         </motion.p>
 
         <motion.div
@@ -184,10 +194,10 @@ export default function Home() {
       <section className="bg-white py-6 px-4">
         <p className="text-center text-black" data-testid="text-service-times">
           <span className="font-bold" style={{ fontFamily: "Montserrat, sans-serif", fontWeight: 700 }}>
-            Sunday @ 10:00 AM
+            {c.service_time}
           </span>
           <span className="mx-2">|</span>
-          <span>6717 Fry Road, Middleburg Heights, OH</span>
+          <span>{c.service_location}</span>
         </p>
       </section>
 
@@ -199,7 +209,7 @@ export default function Home() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-numbers-heading"
           >
-            Lake City in Numbers
+            {c.numbers_heading}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
             {stats.map((stat) => (
@@ -297,10 +307,10 @@ export default function Home() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-connect-heading"
           >
-            We'd Love to Get to Know You
+            {c.connect_heading}
           </h2>
           <p className="text-white/70 text-lg mb-8">
-            Fill out a connect card and let us know you're here.
+            {c.connect_description}
           </p>
           <Link href="/connect-serve">
             <Button
