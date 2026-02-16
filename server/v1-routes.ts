@@ -1,10 +1,13 @@
 import { Router, Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
+import { OAuth2Client } from "google-auth-library";
+import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { storage } from "./storage";
 import {
   registerUserSchema, loginSchema, updateProfileSchema,
   createChildSchema, createEventV1Schema,
   createFormSchema, createFormFieldSchema,
+  socialAuthSchema,
   EVENT_TYPES, AVAILABLE_ROLES, FORM_FIELD_TYPES,
 } from "@shared/schema";
 import {
@@ -12,6 +15,9 @@ import {
   hashRefreshToken, getRefreshTokenExpiry,
 } from "./jwt";
 import { z } from "zod";
+import crypto from "crypto";
+
+const objectStorage = new ObjectStorageService();
 
 const v1Router = Router();
 
@@ -112,6 +118,13 @@ v1Router.post("/auth/register", async (req, res) => {
       ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null,
       expiresAt: getRefreshTokenExpiry(),
     });
+
+    if (user.email) {
+      const { welcomeEmail } = await import("./email-templates");
+      const { sendEmail } = await import("./email-service");
+      const tmpl = welcomeEmail(parsed.data.name || user.username);
+      sendEmail({ to: user.email, ...tmpl }).catch(() => {});
+    }
 
     return apiResponse(res, 201, {
       user: sanitizeUser(user),
@@ -543,6 +556,16 @@ v1Router.post("/events/:id/signup", requireJwt, async (req, res) => {
       status,
       signupDetails: req.body.signupDetails || null,
     });
+
+    const user = await storage.getUser(userId);
+    if (user?.email) {
+      const { eventSignupConfirmationEmail } = await import("./email-templates");
+      const { sendEmail } = await import("./email-service");
+      const dateStr = event.startDate ? new Date(event.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "TBD";
+      const tmpl = eventSignupConfirmationEmail(user.displayName || user.username, event.title, dateStr, event.location, status);
+      sendEmail({ to: user.email, ...tmpl }).catch(() => {});
+    }
+
     return apiResponse(res, 201, signup);
   } catch (err: any) {
     if (err.code === "23505") {
@@ -1040,6 +1063,34 @@ v1Router.get("/health", (_req, res) => {
   return apiResponse(res, 200, { status: "ok", timestamp: new Date().toISOString() });
 });
 
+// ======== FILE UPLOADS (V1 - JWT Auth) ========
+
+v1Router.post("/uploads/request-url", requireJwt, async (req, res) => {
+  try {
+    const { name, contentType } = req.body;
+    if (!name) return apiResponse(res, 400, null, "File name is required");
+    const uploadURL = await objectStorage.getObjectEntityUploadURL();
+    const objectPath = objectStorage.normalizeObjectEntityPath(uploadURL);
+    return apiResponse(res, 200, { uploadURL, objectPath, metadata: { name, contentType } });
+  } catch (err) {
+    console.error("Upload URL error:", err);
+    return apiResponse(res, 500, null, "Failed to generate upload URL");
+  }
+});
+
+v1Router.put("/auth/me/photo", requireJwt, async (req, res) => {
+  try {
+    const userId = (req as any).jwtUser.userId;
+    const { objectPath } = req.body;
+    if (!objectPath) return apiResponse(res, 400, null, "objectPath is required");
+    const updated = await storage.updateUser(userId, { profilePhotoUrl: objectPath });
+    if (!updated) return apiResponse(res, 404, null, "User not found");
+    return apiResponse(res, 200, sanitizeUser(updated));
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
 v1Router.get("/config/ministry-types", (_req, res) => {
   return apiResponse(res, 200, EVENT_TYPES.map((t) => ({ value: t, label: (EVENT_TYPE_LABELS as any)[t] || t })));
 });
@@ -1105,6 +1156,181 @@ v1Router.get("/push/vapid-key", (_req, res) => {
   const key = process.env.VAPID_PUBLIC_KEY;
   if (!key) return apiResponse(res, 500, null, "Push notifications not configured");
   return apiResponse(res, 200, { publicKey: key });
+});
+
+// ==================== SOCIAL AUTH ====================
+
+let googleClient: OAuth2Client | null = null;
+function getGoogleClient(): OAuth2Client {
+  if (!googleClient) {
+    googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+  return googleClient;
+}
+
+async function verifyGoogleToken(idToken: string): Promise<{ sub: string; email: string; name: string; picture?: string } | null> {
+  try {
+    const client = getGoogleClient();
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.sub || !payload.email) return null;
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name || payload.email.split("@")[0],
+      picture: payload.picture,
+    };
+  } catch (err) {
+    console.error("Google token verification failed:", err);
+    return null;
+  }
+}
+
+async function verifyAppleToken(idToken: string): Promise<{ sub: string; email: string; name?: string } | null> {
+  try {
+    const jwt = await import("jsonwebtoken");
+    const jwksClient = (await import("jwks-rsa")).default;
+
+    const client = jwksClient({
+      jwksUri: "https://appleid.apple.com/auth/keys",
+      cache: true,
+      cacheMaxAge: 86400000,
+    });
+
+    const decoded = jwt.default.decode(idToken, { complete: true });
+    if (!decoded || !decoded.header?.kid) return null;
+
+    const key = await client.getSigningKey(decoded.header.kid);
+    const signingKey = key.getPublicKey();
+
+    const aud = process.env.APPLE_CLIENT_ID || process.env.APPLE_BUNDLE_ID;
+    const verifyOptions: any = {
+      algorithms: ["RS256"],
+      issuer: "https://appleid.apple.com",
+    };
+    if (aud) verifyOptions.audience = aud;
+
+    const payload: any = jwt.default.verify(idToken, signingKey, verifyOptions);
+
+    if (!payload.sub) return null;
+
+    return {
+      sub: payload.sub,
+      email: payload.email || `${payload.sub}@privaterelay.appleid.com`,
+      name: payload.name,
+    };
+  } catch (err) {
+    console.error("Apple token verification failed:", err);
+    return null;
+  }
+}
+
+async function handleSocialAuth(provider: string, providerId: string, email: string, name: string, profilePhotoUrl: string | null, req: any) {
+  let user = await storage.getUserByAuthProvider(provider, providerId);
+
+  if (!user) {
+    user = await storage.getUserByEmail(email);
+    if (user) {
+      await storage.updateUser(user.id, {
+        authProvider: provider,
+        authProviderId: providerId,
+        profilePhotoUrl: user.profilePhotoUrl || profilePhotoUrl,
+      });
+      user = (await storage.getUser(user.id))!;
+    }
+  }
+
+  if (!user) {
+    const randomPassword = crypto.randomBytes(32).toString("hex");
+    const hashed = await bcrypt.hash(randomPassword, 12);
+    user = await storage.createUser({
+      username: email,
+      password: hashed,
+      email,
+      name,
+      roles: ["member"],
+      authProvider: provider,
+      authProviderId: providerId,
+      profilePhotoUrl,
+    });
+  }
+
+  if (!user.isActive || user.deletedAt) {
+    return null;
+  }
+
+  const deviceId = req.body.deviceId || `${provider}-${Date.now()}`;
+  const deviceName = req.body.deviceName || req.headers["user-agent"]?.slice(0, 100) || "Unknown";
+  const deviceType = req.body.deviceType || "web";
+
+  const accessToken = generateAccessToken({ userId: user.id, roles: user.roles });
+  const refreshTokenRaw = generateRefreshToken();
+  const tokenHash = hashRefreshToken(refreshTokenRaw);
+
+  await storage.createRefreshToken({
+    userId: user.id,
+    tokenHash,
+    deviceId,
+    deviceName,
+    deviceType,
+    ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null,
+    expiresAt: getRefreshTokenExpiry(),
+  });
+
+  const { password, ...safeUser } = user;
+  return { user: safeUser, accessToken, refreshToken: refreshTokenRaw };
+}
+
+v1Router.post("/auth/social", async (req, res) => {
+  try {
+    const parsed = socialAuthSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return apiResponse(res, 400, null, parsed.error.errors.map((e) => e.message).join(", "));
+    }
+
+    const { provider, idToken } = parsed.data;
+
+    if (provider === "google") {
+      if (!process.env.GOOGLE_CLIENT_ID) {
+        return apiResponse(res, 503, null, "Google Sign-In is not configured");
+      }
+
+      const googleUser = await verifyGoogleToken(idToken);
+      if (!googleUser) {
+        return apiResponse(res, 401, null, "Invalid Google token");
+      }
+
+      const result = await handleSocialAuth("google", googleUser.sub, googleUser.email, googleUser.name, googleUser.picture || null, req);
+      if (!result) {
+        return apiResponse(res, 401, null, "Account is deactivated");
+      }
+
+      return apiResponse(res, 200, result);
+    }
+
+    if (provider === "apple") {
+      const appleUser = await verifyAppleToken(idToken);
+      if (!appleUser) {
+        return apiResponse(res, 401, null, "Invalid Apple token");
+      }
+
+      const name = req.body.fullName || appleUser.name || appleUser.email.split("@")[0];
+      const result = await handleSocialAuth("apple", appleUser.sub, appleUser.email, name, null, req);
+      if (!result) {
+        return apiResponse(res, 401, null, "Account is deactivated");
+      }
+
+      return apiResponse(res, 200, result);
+    }
+
+    return apiResponse(res, 400, null, "Unsupported provider");
+  } catch (err) {
+    console.error("Social auth error:", err);
+    return apiResponse(res, 500, null, "Server error");
+  }
 });
 
 export default v1Router;

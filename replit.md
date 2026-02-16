@@ -101,6 +101,20 @@ migrations/           # Drizzle migration output directory
 - **Google Fonts** — Typography (Inter, Montserrat, DM Sans, etc.)
 - **Stripe** — Payment processing for donations (one-time and recurring via Checkout Sessions). Uses STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, and STRIPE_WEBHOOK_SECRET env vars.
 - **Web Push** — Push notifications via Web Push API with VAPID keys (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VITE_VAPID_PUBLIC_KEY). Uses web-push npm package.
+- **Google OAuth** — Social authentication via Google Sign-In (server-side ID token verification with google-auth-library). Uses GOOGLE_CLIENT_ID env var.
+- **Apple Sign-In** — Social authentication via Apple ID (JWT verification against Apple JWKS using jwks-rsa). Uses APPLE_CLIENT_ID/APPLE_BUNDLE_ID env vars.
+- **Replit App Storage** — Object storage for file uploads (presigned URL flow). Uses DEFAULT_OBJECT_STORAGE_BUCKET_ID env var.
+- **SMTP Email** — Transactional emails via Nodemailer. Uses SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM env vars. Gracefully degrades (logs to console) when SMTP not configured.
+
+### Email Templates
+- `server/email-templates.ts` — HTML email templates matching church dark/gradient branding:
+  - Welcome email (on user registration)
+  - Contact form confirmation
+  - Event signup/waitlist confirmation
+  - Connect card confirmation
+  - Donation receipt (on Stripe webhook)
+  - Admin notification (generic)
+- `server/email-service.ts` — Nodemailer transport with SMTP env var configuration
 
 ### Key NPM Dependencies
 - `drizzle-orm` + `drizzle-kit` — Database ORM and schema tooling
@@ -108,6 +122,9 @@ migrations/           # Drizzle migration output directory
 - `connect-pg-simple` — PostgreSQL session store
 - `bcryptjs` — Password hashing
 - `jsonwebtoken` — JWT token generation and verification for v1 API
+- `jwks-rsa` — Apple Sign-In JWKS key verification
+- `google-auth-library` — Google OAuth2 ID token verification
+- `nodemailer` — Email sending via SMTP
 - `@tanstack/react-query` — Client-side data fetching/caching
 - `framer-motion` — Animations
 - `wouter` — Client-side routing

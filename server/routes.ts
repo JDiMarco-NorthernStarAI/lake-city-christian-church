@@ -4,6 +4,7 @@ import session from "express-session";
 import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import webpush from "web-push";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { storage } from "./storage";
 import { db } from "./db";
 import {
@@ -152,6 +153,8 @@ export async function registerRoutes(
 
   await seedDatabase();
 
+  registerObjectStorageRoutes(app);
+
   app.use("/api/v1", v1Router);
 
   app.post("/api/auth/login", async (req, res) => {
@@ -290,6 +293,14 @@ export async function registerRoutes(
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const submission = await storage.createContactSubmission(parsed.data);
+
+    if (parsed.data.email) {
+      const { contactConfirmationEmail } = await import("./email-templates");
+      const { sendEmail } = await import("./email-service");
+      const tmpl = contactConfirmationEmail(parsed.data.name, parsed.data.message);
+      sendEmail({ to: parsed.data.email, ...tmpl }).catch(() => {});
+    }
+
     res.status(201).json(submission);
   });
 
@@ -302,6 +313,14 @@ export async function registerRoutes(
     const parsed = insertConnectCardSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const card = await storage.createConnectCard(parsed.data);
+
+    if (parsed.data.email) {
+      const { connectCardConfirmationEmail } = await import("./email-templates");
+      const { sendEmail } = await import("./email-service");
+      const tmpl = connectCardConfirmationEmail(parsed.data.firstName);
+      sendEmail({ to: parsed.data.email, ...tmpl }).catch(() => {});
+    }
+
     res.status(201).json(card);
   });
 
@@ -822,6 +841,22 @@ export async function registerRoutes(
               updateData.donorName = session.customer_details.name;
             }
             await storage.updateDonation(donation.id, updateData);
+
+            const finalEmail = updateData.donorEmail || donation.donorEmail;
+            if (finalEmail) {
+              const { donationReceiptEmail } = await import("./email-templates");
+              const { sendEmail } = await import("./email-service");
+              const fund = donation.fundId ? await storage.getDonationFund(donation.fundId) : null;
+              const amountStr = `$${(donation.amountCents / 100).toFixed(2)}`;
+              const tmpl = donationReceiptEmail(
+                updateData.donorName || donation.donorName || "Friend",
+                amountStr,
+                fund?.name || "General",
+                donation.frequency || "one_time",
+                new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+              );
+              sendEmail({ to: finalEmail, ...tmpl }).catch(() => {});
+            }
           }
           break;
         }

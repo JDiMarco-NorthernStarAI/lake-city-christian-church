@@ -495,6 +495,14 @@ export const sendNotificationSchema = z.object({
   url: z.string().optional(),
 });
 
+export const socialAuthSchema = z.object({
+  provider: z.enum(["google", "apple"]),
+  idToken: z.string().min(1, "ID token is required"),
+  deviceId: z.string().optional(),
+  deviceName: z.string().optional(),
+  deviceType: z.enum(["web", "ios", "android"]).optional(),
+});
+
 export const createCheckoutSchema = z.object({
   amountCents: z.number().int().positive("Amount must be positive"),
   frequency: z.enum(DONATION_FREQUENCIES),

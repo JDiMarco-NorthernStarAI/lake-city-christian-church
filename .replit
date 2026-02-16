@@ -44,3 +44,6 @@ waitForPort = 5000
 VAPID_PUBLIC_KEY = "BOzQBy91aj3V-yp_paDwblxBV7qAOGul7zyr2hnK_DZLGMLryPGvz580IhUsNyQQtIoA6mXtyEiidyFNQa7K7GA"
 VITE_VAPID_PUBLIC_KEY = "BOzQBy91aj3V-yp_paDwblxBV7qAOGul7zyr2hnK_DZLGMLryPGvz580IhUsNyQQtIoA6mXtyEiidyFNQa7K7GA"
 VAPID_PRIVATE_KEY = "Y_C1cHkOuSGAp4V1DNUXb9svwbfV81W6noS2C9xOWjc"
+
+[agent]
+integrations = ["javascript_object_storage:2.0.0"]
