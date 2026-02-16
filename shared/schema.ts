@@ -874,6 +874,22 @@ export const SIGNUP_CATEGORY_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+export const loginActivity = pgTable("login_activity", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  username: varchar("username", { length: 255 }),
+  email: varchar("email", { length: 255 }),
+  displayName: varchar("display_name", { length: 255 }),
+  loginMethod: varchar("login_method", { length: 50 }).notNull().default("password"),
+  source: varchar("source", { length: 20 }).notNull().default("web"),
+  ipAddress: varchar("ip_address", { length: 100 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type LoginActivity = typeof loginActivity.$inferSelect;
+export type InsertLoginActivity = typeof loginActivity.$inferInsert;
+
 export const createSignupEventSchema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
