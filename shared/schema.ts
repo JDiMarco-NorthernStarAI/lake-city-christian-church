@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, unique, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, unique, decimal, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -30,6 +30,7 @@ export const AVAILABLE_FEATURES = [
   "team",
   "messages",
   "connect",
+  "forms",
   "settings",
   "users",
   "roles",
@@ -44,6 +45,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   team: "Team",
   messages: "Messages",
   connect: "Connect Cards",
+  forms: "Form Builder",
   settings: "Settings",
   users: "User Management",
   roles: "Role Permissions",
@@ -66,6 +68,34 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export const SIGNUP_STATUSES = ["registered", "waitlist", "cancelled"] as const;
+
+export const FORM_STATUSES = ["draft", "published", "archived"] as const;
+
+export const FORM_FIELD_TYPES = [
+  "text",
+  "textarea",
+  "email",
+  "phone",
+  "number",
+  "date",
+  "select",
+  "radio",
+  "checkbox",
+  "checkbox_group",
+] as const;
+
+export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
+  text: "Short Text",
+  textarea: "Long Text",
+  email: "Email",
+  phone: "Phone",
+  number: "Number",
+  date: "Date",
+  select: "Dropdown",
+  radio: "Radio Buttons",
+  checkbox: "Checkbox (Yes/No)",
+  checkbox_group: "Checkbox Group",
+};
 
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -219,6 +249,42 @@ export const pageViews = pgTable("page_views", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const forms = pgTable("forms", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  description: text("description"),
+  slug: text("slug").notNull().unique(),
+  status: text("status").notNull().default("draft"),
+  submitButtonText: text("submit_button_text").default("Submit"),
+  successMessage: text("success_message").default("Thank you for your submission!"),
+  requireAuth: boolean("require_auth").notNull().default(false),
+  allowMultiple: boolean("allow_multiple").notNull().default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const formFields = pgTable("form_fields", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  formId: integer("form_id").notNull(),
+  label: text("label").notNull(),
+  fieldType: text("field_type").notNull().default("text"),
+  required: boolean("required").notNull().default(false),
+  placeholder: text("placeholder"),
+  helpText: text("help_text"),
+  options: jsonb("options"),
+  defaultValue: text("default_value"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const formSubmissions = pgTable("form_submissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  formId: integer("form_id").notNull(),
+  userId: integer("user_id"),
+  data: jsonb("data").notNull(),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSermonSchema = createInsertSchema(sermons).omit({ id: true });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, updatedAt: true });
@@ -312,3 +378,36 @@ export type InsertEventSignup = z.infer<typeof insertEventSignupSchema>;
 export type EventSignup = typeof eventSignups.$inferSelect;
 export type InsertChild = z.infer<typeof insertChildSchema>;
 export type Child = typeof children.$inferSelect;
+
+export const insertFormSchema = createInsertSchema(forms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFormFieldSchema = createInsertSchema(formFields).omit({ id: true });
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({ id: true, submittedAt: true });
+
+export type InsertForm = z.infer<typeof insertFormSchema>;
+export type Form = typeof forms.$inferSelect;
+export type InsertFormField = z.infer<typeof insertFormFieldSchema>;
+export type FormField = typeof formFields.$inferSelect;
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+export const createFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  slug: z.string().min(1, "URL slug is required").regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+  status: z.enum(FORM_STATUSES).optional(),
+  submitButtonText: z.string().optional(),
+  successMessage: z.string().optional(),
+  requireAuth: z.boolean().optional(),
+  allowMultiple: z.boolean().optional(),
+});
+
+export const createFormFieldSchema = z.object({
+  label: z.string().min(1, "Label is required"),
+  fieldType: z.enum(FORM_FIELD_TYPES),
+  required: z.boolean().optional(),
+  placeholder: z.string().optional(),
+  helpText: z.string().optional(),
+  options: z.array(z.string()).optional(),
+  defaultValue: z.string().optional(),
+  sortOrder: z.number().int().optional(),
+});

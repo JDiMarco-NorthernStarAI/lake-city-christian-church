@@ -2,7 +2,7 @@ import { db } from "./db";
 import { eq, desc, asc, and, isNull, sql } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
-  refreshTokens, eventSignups, children,
+  refreshTokens, eventSignups, children, forms, formFields, formSubmissions,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -15,6 +15,9 @@ import {
   type RefreshToken, type InsertRefreshToken,
   type EventSignup, type InsertEventSignup,
   type Child, type InsertChild,
+  type Form, type InsertForm,
+  type FormField, type InsertFormField,
+  type FormSubmission, type InsertFormSubmission,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -88,6 +91,27 @@ export interface IStorage {
   getRolePermissionsByRole(role: string): Promise<RolePermission[]>;
   setRolePermission(role: string, feature: string, enabled: boolean): Promise<void>;
   getEnabledFeaturesForRoles(roles: string[]): Promise<string[]>;
+
+  getForms(): Promise<Form[]>;
+  getPublishedForms(): Promise<Form[]>;
+  getForm(id: number): Promise<Form | undefined>;
+  getFormBySlug(slug: string): Promise<Form | undefined>;
+  createForm(form: InsertForm): Promise<Form>;
+  updateForm(id: number, data: Partial<InsertForm>): Promise<Form | undefined>;
+  deleteForm(id: number): Promise<void>;
+
+  getFormFields(formId: number): Promise<FormField[]>;
+  getFormField(id: number): Promise<FormField | undefined>;
+  createFormField(field: InsertFormField): Promise<FormField>;
+  updateFormField(id: number, data: Partial<InsertFormField>): Promise<FormField | undefined>;
+  deleteFormField(id: number): Promise<void>;
+  deleteFormFieldsByFormId(formId: number): Promise<void>;
+
+  getFormSubmissions(formId: number): Promise<FormSubmission[]>;
+  getFormSubmission(id: number): Promise<FormSubmission | undefined>;
+  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  deleteFormSubmission(id: number): Promise<void>;
+  getFormSubmissionCount(formId: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -423,6 +447,91 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Array.from(enabledFeatures);
+  }
+
+  async getForms(): Promise<Form[]> {
+    return db.select().from(forms).orderBy(desc(forms.createdAt));
+  }
+
+  async getPublishedForms(): Promise<Form[]> {
+    return db.select().from(forms).where(eq(forms.status, "published")).orderBy(desc(forms.createdAt));
+  }
+
+  async getForm(id: number): Promise<Form | undefined> {
+    const [form] = await db.select().from(forms).where(eq(forms.id, id));
+    return form;
+  }
+
+  async getFormBySlug(slug: string): Promise<Form | undefined> {
+    const [form] = await db.select().from(forms).where(eq(forms.slug, slug));
+    return form;
+  }
+
+  async createForm(form: InsertForm): Promise<Form> {
+    const [created] = await db.insert(forms).values(form).returning();
+    return created;
+  }
+
+  async updateForm(id: number, data: Partial<InsertForm>): Promise<Form | undefined> {
+    const [updated] = await db.update(forms).set({ ...data, updatedAt: new Date() }).where(eq(forms.id, id)).returning();
+    return updated;
+  }
+
+  async deleteForm(id: number): Promise<void> {
+    await db.delete(formSubmissions).where(eq(formSubmissions.formId, id));
+    await db.delete(formFields).where(eq(formFields.formId, id));
+    await db.delete(forms).where(eq(forms.id, id));
+  }
+
+  async getFormFields(formId: number): Promise<FormField[]> {
+    return db.select().from(formFields).where(eq(formFields.formId, formId)).orderBy(asc(formFields.sortOrder));
+  }
+
+  async getFormField(id: number): Promise<FormField | undefined> {
+    const [field] = await db.select().from(formFields).where(eq(formFields.id, id));
+    return field;
+  }
+
+  async createFormField(field: InsertFormField): Promise<FormField> {
+    const [created] = await db.insert(formFields).values(field).returning();
+    return created;
+  }
+
+  async updateFormField(id: number, data: Partial<InsertFormField>): Promise<FormField | undefined> {
+    const [updated] = await db.update(formFields).set(data).where(eq(formFields.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFormField(id: number): Promise<void> {
+    await db.delete(formFields).where(eq(formFields.id, id));
+  }
+
+  async deleteFormFieldsByFormId(formId: number): Promise<void> {
+    await db.delete(formFields).where(eq(formFields.formId, formId));
+  }
+
+  async getFormSubmissions(formId: number): Promise<FormSubmission[]> {
+    return db.select().from(formSubmissions).where(eq(formSubmissions.formId, formId)).orderBy(desc(formSubmissions.submittedAt));
+  }
+
+  async getFormSubmission(id: number): Promise<FormSubmission | undefined> {
+    const [sub] = await db.select().from(formSubmissions).where(eq(formSubmissions.id, id));
+    return sub;
+  }
+
+  async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
+    const [created] = await db.insert(formSubmissions).values(submission).returning();
+    return created;
+  }
+
+  async deleteFormSubmission(id: number): Promise<void> {
+    await db.delete(formSubmissions).where(eq(formSubmissions.id, id));
+  }
+
+  async getFormSubmissionCount(formId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(formSubmissions)
+      .where(eq(formSubmissions.formId, formId));
+    return result[0]?.count ?? 0;
   }
 }
 

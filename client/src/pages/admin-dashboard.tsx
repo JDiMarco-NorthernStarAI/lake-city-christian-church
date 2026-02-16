@@ -19,16 +19,16 @@ import {
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
-  Shield, UserCog,
+  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission } from "@shared/schema";
-import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS } from "@shared/schema";
+import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission } from "@shared/schema";
+import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "pages" | "settings" | "users" | "roles";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "pages" | "settings" | "users" | "roles";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -39,6 +39,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "team", label: "Team", icon: Users, feature: "team" },
   { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
   { id: "connect", label: "Connect Cards", icon: FileText, feature: "connect" },
+  { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "users", label: "Users", icon: UserCog, feature: "users" },
   { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
@@ -138,6 +139,7 @@ export default function AdminDashboard() {
           {activeTab === "team" && <TeamTab />}
           {activeTab === "messages" && <MessagesTab />}
           {activeTab === "connect" && <ConnectCardsTab />}
+          {activeTab === "forms" && <FormsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}
@@ -1572,6 +1574,653 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                   ))}
                 </TableRow>
               ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormsTab() {
+  const { toast } = useToast();
+  const [view, setView] = useState<"list" | "editor" | "submissions">("list");
+  const [editingFormId, setEditingFormId] = useState<number | null>(null);
+  const [viewingSubmissionsFormId, setViewingSubmissionsFormId] = useState<number | null>(null);
+
+  function goToList() {
+    setView("list");
+    setEditingFormId(null);
+    setViewingSubmissionsFormId(null);
+  }
+
+  function goToEditor(id: number | null) {
+    setEditingFormId(id);
+    setView("editor");
+  }
+
+  function goToSubmissions(id: number) {
+    setViewingSubmissionsFormId(id);
+    setView("submissions");
+  }
+
+  if (view === "editor") {
+    return <FormEditor formId={editingFormId} onBack={goToList} />;
+  }
+
+  if (view === "submissions" && viewingSubmissionsFormId) {
+    return <FormSubmissionsView formId={viewingSubmissionsFormId} onBack={goToList} />;
+  }
+
+  return <FormListView onCreate={() => goToEditor(null)} onEdit={goToEditor} onViewSubmissions={goToSubmissions} />;
+}
+
+function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () => void; onEdit: (id: number) => void; onViewSubmissions: (id: number) => void }) {
+  const { toast } = useToast();
+  const { data: forms, isLoading } = useQuery<(Form & { submissionCount: number; fieldCount: number })[]>({ queryKey: ["/api/forms"] });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/forms/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      toast({ title: "Form deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const statusVariant = (status: string) => {
+    if (status === "published") return "default" as const;
+    if (status === "archived") return "secondary" as const;
+    return "outline" as const;
+  };
+
+  return (
+    <div data-testid="tab-forms">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-2xl font-bold">Form Builder</h1>
+        <Button onClick={onCreate} data-testid="button-create-form">
+          <Plus className="w-4 h-4 mr-2" /> Create Form
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading...</p>
+      ) : !forms?.length ? (
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            No forms yet. Create your first form to get started.
+          </CardContent>
+        </Card>
+      ) : (
+        <Table data-testid="table-forms">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Fields</TableHead>
+              <TableHead>Submissions</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {forms.map((form) => (
+              <TableRow key={form.id} data-testid={`row-form-${form.id}`}>
+                <TableCell className="font-medium">{form.title}</TableCell>
+                <TableCell>
+                  <Badge variant={statusVariant(form.status)} data-testid={`badge-status-${form.id}`}>
+                    {form.status}
+                  </Badge>
+                </TableCell>
+                <TableCell>{form.fieldCount ?? 0}</TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="sm" onClick={() => onViewSubmissions(form.id)} data-testid={`button-submissions-${form.id}`}>
+                    {form.submissionCount ?? 0} submissions
+                  </Button>
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {form.createdAt ? new Date(form.createdAt).toLocaleDateString() : ""}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => onEdit(form.id)} data-testid={`button-edit-form-${form.id}`}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(form.id)} data-testid={`button-delete-form-${form.id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
+function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => void }) {
+  const { toast } = useToast();
+  const isNew = formId === null;
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    slug: "",
+    status: "draft",
+    submitButtonText: "Submit",
+    successMessage: "Thank you for your submission!",
+    requireAuth: false,
+    allowMultiple: true,
+  });
+  const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+  const [editingField, setEditingField] = useState<FormField | null>(null);
+  const [fieldForm, setFieldForm] = useState({
+    label: "",
+    fieldType: "text",
+    required: false,
+    placeholder: "",
+    helpText: "",
+    options: "",
+  });
+
+  const { data: formWithFields, isLoading } = useQuery<Form & { fields: FormField[] }>({
+    queryKey: ["/api/forms", formId],
+    enabled: !isNew && formId !== null,
+  });
+
+  useEffect(() => {
+    if (formWithFields) {
+      setFormData({
+        title: formWithFields.title,
+        description: formWithFields.description || "",
+        slug: formWithFields.slug,
+        status: formWithFields.status,
+        submitButtonText: formWithFields.submitButtonText || "Submit",
+        successMessage: formWithFields.successMessage || "Thank you for your submission!",
+        requireAuth: formWithFields.requireAuth,
+        allowMultiple: formWithFields.allowMultiple,
+      });
+    }
+  }, [formWithFields]);
+
+  function generateSlug(title: string) {
+    return title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  }
+
+  function handleTitleChange(title: string) {
+    setFormData((prev) => ({
+      ...prev,
+      title,
+      slug: isNew || prev.slug === generateSlug(prev.title) ? generateSlug(title) : prev.slug,
+    }));
+  }
+
+  const createFormMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/forms", data);
+      return await res.json();
+    },
+    onSuccess: (newForm: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      toast({ title: "Form created" });
+      onBack();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateFormMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("PATCH", `/api/forms/${formId}`, data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Form updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const createFieldMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("POST", `/api/forms/${formId}/fields`, data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Field added" });
+      setFieldDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateFieldMutation = useMutation({
+    mutationFn: async ({ fieldId, data }: { fieldId: number; data: any }) => {
+      await apiRequest("PATCH", `/api/forms/${formId}/fields/${fieldId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Field updated" });
+      setFieldDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteFieldMutation = useMutation({
+    mutationFn: async (fieldId: number) => { await apiRequest("DELETE", `/api/forms/${formId}/fields/${fieldId}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Field deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const reorderFieldsMutation = useMutation({
+    mutationFn: async (fieldIds: number[]) => {
+      await apiRequest("PUT", `/api/forms/${formId}/fields/reorder`, { fieldIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function handleSaveForm() {
+    const payload = {
+      ...formData,
+      description: formData.description || null,
+    };
+    if (isNew) {
+      createFormMutation.mutate(payload);
+    } else {
+      updateFormMutation.mutate(payload);
+    }
+  }
+
+  function openAddField() {
+    setEditingField(null);
+    setFieldForm({ label: "", fieldType: "text", required: false, placeholder: "", helpText: "", options: "" });
+    setFieldDialogOpen(true);
+  }
+
+  function openEditField(field: FormField) {
+    setEditingField(field);
+    const opts = Array.isArray(field.options) ? (field.options as string[]).join("\n") : "";
+    setFieldForm({
+      label: field.label,
+      fieldType: field.fieldType,
+      required: field.required,
+      placeholder: field.placeholder || "",
+      helpText: field.helpText || "",
+      options: opts,
+    });
+    setFieldDialogOpen(true);
+  }
+
+  function handleFieldSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const optionTypes = ["select", "radio", "checkbox_group"];
+    const data: any = {
+      label: fieldForm.label,
+      fieldType: fieldForm.fieldType,
+      required: fieldForm.required,
+      placeholder: fieldForm.placeholder || null,
+      helpText: fieldForm.helpText || null,
+      options: optionTypes.includes(fieldForm.fieldType)
+        ? fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean)
+        : null,
+    };
+
+    if (editingField) {
+      updateFieldMutation.mutate({ fieldId: editingField.id, data });
+    } else {
+      const fields = formWithFields?.fields || [];
+      data.sortOrder = fields.length;
+      createFieldMutation.mutate(data);
+    }
+  }
+
+  function moveField(fieldId: number, direction: "up" | "down") {
+    const fields = formWithFields?.fields || [];
+    const sorted = [...fields].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((f) => f.id === fieldId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const newOrder = sorted.map((f) => f.id);
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    reorderFieldsMutation.mutate(newOrder);
+  }
+
+  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
+  const showOptionsField = ["select", "radio", "checkbox_group"].includes(fieldForm.fieldType);
+
+  if (!isNew && isLoading) {
+    return <p className="text-muted-foreground">Loading form...</p>;
+  }
+
+  return (
+    <div data-testid="form-editor">
+      <div className="flex items-center gap-4 flex-wrap mb-6">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-forms">
+          <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Back to Forms
+        </Button>
+        <h1 className="text-2xl font-bold">{isNew ? "Create Form" : "Edit Form"}</h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Form Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={formData.title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                required
+                data-testid="input-form-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                data-testid="input-form-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>URL Slug</Label>
+              <Input
+                value={formData.slug}
+                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                required
+                data-testid="input-form-slug"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                <SelectTrigger data-testid="select-form-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORM_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Submit Button Text</Label>
+              <Input
+                value={formData.submitButtonText}
+                onChange={(e) => setFormData({ ...formData, submitButtonText: e.target.value })}
+                data-testid="input-form-submit-text"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Success Message</Label>
+              <Textarea
+                value={formData.successMessage}
+                onChange={(e) => setFormData({ ...formData, successMessage: e.target.value })}
+                data-testid="input-form-success-message"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={formData.requireAuth}
+                onCheckedChange={(v) => setFormData({ ...formData, requireAuth: v })}
+                data-testid="switch-form-require-auth"
+              />
+              <Label>Require authentication</Label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={formData.allowMultiple}
+                onCheckedChange={(v) => setFormData({ ...formData, allowMultiple: v })}
+                data-testid="switch-form-allow-multiple"
+              />
+              <Label>Allow multiple submissions</Label>
+            </div>
+            <Button
+              onClick={handleSaveForm}
+              className="w-full"
+              disabled={createFormMutation.isPending || updateFormMutation.isPending}
+              data-testid="button-save-form"
+            >
+              <Save className="w-4 h-4 mr-2" /> {isNew ? "Create Form" : "Save Changes"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {!isNew && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle>Fields</CardTitle>
+              <Button size="sm" onClick={openAddField} data-testid="button-add-field">
+                <Plus className="w-4 h-4 mr-2" /> Add Field
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {fields.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No fields yet. Add fields to build your form.</p>
+              ) : (
+                <div className="space-y-2">
+                  {fields.map((field, idx) => (
+                    <div
+                      key={field.id}
+                      className="flex items-center gap-2 p-3 border rounded-md"
+                      data-testid={`field-row-${field.id}`}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => moveField(field.id, "up")}
+                          disabled={idx === 0}
+                          data-testid={`button-move-up-${field.id}`}
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => moveField(field.id, "down")}
+                          disabled={idx === fields.length - 1}
+                          data-testid={`button-move-down-${field.id}`}
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{field.label}</div>
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          <Badge variant="secondary">{FORM_FIELD_TYPE_LABELS[field.fieldType] || field.fieldType}</Badge>
+                          {field.required && <Badge variant="outline">Required</Badge>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEditField(field)} data-testid={`button-edit-field-${field.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => deleteFieldMutation.mutate(field.id)} data-testid={`button-delete-field-${field.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <Dialog open={fieldDialogOpen} onOpenChange={setFieldDialogOpen}>
+        <DialogContent data-testid="dialog-field">
+          <DialogHeader>
+            <DialogTitle>{editingField ? "Edit Field" : "Add Field"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleFieldSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Label</Label>
+              <Input
+                value={fieldForm.label}
+                onChange={(e) => setFieldForm({ ...fieldForm, label: e.target.value })}
+                required
+                data-testid="input-field-label"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Field Type</Label>
+              <Select value={fieldForm.fieldType} onValueChange={(v) => setFieldForm({ ...fieldForm, fieldType: v })}>
+                <SelectTrigger data-testid="select-field-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORM_FIELD_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{FORM_FIELD_TYPE_LABELS[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={fieldForm.required}
+                onCheckedChange={(v) => setFieldForm({ ...fieldForm, required: !!v })}
+                data-testid="checkbox-field-required"
+              />
+              <Label>Required</Label>
+            </div>
+            <div className="space-y-2">
+              <Label>Placeholder</Label>
+              <Input
+                value={fieldForm.placeholder}
+                onChange={(e) => setFieldForm({ ...fieldForm, placeholder: e.target.value })}
+                data-testid="input-field-placeholder"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Help Text</Label>
+              <Input
+                value={fieldForm.helpText}
+                onChange={(e) => setFieldForm({ ...fieldForm, helpText: e.target.value })}
+                data-testid="input-field-help-text"
+              />
+            </div>
+            {showOptionsField && (
+              <div className="space-y-2">
+                <Label>Options (one per line)</Label>
+                <Textarea
+                  value={fieldForm.options}
+                  onChange={(e) => setFieldForm({ ...fieldForm, options: e.target.value })}
+                  data-testid="input-field-options"
+                />
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createFieldMutation.isPending || updateFieldMutation.isPending}
+              data-testid="button-submit-field"
+            >
+              {editingField ? "Update Field" : "Add Field"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function FormSubmissionsView({ formId, onBack }: { formId: number; onBack: () => void }) {
+  const { toast } = useToast();
+
+  const { data: formWithFields } = useQuery<Form & { fields: FormField[] }>({
+    queryKey: ["/api/forms", formId],
+  });
+
+  const { data: submissions, isLoading } = useQuery<FormSubmission[]>({
+    queryKey: ["/api/forms", formId, "submissions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/forms/${formId}/submissions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch submissions");
+      return res.json();
+    },
+  });
+
+  const deleteSubmissionMutation = useMutation({
+    mutationFn: async (subId: number) => { await apiRequest("DELETE", `/api/forms/${formId}/submissions/${subId}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      toast({ title: "Submission deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
+  const fieldLabels = fields.reduce((acc, f) => { acc[f.id.toString()] = f.label; return acc; }, {} as Record<string, string>);
+
+  return (
+    <div data-testid="form-submissions">
+      <div className="flex items-center gap-4 flex-wrap mb-6">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-submissions">
+          <ChevronRight className="w-4 h-4 mr-1 rotate-180" /> Back to Forms
+        </Button>
+        <h1 className="text-2xl font-bold">Submissions: {formWithFields?.title || ""}</h1>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading submissions...</p>
+      ) : !submissions?.length ? (
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            No submissions yet for this form.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table data-testid="table-submissions">
+            <TableHeader>
+              <TableRow>
+                {fields.map((f) => (
+                  <TableHead key={f.id}>{f.label}</TableHead>
+                ))}
+                <TableHead>Submitted</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {submissions.map((sub) => {
+                const data = (sub.data || {}) as Record<string, any>;
+                return (
+                  <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
+                    {fields.map((f) => (
+                      <TableCell key={f.id}>
+                        {data[f.id.toString()] !== undefined
+                          ? Array.isArray(data[f.id.toString()])
+                            ? (data[f.id.toString()] as string[]).join(", ")
+                            : String(data[f.id.toString()])
+                          : data[f.label] !== undefined
+                            ? String(data[f.label])
+                            : ""}
+                      </TableCell>
+                    ))}
+                    <TableCell className="text-muted-foreground text-sm">
+                      {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : ""}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteSubmissionMutation.mutate(sub.id)}
+                        data-testid={`button-delete-submission-${sub.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

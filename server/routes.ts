@@ -8,6 +8,7 @@ import {
   insertSermonSchema, insertEventSchema, insertTeamMemberSchema,
   insertContactSchema, insertConnectCardSchema, siteSettings,
   AVAILABLE_ROLES, AVAILABLE_FEATURES,
+  createFormSchema, createFormFieldSchema,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
@@ -463,6 +464,185 @@ export async function registerRoutes(
       res.json({ message: "Permissions updated" });
     } catch (err) {
       res.status(500).json({ message: "Error updating permissions" });
+    }
+  });
+
+  app.get("/api/forms", requireFeature("forms"), async (_req, res) => {
+    try {
+      const data = await storage.getForms();
+      const formsWithCounts = await Promise.all(
+        data.map(async (form) => ({
+          ...form,
+          submissionCount: await storage.getFormSubmissionCount(form.id),
+          fieldCount: (await storage.getFormFields(form.id)).length,
+        }))
+      );
+      res.json(formsWithCounts);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching forms" });
+    }
+  });
+
+  app.get("/api/forms/:id", requireFeature("forms"), async (req, res) => {
+    try {
+      const form = await storage.getForm(Number(req.params.id));
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      const fields = await storage.getFormFields(form.id);
+      res.json({ ...form, fields });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching form" });
+    }
+  });
+
+  app.post("/api/forms", requireFeature("forms"), async (req, res) => {
+    try {
+      const parsed = createFormSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid form data" });
+      const existing = await storage.getFormBySlug(parsed.data.slug);
+      if (existing) return res.status(400).json({ message: "A form with this URL slug already exists" });
+      const form = await storage.createForm({ ...parsed.data, createdBy: req.session.userId });
+      res.status(201).json(form);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating form" });
+    }
+  });
+
+  app.patch("/api/forms/:id", requireFeature("forms"), async (req, res) => {
+    try {
+      const formId = Number(req.params.id);
+      const form = await storage.getForm(formId);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      const parsed = createFormSchema.partial().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid form data" });
+      if (parsed.data.slug && parsed.data.slug !== form.slug) {
+        const existing = await storage.getFormBySlug(parsed.data.slug);
+        if (existing) return res.status(400).json({ message: "A form with this URL slug already exists" });
+      }
+      const updated = await storage.updateForm(formId, parsed.data);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating form" });
+    }
+  });
+
+  app.delete("/api/forms/:id", requireFeature("forms"), async (req, res) => {
+    try {
+      await storage.deleteForm(Number(req.params.id));
+      res.json({ message: "Form deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting form" });
+    }
+  });
+
+  app.get("/api/forms/:id/fields", requireFeature("forms"), async (req, res) => {
+    try {
+      const fields = await storage.getFormFields(Number(req.params.id));
+      res.json(fields);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching fields" });
+    }
+  });
+
+  app.post("/api/forms/:id/fields", requireFeature("forms"), async (req, res) => {
+    try {
+      const formId = Number(req.params.id);
+      const form = await storage.getForm(formId);
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      const parsed = createFormFieldSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid field data" });
+      const existingFields = await storage.getFormFields(formId);
+      const sortOrder = parsed.data.sortOrder ?? existingFields.length;
+      const field = await storage.createFormField({ ...parsed.data, formId, sortOrder });
+      res.status(201).json(field);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating field" });
+    }
+  });
+
+  app.patch("/api/forms/:formId/fields/:fieldId", requireFeature("forms"), async (req, res) => {
+    try {
+      const parsed = createFormFieldSchema.partial().safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid field data" });
+      const updated = await storage.updateFormField(Number(req.params.fieldId), parsed.data);
+      if (!updated) return res.status(404).json({ message: "Field not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating field" });
+    }
+  });
+
+  app.delete("/api/forms/:formId/fields/:fieldId", requireFeature("forms"), async (req, res) => {
+    try {
+      await storage.deleteFormField(Number(req.params.fieldId));
+      res.json({ message: "Field deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting field" });
+    }
+  });
+
+  app.put("/api/forms/:id/fields/reorder", requireFeature("forms"), async (req, res) => {
+    try {
+      const { fieldIds } = req.body;
+      if (!Array.isArray(fieldIds)) return res.status(400).json({ message: "fieldIds array required" });
+      for (let i = 0; i < fieldIds.length; i++) {
+        await storage.updateFormField(fieldIds[i], { sortOrder: i });
+      }
+      const fields = await storage.getFormFields(Number(req.params.id));
+      res.json(fields);
+    } catch (err) {
+      res.status(500).json({ message: "Error reordering fields" });
+    }
+  });
+
+  app.get("/api/forms/:id/submissions", requireFeature("forms"), async (req, res) => {
+    try {
+      const submissions = await storage.getFormSubmissions(Number(req.params.id));
+      res.json(submissions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching submissions" });
+    }
+  });
+
+  app.delete("/api/forms/:formId/submissions/:subId", requireFeature("forms"), async (req, res) => {
+    try {
+      await storage.deleteFormSubmission(Number(req.params.subId));
+      res.json({ message: "Submission deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting submission" });
+    }
+  });
+
+  app.get("/api/public/forms/:slug", async (req, res) => {
+    try {
+      const form = await storage.getFormBySlug(req.params.slug);
+      if (!form || form.status !== "published") return res.status(404).json({ message: "Form not found" });
+      const fields = await storage.getFormFields(form.id);
+      res.json({ ...form, fields });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching form" });
+    }
+  });
+
+  app.post("/api/public/forms/:slug/submit", async (req, res) => {
+    try {
+      const form = await storage.getFormBySlug(req.params.slug);
+      if (!form || form.status !== "published") return res.status(404).json({ message: "Form not found" });
+      const fields = await storage.getFormFields(form.id);
+      const data = req.body;
+      if (!data || typeof data !== "object") return res.status(400).json({ message: "Submission data required" });
+      for (const field of fields) {
+        if (field.required && (!data[field.id] || (typeof data[field.id] === "string" && data[field.id].trim() === ""))) {
+          return res.status(400).json({ message: `${field.label} is required` });
+        }
+      }
+      const submission = await storage.createFormSubmission({
+        formId: form.id,
+        data,
+        userId: null,
+      });
+      res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission });
+    } catch (err) {
+      res.status(500).json({ message: "Error submitting form" });
     }
   });
 

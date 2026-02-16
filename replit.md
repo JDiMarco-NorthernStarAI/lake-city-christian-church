@@ -43,6 +43,7 @@ Preferred communication style: Simple, everyday language.
 - **Schema Push**: `npm run db:push` uses drizzle-kit push (no migration files needed for dev)
 - **Tables**: users, sermons, events, team_members, contact_submissions, connect_cards, site_settings, plus session table auto-created by connect-pg-simple
 - **V1 API Tables**: refresh_tokens (JWT refresh token storage with device tracking), event_signups (event registration with waitlist support), children (kids ministry registration)
+- **Form Builder Tables**: forms (configurable forms with slug, status, settings), form_fields (fields with type, order, options), form_submissions (submitted data as JSONB)
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface with a database-backed implementation using Drizzle

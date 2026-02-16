@@ -23,6 +23,7 @@ import PlanVisit from "@/pages/plan-visit";
 import Contact from "@/pages/contact";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import PublicForm from "@/pages/public-form";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/give" component={Give} />
       <Route path="/plan-visit" component={PlanVisit} />
       <Route path="/contact" component={Contact} />
+      <Route path="/forms/:slug" component={PublicForm} />
       <Route path="/admin" component={AdminLogin} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route component={NotFound} />

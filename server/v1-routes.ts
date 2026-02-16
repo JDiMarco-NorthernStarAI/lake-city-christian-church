@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import {
   registerUserSchema, loginSchema, updateProfileSchema,
   createChildSchema, createEventV1Schema,
-  EVENT_TYPES, AVAILABLE_ROLES,
+  createFormSchema, createFormFieldSchema,
+  EVENT_TYPES, AVAILABLE_ROLES, FORM_FIELD_TYPES,
 } from "@shared/schema";
 import {
   generateAccessToken, verifyAccessToken, generateRefreshToken,
@@ -825,6 +826,214 @@ v1Router.post("/users/:id/restore", requireJwt, requireAdmin, async (req, res) =
   } catch (err) {
     return apiResponse(res, 500, null, "Server error");
   }
+});
+
+v1Router.get("/forms", async (_req, res) => {
+  try {
+    const data = await storage.getPublishedForms();
+    return apiResponse(res, 200, data.map((f) => ({
+      id: f.id,
+      title: f.title,
+      description: f.description,
+      slug: f.slug,
+      requireAuth: f.requireAuth,
+      allowMultiple: f.allowMultiple,
+    })));
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/forms/:slug", async (req, res) => {
+  try {
+    const form = await storage.getFormBySlug(req.params.slug);
+    if (!form || form.status !== "published") {
+      return apiResponse(res, 404, null, "Form not found");
+    }
+    const fields = await storage.getFormFields(form.id);
+    return apiResponse(res, 200, {
+      ...form,
+      fields: fields.map((f) => ({
+        id: f.id,
+        label: f.label,
+        fieldType: f.fieldType,
+        required: f.required,
+        placeholder: f.placeholder,
+        helpText: f.helpText,
+        options: f.options,
+        defaultValue: f.defaultValue,
+        sortOrder: f.sortOrder,
+      })),
+    });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.post("/forms/:slug/submit", async (req, res) => {
+  try {
+    const form = await storage.getFormBySlug(req.params.slug);
+    if (!form || form.status !== "published") {
+      return apiResponse(res, 404, null, "Form not found");
+    }
+    const fields = await storage.getFormFields(form.id);
+    const data = req.body;
+    if (!data || typeof data !== "object") {
+      return apiResponse(res, 400, null, "Submission data required");
+    }
+    for (const field of fields) {
+      if (field.required) {
+        const val = data[field.id];
+        if (val === undefined || val === null || (typeof val === "string" && val.trim() === "")) {
+          return apiResponse(res, 400, null, `${field.label} is required`);
+        }
+      }
+    }
+    let userId = null;
+    const auth = req.headers.authorization;
+    if (auth?.startsWith("Bearer ")) {
+      const payload = verifyAccessToken(auth.slice(7));
+      if (payload) userId = payload.userId;
+    }
+    const submission = await storage.createFormSubmission({
+      formId: form.id,
+      data,
+      userId,
+    });
+    return apiResponse(res, 201, {
+      message: form.successMessage || "Thank you for your submission!",
+      submissionId: submission.id,
+    });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/admin/forms", requireJwt, requireAdmin, async (_req, res) => {
+  try {
+    const data = await storage.getForms();
+    const formsWithCounts = await Promise.all(
+      data.map(async (form) => ({
+        ...form,
+        submissionCount: await storage.getFormSubmissionCount(form.id),
+        fieldCount: (await storage.getFormFields(form.id)).length,
+      }))
+    );
+    return apiResponse(res, 200, formsWithCounts);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/admin/forms/:id", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    const form = await storage.getForm(Number(req.params.id));
+    if (!form) return apiResponse(res, 404, null, "Form not found");
+    const fields = await storage.getFormFields(form.id);
+    return apiResponse(res, 200, { ...form, fields });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.post("/admin/forms", requireJwt, requireAdmin, async (req: any, res) => {
+  try {
+    const parsed = createFormSchema.safeParse(req.body);
+    if (!parsed.success) return apiResponse(res, 400, null, parsed.error.errors[0]?.message || "Invalid form data");
+    const existing = await storage.getFormBySlug(parsed.data.slug);
+    if (existing) return apiResponse(res, 400, null, "A form with this URL slug already exists");
+    const form = await storage.createForm({ ...parsed.data, createdBy: req.jwtPayload?.userId });
+    return apiResponse(res, 201, form);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.patch("/admin/forms/:id", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    const formId = Number(req.params.id);
+    const form = await storage.getForm(formId);
+    if (!form) return apiResponse(res, 404, null, "Form not found");
+    const parsed = createFormSchema.partial().safeParse(req.body);
+    if (!parsed.success) return apiResponse(res, 400, null, parsed.error.errors[0]?.message || "Invalid form data");
+    if (parsed.data.slug && parsed.data.slug !== form.slug) {
+      const existing = await storage.getFormBySlug(parsed.data.slug);
+      if (existing) return apiResponse(res, 400, null, "A form with this URL slug already exists");
+    }
+    const updated = await storage.updateForm(formId, parsed.data);
+    return apiResponse(res, 200, updated);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.delete("/admin/forms/:id", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    await storage.deleteForm(Number(req.params.id));
+    return apiResponse(res, 200, { message: "Form deleted" });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.post("/admin/forms/:id/fields", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    const formId = Number(req.params.id);
+    const form = await storage.getForm(formId);
+    if (!form) return apiResponse(res, 404, null, "Form not found");
+    const parsed = createFormFieldSchema.safeParse(req.body);
+    if (!parsed.success) return apiResponse(res, 400, null, parsed.error.errors[0]?.message || "Invalid field data");
+    const existingFields = await storage.getFormFields(formId);
+    const sortOrder = parsed.data.sortOrder ?? existingFields.length;
+    const field = await storage.createFormField({ ...parsed.data, formId, sortOrder });
+    return apiResponse(res, 201, field);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.patch("/admin/forms/:formId/fields/:fieldId", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    const parsed = createFormFieldSchema.partial().safeParse(req.body);
+    if (!parsed.success) return apiResponse(res, 400, null, parsed.error.errors[0]?.message || "Invalid field data");
+    const updated = await storage.updateFormField(Number(req.params.fieldId), parsed.data);
+    if (!updated) return apiResponse(res, 404, null, "Field not found");
+    return apiResponse(res, 200, updated);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.delete("/admin/forms/:formId/fields/:fieldId", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    await storage.deleteFormField(Number(req.params.fieldId));
+    return apiResponse(res, 200, { message: "Field deleted" });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/admin/forms/:id/submissions", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    const submissions = await storage.getFormSubmissions(Number(req.params.id));
+    return apiResponse(res, 200, submissions);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.delete("/admin/forms/:formId/submissions/:subId", requireJwt, requireAdmin, async (req, res) => {
+  try {
+    await storage.deleteFormSubmission(Number(req.params.subId));
+    return apiResponse(res, 200, { message: "Submission deleted" });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/config/form-field-types", (_req, res) => {
+  const { FORM_FIELD_TYPE_LABELS } = require("@shared/schema");
+  return apiResponse(res, 200, FORM_FIELD_TYPES.map((t: string) => ({ value: t, label: FORM_FIELD_TYPE_LABELS[t] || t })));
 });
 
 v1Router.get("/health", (_req, res) => {
