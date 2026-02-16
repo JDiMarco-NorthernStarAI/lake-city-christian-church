@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { usePageContent } from "@/hooks/use-page-content";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, Clock, GraduationCap, UtensilsCrossed, ExternalLink, ClipboardList } from "lucide-react";
+import { ArrowRight, Clock, GraduationCap, UtensilsCrossed, ClipboardList } from "lucide-react";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -118,7 +118,7 @@ export default function StudentMinistry() {
                 <p className="text-muted-foreground leading-relaxed">
                   {c.meal_description}
                 </p>
-                <a href={c.meal_sponsor_url} target="_blank" rel="noopener noreferrer">
+                <Link href="/forms/club419-meal-sponsor">
                   <Button
                     size="lg"
                     className="text-white border-transparent"
@@ -126,9 +126,9 @@ export default function StudentMinistry() {
                     data-testid="button-sponsor-meal"
                   >
                     I'll Sponsor!
-                    <ExternalLink className="w-4 h-4 ml-2" />
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
-                </a>
+                </Link>
               </CardContent>
             </Card>
 
