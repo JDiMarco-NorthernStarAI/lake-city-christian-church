@@ -656,9 +656,16 @@ function TeamTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [form, setForm] = useState({ name: "", role: "", bio: "", sortOrder: 0, isFeatured: false });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => { await apiRequest("POST", "/api/team", data); },
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/team", data);
+      const member = await res.json();
+      if (photoFile) await uploadTeamPhoto(member.id, photoFile);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/team"] });
       toast({ title: "Team member added" });
@@ -668,7 +675,10 @@ function TeamTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/team/${id}`, data); },
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      await apiRequest("PATCH", `/api/team/${id}`, data);
+      if (photoFile) await uploadTeamPhoto(id, photoFile);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/team"] });
       toast({ title: "Team member updated" });
@@ -686,9 +696,40 @@ function TeamTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  function getTeamPhotoSrc(path: string | null | undefined) {
+    if (!path) return undefined;
+    if (path.startsWith("http")) return path;
+    return `/objects${path.startsWith("/") ? path : `/${path}`}`;
+  }
+
+  async function uploadTeamPhoto(memberId: number, file: File) {
+    try {
+      setUploadingPhoto(true);
+      const uploadRes = await apiRequest("POST", `/api/team/${memberId}/photo`);
+      const { uploadURL, objectPath } = await uploadRes.json();
+      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      await apiRequest("PUT", `/api/team/${memberId}/photo`, { objectPath });
+    } catch (err: any) {
+      toast({ title: "Photo upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
   function openAdd() {
     setEditing(null);
     setForm({ name: "", role: "", bio: "", sortOrder: 0, isFeatured: false });
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setDialogOpen(true);
   }
 
@@ -701,12 +742,16 @@ function TeamTab() {
       sortOrder: member.sortOrder,
       isFeatured: member.isFeatured,
     });
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setDialogOpen(true);
   }
 
   function closeDialog() {
     setDialogOpen(false);
     setEditing(null);
+    setPhotoFile(null);
+    setPhotoPreview(null);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -735,9 +780,18 @@ function TeamTab() {
           {team?.map((member) => (
             <Card key={member.id} data-testid={`card-team-${member.id}`}>
               <CardHeader className="flex flex-row items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base">{member.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{member.role}</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+                    {member.photoUrl ? (
+                      <img src={getTeamPhotoSrc(member.photoUrl)} alt={member.name} className="w-full h-full object-cover" data-testid={`img-team-photo-${member.id}`} />
+                    ) : (
+                      <Users className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">{member.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{member.role}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <Button size="icon" variant="ghost" onClick={() => openEdit(member)} data-testid={`button-edit-team-${member.id}`}>
@@ -764,6 +818,21 @@ function TeamTab() {
             <DialogTitle>{editing ? "Edit Team Member" : "Add Team Member"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="flex justify-center">
+              <label className="relative cursor-pointer group" data-testid="label-team-photo">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                  {photoPreview || editing?.photoUrl ? (
+                    <img src={photoPreview || getTeamPhotoSrc(editing?.photoUrl) || ""} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="w-8 h-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} data-testid="input-team-photo" />
+              </label>
+            </div>
             <div className="space-y-2">
               <Label>Name</Label>
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required data-testid="input-team-name" />
@@ -789,7 +858,8 @@ function TeamTab() {
               />
               <Label htmlFor="isFeatured">Featured</Label>
             </div>
-            <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-team">
+            <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || uploadingPhoto} data-testid="button-submit-team">
+              {(createMutation.isPending || updateMutation.isPending || uploadingPhoto) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editing ? "Update" : "Create"}
             </Button>
           </form>

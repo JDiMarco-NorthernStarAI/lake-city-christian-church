@@ -324,6 +324,32 @@ export async function registerRoutes(
     res.json({ message: "Deleted" });
   });
 
+  app.post("/api/team/:id/photo", requireFeature("team"), async (req, res) => {
+    try {
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objStorage = new ObjectStorageService();
+      const uploadURL = await objStorage.getObjectEntityUploadURL();
+      const objectPath = objStorage.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (err) {
+      console.error("Team photo upload URL error:", err);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  app.put("/api/team/:id/photo", requireFeature("team"), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { objectPath } = req.body;
+      if (!objectPath) return res.status(400).json({ message: "objectPath is required" });
+      const updated = await storage.updateTeamMember(id, { photoUrl: objectPath });
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.post("/api/contact", async (req, res) => {
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });

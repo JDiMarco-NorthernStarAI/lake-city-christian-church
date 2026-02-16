@@ -8,6 +8,12 @@ import { useQuery } from "@tanstack/react-query";
 import type { TeamMember } from "@shared/schema";
 import { usePageContent } from "@/hooks/use-page-content";
 
+function getTeamPhotoSrc(path: string | null | undefined) {
+  if (!path) return undefined;
+  if (path.startsWith("http")) return path;
+  return `/objects${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
     <motion.div
@@ -80,7 +86,7 @@ export default function Leadership() {
                 <div className="flex flex-col md:flex-row items-center gap-8">
                   <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                     {featured.photoUrl ? (
-                      <img src={featured.photoUrl} alt={featured.name} className="w-full h-full object-cover" />
+                      <img src={getTeamPhotoSrc(featured.photoUrl)} alt={featured.name} className="w-full h-full object-cover" />
                     ) : (
                       <Users className="w-12 h-12 text-muted-foreground" />
                     )}
@@ -148,7 +154,7 @@ export default function Leadership() {
                     <CardContent className="p-6 flex flex-col items-center text-center">
                       <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4 overflow-hidden">
                         {member.photoUrl ? (
-                          <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
+                          <img src={getTeamPhotoSrc(member.photoUrl)} alt={member.name} className="w-full h-full object-cover" />
                         ) : (
                           <Users className="w-8 h-8 text-muted-foreground" />
                         )}
