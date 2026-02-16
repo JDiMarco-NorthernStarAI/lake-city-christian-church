@@ -19,69 +19,36 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
   );
 }
 
-const beliefs = [
-  {
-    id: "god",
-    title: "God",
-    content: "We believe in one God \u2013 Father, Son and Holy Spirit.",
-  },
-  {
-    id: "god-the-father",
-    title: "God the Father",
-    content: "We believe in God the Father Almighty, Creator of all things visible and invisible.",
-  },
-  {
-    id: "jesus-christ",
-    title: "Jesus Christ",
-    content: "We believe Jesus Christ is God's Son, born fully human and fully divine. He was crucified for the sins of the world, buried, and rose again on the third day. He ascended to heaven where He reigns as Lord. He will return to judge the living and the dead.",
-  },
-  {
-    id: "holy-spirit",
-    title: "The Holy Spirit",
-    content: "We believe the Holy Spirit is personal and active, indwelling every Christian from the moment of salvation, empowering believers for service and growth.",
-  },
-  {
-    id: "the-bible",
-    title: "The Bible",
-    content: "We believe the Bible is God's Holy Word, inspired by the Holy Spirit, and is the final authority for all matters of faith and practice.",
-  },
-  {
-    id: "humanity-and-sin",
-    title: "Humanity & Sin",
-    content: "We believe people were created by God but have willfully sinned and are lost without Jesus Christ.",
-  },
-  {
-    id: "salvation",
-    title: "Salvation",
-    content: "We believe forgiveness of sins comes through the blood of Jesus Christ and by God's grace \u2014 not by works or human effort.",
-  },
-  {
-    id: "our-response",
-    title: "Our Response",
-    content: "We believe in admitting our sin, believing and confessing Jesus as Lord, repenting of sin, trusting fully in Jesus, and being baptized by immersion as an outward expression of an inward transformation.",
-  },
-  {
-    id: "the-church",
-    title: "The Church",
-    content: "We believe the Church consists of all Christians everywhere who have placed their faith in Jesus Christ.",
-  },
-  {
-    id: "lords-supper",
-    title: "The Lord's Supper",
-    content: "We celebrate the Lord's Supper weekly as a proclamation of Christ's death, burial, and resurrection until He comes again.",
-  },
-  {
-    id: "great-commission",
-    title: "The Great Commission",
-    content: "We are called to go and make disciples of all people groups, baptizing them and teaching them to obey everything Jesus commanded.",
-  },
-];
-
 export default function WhatWeBelieve() {
   const c = usePageContent("what-we-believe", {
     hero_title: "What We Believe",
     intro_text: "These are the core convictions that shape our faith and guide our community. We hold to the essentials of the Christian faith as revealed in Scripture.",
+    belief_god: "We believe in one God \u2013 Father, Son and Holy Spirit.",
+    belief_god_the_father: "We believe in God the Father Almighty, Creator of all things visible and invisible.",
+    belief_jesus_christ: "We believe Jesus Christ is God's Son, born fully human and fully divine. He was crucified for the sins of the world, buried, and rose again on the third day. He ascended to heaven where He reigns as Lord. He will return to judge the living and the dead.",
+    belief_holy_spirit: "We believe the Holy Spirit is personal and active, indwelling every Christian from the moment of salvation, empowering believers for service and growth.",
+    belief_the_bible: "We believe the Bible is God's Holy Word, inspired by the Holy Spirit, and is the final authority for all matters of faith and practice.",
+    belief_humanity_and_sin: "We believe people were created by God but have willfully sinned and are lost without Jesus Christ.",
+    belief_salvation: "We believe forgiveness of sins comes through the blood of Jesus Christ and by God's grace \u2014 not by works or human effort.",
+    belief_our_response: "We believe in admitting our sin, believing and confessing Jesus as Lord, repenting of sin, trusting fully in Jesus, and being baptized by immersion as an outward expression of an inward transformation.",
+    belief_the_church: "We believe the Church consists of all Christians everywhere who have placed their faith in Jesus Christ.",
+    belief_lords_supper: "We celebrate the Lord's Supper weekly as a proclamation of Christ's death, burial, and resurrection until He comes again.",
+    belief_great_commission: "We are called to go and make disciples of all people groups, baptizing them and teaching them to obey everything Jesus commanded.",
   });
+
+  const beliefKeys: { id: string; title: string; contentKey: string }[] = [
+    { id: "god", title: "God", contentKey: "belief_god" },
+    { id: "god-the-father", title: "God the Father", contentKey: "belief_god_the_father" },
+    { id: "jesus-christ", title: "Jesus Christ", contentKey: "belief_jesus_christ" },
+    { id: "holy-spirit", title: "The Holy Spirit", contentKey: "belief_holy_spirit" },
+    { id: "the-bible", title: "The Bible", contentKey: "belief_the_bible" },
+    { id: "humanity-and-sin", title: "Humanity & Sin", contentKey: "belief_humanity_and_sin" },
+    { id: "salvation", title: "Salvation", contentKey: "belief_salvation" },
+    { id: "our-response", title: "Our Response", contentKey: "belief_our_response" },
+    { id: "the-church", title: "The Church", contentKey: "belief_the_church" },
+    { id: "lords-supper", title: "The Lord's Supper", contentKey: "belief_lords_supper" },
+    { id: "great-commission", title: "The Great Commission", contentKey: "belief_great_commission" },
+  ];
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center bg-black py-24 md:py-32 px-4">
@@ -115,7 +82,7 @@ export default function WhatWeBelieve() {
 
         <FadeInSection className="max-w-3xl mx-auto">
           <Accordion type="single" collapsible className="w-full">
-            {beliefs.map((belief) => (
+            {beliefKeys.map((belief) => (
               <AccordionItem key={belief.id} value={belief.id} data-testid={`accordion-${belief.id}`}>
                 <AccordionTrigger
                   className="text-left text-base md:text-lg"
@@ -125,7 +92,7 @@ export default function WhatWeBelieve() {
                   {belief.title}
                 </AccordionTrigger>
                 <AccordionContent className="text-base text-muted-foreground leading-relaxed">
-                  {belief.content}
+                  {c[belief.contentKey]}
                 </AccordionContent>
               </AccordionItem>
             ))}

@@ -844,6 +844,7 @@ type PageFieldConfig = {
   key: string;
   label: string;
   type: "input" | "textarea";
+  placeholder?: string;
 };
 
 type PageConfig = {
@@ -857,157 +858,168 @@ const pageConfigs: PageConfig[] = [
     id: "home",
     label: "Home",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "hero_tagline", label: "Hero Tagline", type: "input" },
-      { key: "service_time", label: "Service Time", type: "input" },
-      { key: "service_location", label: "Service Location", type: "input" },
-      { key: "numbers_heading", label: "By the Numbers - Heading", type: "input" },
-      { key: "connect_heading", label: "Connect Section - Heading", type: "input" },
-      { key: "connect_description", label: "Connect Section - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Lake City Christian Church" },
+      { key: "hero_tagline", label: "Hero Tagline", type: "input", placeholder: "Connecting people to a life-changing relationship with Jesus." },
+      { key: "service_time", label: "Service Time", type: "input", placeholder: "Sunday @ 10:00 AM" },
+      { key: "service_location", label: "Service Location", type: "input", placeholder: "6717 Fry Road, Middleburg Heights, OH" },
+      { key: "numbers_heading", label: "By the Numbers - Heading", type: "input", placeholder: "Lake City in Numbers" },
+      { key: "connect_heading", label: "Connect Section - Heading", type: "input", placeholder: "Get Connected" },
+      { key: "connect_description", label: "Connect Section - Description", type: "textarea", placeholder: "We would love for you to be a part of what God is doing at Lake City." },
     ],
   },
   {
     id: "about",
     label: "Who We Are",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "mission_heading", label: "Mission Heading", type: "input" },
-      { key: "mission_description", label: "Mission Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Who We Are" },
+      { key: "mission_heading", label: "Mission Heading", type: "input", placeholder: "Lake City Christian Church exists to connect people to a life-changing relationship with Jesus." },
+      { key: "mission_description", label: "Mission Description", type: "textarea", placeholder: "We are a community of Christ-followers committed to making disciples, serving our neighbors, and growing together in faith." },
     ],
   },
   {
     id: "our-story",
     label: "Our Story",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "story_p1", label: "Story - Paragraph 1", type: "textarea" },
-      { key: "story_p2", label: "Story - Paragraph 2", type: "textarea" },
-      { key: "kln_heading", label: "KLN Section - Heading", type: "input" },
-      { key: "kln_description", label: "KLN Section - Description", type: "textarea" },
-      { key: "memorial_heading", label: "Memorial - Heading", type: "input" },
-      { key: "memorial_year", label: "Memorial - Year", type: "input" },
-      { key: "memorial_description", label: "Memorial - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Our Story" },
+      { key: "story_p1", label: "Story - Paragraph 1", type: "textarea", placeholder: "In the fall of 2022, Jeff Linger felt a calling..." },
+      { key: "story_p2", label: "Story - Paragraph 2", type: "textarea", placeholder: "After connecting with other like-minded leaders..." },
+      { key: "kln_heading", label: "KLN Section - Heading", type: "input", placeholder: "Kingdom Leaders Network" },
+      { key: "kln_description", label: "KLN Section - Description", type: "textarea", placeholder: "Lake City Christian Church is affiliated with..." },
+      { key: "memorial_heading", label: "Memorial - Heading", type: "input", placeholder: "In Loving Memory" },
+      { key: "memorial_year", label: "Memorial - Year", type: "input", placeholder: "1958 - 2024" },
+      { key: "memorial_description", label: "Memorial - Description", type: "textarea", placeholder: "In memory of John Linger..." },
     ],
   },
   {
     id: "what-we-believe",
     label: "What We Believe",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "intro_text", label: "Intro Text", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "What We Believe" },
+      { key: "intro_text", label: "Intro Text", type: "textarea", placeholder: "These are the core convictions that shape our faith and guide our community." },
+      { key: "belief_god", label: "Belief: God", type: "textarea", placeholder: "We believe in one God \u2013 Father, Son and Holy Spirit." },
+      { key: "belief_god_the_father", label: "Belief: God the Father", type: "textarea", placeholder: "We believe in God the Father Almighty, Creator of all things visible and invisible." },
+      { key: "belief_jesus_christ", label: "Belief: Jesus Christ", type: "textarea", placeholder: "We believe Jesus Christ is God's Son, born fully human and fully divine. He was crucified for the sins of the world, buried, and rose again on the third day." },
+      { key: "belief_holy_spirit", label: "Belief: The Holy Spirit", type: "textarea", placeholder: "We believe the Holy Spirit is personal and active, indwelling every Christian from the moment of salvation, empowering believers for service and growth." },
+      { key: "belief_the_bible", label: "Belief: The Bible", type: "textarea", placeholder: "We believe the Bible is God's Holy Word, inspired by the Holy Spirit, and is the final authority for all matters of faith and practice." },
+      { key: "belief_humanity_and_sin", label: "Belief: Humanity & Sin", type: "textarea", placeholder: "We believe people were created by God but have willfully sinned and are lost without Jesus Christ." },
+      { key: "belief_salvation", label: "Belief: Salvation", type: "textarea", placeholder: "We believe forgiveness of sins comes through the blood of Jesus Christ and by God's grace \u2014 not by works or human effort." },
+      { key: "belief_our_response", label: "Belief: Our Response", type: "textarea", placeholder: "We believe in admitting our sin, believing and confessing Jesus as Lord, repenting of sin, trusting fully in Jesus, and being baptized by immersion." },
+      { key: "belief_the_church", label: "Belief: The Church", type: "textarea", placeholder: "We believe the Church consists of all Christians everywhere who have placed their faith in Jesus Christ." },
+      { key: "belief_lords_supper", label: "Belief: The Lord's Supper", type: "textarea", placeholder: "We celebrate the Lord's Supper weekly as a proclamation of Christ's death, burial, and resurrection until He comes again." },
+      { key: "belief_great_commission", label: "Belief: The Great Commission", type: "textarea", placeholder: "We are called to go and make disciples of all people groups, baptizing them and teaching them to obey everything Jesus commanded." },
     ],
   },
   {
     id: "leadership",
     label: "Leadership",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "intro_text", label: "Intro Text", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Leadership" },
+      { key: "intro_text", label: "Intro Text", type: "textarea", placeholder: "Meet the pastors and leaders serving our church community." },
     ],
   },
   {
     id: "ministries",
     label: "Ministries",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Ministries" },
     ],
   },
   {
     id: "kids-ministry",
     label: "Kids Ministry",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "welcome_heading", label: "Welcome Heading", type: "input" },
-      { key: "welcome_description", label: "Welcome Description", type: "textarea" },
-      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
-      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Lake City Kids" },
+      { key: "welcome_heading", label: "Welcome Heading", type: "input", placeholder: "Welcome to Lake City Kids" },
+      { key: "welcome_description", label: "Welcome Description", type: "textarea", placeholder: "A place where your child will feel comfortable, cared for and loved!" },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input", placeholder: "Have Questions?" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea", placeholder: "We would love to hear from you and help your family get connected." },
     ],
   },
   {
     id: "student-ministry",
     label: "Student Ministry",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "hero_subtitle", label: "Hero Subtitle", type: "input" },
-      { key: "scripture_text", label: "Scripture Quote", type: "textarea" },
-      { key: "scripture_ref", label: "Scripture Reference", type: "input" },
-      { key: "description", label: "Description", type: "textarea" },
-      { key: "schedule", label: "Meeting Schedule", type: "input" },
-      { key: "meal_heading", label: "Meal Section - Heading", type: "input" },
-      { key: "meal_description", label: "Meal Section - Description", type: "textarea" },
-      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
-      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Club 419" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "input", placeholder: "Student Ministry" },
+      { key: "scripture_text", label: "Scripture Quote", type: "textarea", placeholder: '"Come, follow me," Jesus said, "and I will send you out to fish for people."' },
+      { key: "scripture_ref", label: "Scripture Reference", type: "input", placeholder: "Matthew 4:19" },
+      { key: "description", label: "Description", type: "textarea", placeholder: "Students have the ability to impact their schools, clubs, families, and other communities in a huge way." },
+      { key: "schedule", label: "Meeting Schedule", type: "input", placeholder: "Wednesday 6:30 PM - 8:00 PM" },
+      { key: "meal_heading", label: "Meal Section - Heading", type: "input", placeholder: "Meal Sponsorship" },
+      { key: "meal_description", label: "Meal Section - Description", type: "textarea", placeholder: "Providing an opportunity for students to sit around the table and cultivate meaningful conversation." },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input", placeholder: "Get Involved" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea", placeholder: "We would love for your student to be a part of Club 419." },
     ],
   },
   {
     id: "small-groups",
     label: "Small Groups",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "intro_text", label: "Intro Text", type: "textarea" },
-      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
-      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "City Small Groups" },
+      { key: "intro_text", label: "Intro Text", type: "textarea", placeholder: "Small group gatherings exist as a way for people to engage in community and develop a closer relationship with Jesus." },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input", placeholder: "Find Your Group" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea", placeholder: "Take the next step and connect with a small group near you." },
     ],
   },
   {
     id: "connect-serve",
     label: "Connect & Serve",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "intro_heading", label: "Intro Heading", type: "input" },
-      { key: "intro_description", label: "Intro Description", type: "textarea" },
-      { key: "volunteer_heading", label: "Volunteer Section - Heading", type: "input" },
-      { key: "volunteer_description", label: "Volunteer Section - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Connect & Serve" },
+      { key: "intro_heading", label: "Intro Heading", type: "input", placeholder: "We would like to get to know you better!" },
+      { key: "intro_description", label: "Intro Description", type: "textarea", placeholder: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus." },
+      { key: "volunteer_heading", label: "Volunteer Section - Heading", type: "input", placeholder: "Ready to Serve?" },
+      { key: "volunteer_description", label: "Volunteer Section - Description", type: "textarea", placeholder: "There is a place for everyone to serve at Lake City." },
     ],
   },
   {
     id: "give",
     label: "Give",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },
-      { key: "scripture_text", label: "Scripture Quote", type: "textarea" },
-      { key: "scripture_ref", label: "Scripture Reference", type: "input" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Give" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea", placeholder: "Your generosity helps us connect people to a life-changing relationship with Jesus." },
+      { key: "scripture_text", label: "Scripture Quote", type: "textarea", placeholder: "Each of you should give what you have decided in your heart to give..." },
+      { key: "scripture_ref", label: "Scripture Reference", type: "input", placeholder: "2 Corinthians 9:7" },
     ],
   },
   {
     id: "plan-a-visit",
     label: "Plan a Visit",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },
-      { key: "service_time", label: "Service Time", type: "input" },
-      { key: "location", label: "Location", type: "input" },
-      { key: "dress_code", label: "Dress Code", type: "textarea" },
-      { key: "kids_info", label: "Kids Info", type: "textarea" },
-      { key: "cta_heading", label: "Bottom Section - Heading", type: "input" },
-      { key: "cta_description", label: "Bottom Section - Description", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Plan Your Visit" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea", placeholder: "We would love to meet you! Here is everything you need to know..." },
+      { key: "service_time", label: "Service Time", type: "input", placeholder: "Sunday @ 10:00 AM" },
+      { key: "location", label: "Location", type: "input", placeholder: "6717 Fry Road, Middleburg Heights, OH 44130" },
+      { key: "dress_code", label: "Dress Code", type: "textarea", placeholder: "Come as you are! You will see everything from jeans to dress clothes." },
+      { key: "kids_info", label: "Kids Info", type: "textarea", placeholder: "We have a safe, fun environment for your kids!" },
+      { key: "cta_heading", label: "Bottom Section - Heading", type: "input", placeholder: "Ready to Visit?" },
+      { key: "cta_description", label: "Bottom Section - Description", type: "textarea", placeholder: "We can't wait to meet you and your family." },
     ],
   },
   {
     id: "contact",
     label: "Contact",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "address", label: "Address", type: "input" },
-      { key: "service_time", label: "Service Time", type: "input" },
-      { key: "email", label: "Email", type: "input" },
-      { key: "phone", label: "Phone", type: "input" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Contact Us" },
+      { key: "address", label: "Address", type: "input", placeholder: "6717 Fry Road, Middleburg Heights, OH" },
+      { key: "service_time", label: "Service Time", type: "input", placeholder: "Sunday @ 10:00 AM" },
+      { key: "email", label: "Email", type: "input", placeholder: "info@lakecitycc.org" },
+      { key: "phone", label: "Phone", type: "input", placeholder: "(216) 555-0123" },
     ],
   },
   {
     id: "encounter",
     label: "Watch (Sermons)",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
-      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Watch" },
+      { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea", placeholder: "Watch & Listen" },
     ],
   },
   {
     id: "announcements",
     label: "Announcements",
     fields: [
-      { key: "hero_title", label: "Hero Title", type: "input" },
+      { key: "hero_title", label: "Hero Title", type: "input", placeholder: "What's Happening" },
     ],
   },
 ];
@@ -1113,7 +1125,7 @@ function PagesTab() {
                         <Textarea
                           value={values[field.key] || ""}
                           onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                          placeholder={`Default text will be used if left blank`}
+                          placeholder={field.placeholder || ""}
                           rows={3}
                           className="resize-none"
                           data-testid={`input-content-${field.key}`}
@@ -1122,7 +1134,7 @@ function PagesTab() {
                         <Input
                           value={values[field.key] || ""}
                           onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                          placeholder={`Default text will be used if left blank`}
+                          placeholder={field.placeholder || ""}
                           data-testid={`input-content-${field.key}`}
                         />
                       )}
