@@ -23,6 +23,7 @@ interface RegisterData {
   state?: string;
   zip?: string;
   dateOfBirth?: string;
+  smsConsent?: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

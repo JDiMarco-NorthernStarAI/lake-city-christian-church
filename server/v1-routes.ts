@@ -87,6 +87,7 @@ v1Router.post("/auth/register", async (req, res) => {
     const hashed = await bcrypt.hash(parsed.data.password, 12);
     const username = parsed.data.email;
 
+    const smsConsented = parsed.data.smsConsent === true;
     const user = await storage.createUser({
       username,
       password: hashed,
@@ -99,6 +100,9 @@ v1Router.post("/auth/register", async (req, res) => {
       zip: parsed.data.zip || null,
       dateOfBirth: parsed.data.dateOfBirth || null,
       roles: ["member"],
+      smsOptIn: smsConsented,
+      smsOptedInAt: smsConsented ? new Date() : null,
+      smsOptedOutAt: smsConsented ? null : new Date(),
     });
 
     const deviceId = req.body.deviceId || "web-" + Date.now();
@@ -281,7 +285,17 @@ v1Router.put("/auth/me", requireJwt, async (req, res) => {
     if (!parsed.success) {
       return apiResponse(res, 400, null, parsed.error.errors.map((e) => e.message).join(", "));
     }
-    const updated = await storage.updateUser(userId, parsed.data);
+    const updateData: any = { ...parsed.data };
+    if (parsed.data.smsOptIn !== undefined) {
+      if (parsed.data.smsOptIn) {
+        updateData.smsOptedInAt = new Date();
+        updateData.smsOptedOutAt = null;
+      } else {
+        updateData.smsOptedOutAt = new Date();
+        updateData.smsOptedInAt = null;
+      }
+    }
+    const updated = await storage.updateUser(userId, updateData);
     if (!updated) return apiResponse(res, 404, null, "User not found");
     return apiResponse(res, 200, sanitizeUser(updated));
   } catch (err) {

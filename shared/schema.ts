@@ -147,7 +147,7 @@ export const users = pgTable("users", {
   profilePhotoUrl: text("profile_photo_url"),
   authProvider: text("auth_provider").default("email"),
   authProviderId: text("auth_provider_id"),
-  smsOptIn: boolean("sms_opt_in").notNull().default(true),
+  smsOptIn: boolean("sms_opt_in").notNull().default(false),
   smsOptedInAt: timestamp("sms_opted_in_at"),
   smsOptedOutAt: timestamp("sms_opted_out_at"),
   phoneType: text("phone_type").notNull().default("unknown"),
@@ -378,6 +378,7 @@ export const registerUserSchema = z.object({
   state: z.string().optional(),
   zip: z.string().optional(),
   dateOfBirth: z.string().optional(),
+  smsConsent: z.boolean().optional(),
 });
 
 export const loginSchema = z.object({
@@ -400,6 +401,7 @@ export const updateProfileSchema = z.object({
   maritalStatus: z.enum(["Single", "Married", "Widowed"]).nullable().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
+  smsOptIn: z.boolean().optional(),
 });
 
 export const createChildSchema = z.object({

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { v1Fetch, v1Put } from "@/lib/v1Api";
@@ -58,6 +59,7 @@ export default function Account() {
     maritalStatus: "" as string,
     emergencyContactName: "",
     emergencyContactPhone: "",
+    smsOptIn: false,
   });
 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -80,6 +82,7 @@ export default function Account() {
         maritalStatus: (user as any).maritalStatus || "",
         emergencyContactName: (user as any).emergencyContactName || "",
         emergencyContactPhone: (user as any).emergencyContactPhone || "",
+        smsOptIn: (user as any).smsOptIn ?? false,
       });
     }
   }, [user]);
@@ -125,6 +128,7 @@ export default function Account() {
       dateOfBirth: profileForm.dateOfBirth || undefined,
       emergencyContactName: profileForm.emergencyContactName || undefined,
       emergencyContactPhone: profileForm.emergencyContactPhone || undefined,
+      smsOptIn: profileForm.smsOptIn,
     };
     const result = await v1Put("/api/v1/auth/me", payload);
     setSaving(false);
@@ -525,6 +529,30 @@ export default function Account() {
                       <p className="text-white text-sm" data-testid="text-profile-emergency-phone">{(user as any)?.emergencyContactPhone || "—"}</p>
                     )}
                   </div>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-white/10">
+                <h3 className="text-white/80 text-sm font-medium mb-4" style={{ fontFamily: "Montserrat, sans-serif" }}>Text Message Preferences</h3>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="sms-opt-in"
+                    checked={profileForm.smsOptIn}
+                    onCheckedChange={(checked) => {
+                      if (editing) {
+                        setProfileForm((f) => ({ ...f, smsOptIn: !!checked }));
+                      }
+                    }}
+                    disabled={!editing}
+                    className="mt-0.5 border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                    data-testid="checkbox-sms-opt-in"
+                  />
+                  <Label htmlFor="sms-opt-in" className="text-white/70 text-sm leading-snug cursor-pointer">
+                    I agree to receive text messages from Lake City Christian Church. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out. Consent is not required to attend or participate.{" "}
+                    <Link href="/sms-terms" className="text-blue-400 hover:text-blue-300 underline" data-testid="link-sms-terms-profile">
+                      SMS Terms & Conditions
+                    </Link>
+                  </Label>
                 </div>
               </div>
 

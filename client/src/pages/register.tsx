@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -25,6 +26,7 @@ export default function Register() {
     city: "",
     state: "",
     zip: "",
+    smsConsent: false,
   });
 
   function update(field: string, value: string) {
@@ -55,6 +57,7 @@ export default function Register() {
       city: form.city || undefined,
       state: form.state || undefined,
       zip: form.zip || undefined,
+      smsConsent: form.smsConsent,
     });
     setLoading(false);
     if (result.success) {
@@ -203,6 +206,21 @@ export default function Register() {
                     autoComplete="postal-code"
                   />
                 </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="sms-consent"
+                  checked={form.smsConsent}
+                  onCheckedChange={(checked) => setForm((prev) => ({ ...prev, smsConsent: !!checked }))}
+                  className="mt-0.5 border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                  data-testid="checkbox-sms-consent"
+                />
+                <Label htmlFor="sms-consent" className="text-white/70 text-sm leading-snug cursor-pointer">
+                  I agree to receive text messages from Lake City Christian Church at the phone number provided. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out. Consent is not required to attend or participate.{" "}
+                  <Link href="/sms-terms" className="text-blue-400 hover:text-blue-300 underline" data-testid="link-sms-terms">
+                    SMS Terms & Conditions
+                  </Link>
+                </Label>
               </div>
               <Button
                 type="submit"
