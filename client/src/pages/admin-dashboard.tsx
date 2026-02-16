@@ -30,9 +30,9 @@ import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSet
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES, SIGNUP_CATEGORIES, SIGNUP_CATEGORY_LABELS, SIGNUP_EVENT_STATUSES, SIGNUP_VISIBILITY, SIGNUP_DISPLAY_TYPES } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 import AdminSmsTab from "@/pages/admin-sms";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Inbox } from "lucide-react";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "pages" | "settings" | "users" | "roles";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "pages" | "settings" | "users" | "roles" | "submissions";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -41,6 +41,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
   { id: "events", label: "Events", icon: Calendar, feature: "events" },
   { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
+  { id: "submissions", label: "Submissions", icon: Inbox, feature: "forms" },
   { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
   { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
   { id: "pages", label: "Page Content", icon: FileEdit, feature: "pages" },
@@ -152,6 +153,7 @@ export default function AdminDashboard() {
           {activeTab === "messages" && <MessagesTab />}
           {activeTab === "connect" && <ConnectCardsTab />}
           {activeTab === "forms" && <FormsTab />}
+          {activeTab === "submissions" && <SubmissionsTab />}
           {activeTab === "donations" && <DonationsTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "sms" && <AdminSmsTab />}
@@ -2874,6 +2876,154 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SubmissionsTab() {
+  const { toast } = useToast();
+  const [selectedFormId, setSelectedFormId] = useState<string>("");
+
+  const { data: forms, isLoading: formsLoading } = useQuery<(Form & { submissionCount: number; fieldCount: number })[]>({
+    queryKey: ["/api/forms"],
+  });
+
+  const formId = selectedFormId ? Number(selectedFormId) : null;
+
+  const { data: formWithFields } = useQuery<Form & { fields: FormField[] }>({
+    queryKey: ["/api/forms", formId],
+    enabled: formId !== null,
+  });
+
+  const { data: submissions, isLoading: subsLoading } = useQuery<FormSubmission[]>({
+    queryKey: ["/api/forms", formId, "submissions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/forms/${formId}/submissions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch submissions");
+      return res.json();
+    },
+    enabled: formId !== null,
+  });
+
+  const deleteSubmissionMutation = useMutation({
+    mutationFn: async (subId: number) => { await apiRequest("DELETE", `/api/forms/${formId}/submissions/${subId}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      toast({ title: "Submission deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
+
+  const publishedForms = (forms || []).filter((f) => f.submissionCount > 0 || f.status === "published");
+
+  return (
+    <div data-testid="tab-submissions">
+      <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Submissions</h1>
+      <p className="text-muted-foreground mb-6">View and manage responses collected from your forms.</p>
+
+      <div className="flex items-end gap-4 flex-wrap mb-6">
+        <div className="w-full max-w-sm space-y-2">
+          <Label>Select a Form</Label>
+          <Select value={selectedFormId} onValueChange={setSelectedFormId}>
+            <SelectTrigger data-testid="select-submission-form">
+              <SelectValue placeholder={formsLoading ? "Loading forms..." : "Choose a form to view"} />
+            </SelectTrigger>
+            <SelectContent>
+              {publishedForms.map((form) => (
+                <SelectItem key={form.id} value={form.id.toString()} data-testid={`option-form-${form.id}`}>
+                  {form.title} ({form.submissionCount ?? 0})
+                </SelectItem>
+              ))}
+              {publishedForms.length === 0 && !formsLoading && (
+                <SelectItem value="__none" disabled>No forms with submissions</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {!formId && (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            <Inbox className="w-12 h-12 mx-auto mb-4 opacity-40" />
+            <p>Select a form above to view its submissions.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {formId && subsLoading && (
+        <p className="text-muted-foreground">Loading submissions...</p>
+      )}
+
+      {formId && !subsLoading && (!submissions || submissions.length === 0) && (
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            No submissions yet for this form.
+          </CardContent>
+        </Card>
+      )}
+
+      {formId && submissions && submissions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+            <p className="text-sm text-muted-foreground">
+              {submissions.length} submission{submissions.length !== 1 ? "s" : ""}
+            </p>
+            <Badge variant="outline">{formWithFields?.title}</Badge>
+          </div>
+          <div className="overflow-x-auto">
+            <Table data-testid="table-submissions">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">#</TableHead>
+                  {fields.map((f) => (
+                    <TableHead key={f.id}>{f.label}</TableHead>
+                  ))}
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {submissions.map((sub, idx) => {
+                  const data = (sub.data || {}) as Record<string, any>;
+                  return (
+                    <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
+                      <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
+                      {fields.map((f) => (
+                        <TableCell key={f.id}>
+                          {data[f.id.toString()] !== undefined
+                            ? Array.isArray(data[f.id.toString()])
+                              ? (data[f.id.toString()] as string[]).join(", ")
+                              : String(data[f.id.toString()])
+                            : data[f.label] !== undefined
+                              ? String(data[f.label])
+                              : ""}
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                        {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : ""}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => deleteSubmissionMutation.mutate(sub.id)}
+                          data-testid={`button-delete-submission-${sub.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
