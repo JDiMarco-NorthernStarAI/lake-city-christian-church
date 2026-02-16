@@ -32,6 +32,7 @@ export const AVAILABLE_FEATURES = [
   "connect",
   "forms",
   "donations",
+  "notifications",
   "settings",
   "users",
   "roles",
@@ -48,6 +49,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   connect: "Connect Cards",
   forms: "Form Builder",
   donations: "Donations",
+  notifications: "Notifications",
   settings: "Settings",
   users: "User Management",
   roles: "Role Permissions",
@@ -73,6 +75,15 @@ export const SIGNUP_STATUSES = ["registered", "waitlist", "cancelled"] as const;
 
 export const DONATION_FREQUENCIES = ["one_time", "weekly", "monthly"] as const;
 export const DONATION_STATUSES = ["pending", "completed", "failed", "refunded"] as const;
+
+export const NOTIFICATION_TYPES = ["general", "sermon", "event", "announcement"] as const;
+
+export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  general: "General",
+  sermon: "New Sermon",
+  event: "Event",
+  announcement: "Announcement",
+};
 
 export const FORM_STATUSES = ["draft", "published", "archived"] as const;
 
@@ -435,6 +446,53 @@ export const createDonationFundSchema = z.object({
   description: z.string().optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+});
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId: integer("user_id"),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  deviceType: text("device_type").default("web"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const notificationLogs = pgTable("notification_logs", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  type: text("type").notNull().default("general"),
+  url: text("url"),
+  payload: jsonb("payload"),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+  successCount: integer("success_count").notNull().default(0),
+  failureCount: integer("failure_count").notNull().default(0),
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({ id: true, sentAt: true });
+export type NotificationLog = typeof notificationLogs.$inferSelect;
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+
+export const subscribePushSchema = z.object({
+  endpoint: z.string().url("Invalid endpoint URL"),
+  keys: z.object({
+    p256dh: z.string().min(1),
+    auth: z.string().min(1),
+  }),
+});
+
+export const sendNotificationSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  body: z.string().min(1, "Message is required"),
+  type: z.enum(NOTIFICATION_TYPES).optional(),
+  url: z.string().optional(),
 });
 
 export const createCheckoutSchema = z.object({

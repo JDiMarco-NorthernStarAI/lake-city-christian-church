@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import bcrypt from "bcryptjs";
 import Stripe from "stripe";
+import webpush from "web-push";
 import { storage } from "./storage";
 import { db } from "./db";
 import {
@@ -11,6 +12,7 @@ import {
   AVAILABLE_ROLES, AVAILABLE_FEATURES,
   createFormSchema, createFormFieldSchema,
   createDonationFundSchema, createCheckoutSchema,
+  subscribePushSchema, sendNotificationSchema,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
@@ -893,6 +895,144 @@ export async function registerRoutes(
       res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission });
     } catch (err) {
       res.status(500).json({ message: "Error submitting form" });
+    }
+  });
+
+  // ======== PUSH NOTIFICATIONS ========
+
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+      "mailto:info@lakecitychristian.church",
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  }
+
+  app.get("/api/push/vapid-key", (_req, res) => {
+    const key = process.env.VAPID_PUBLIC_KEY;
+    if (!key) return res.status(500).json({ message: "Push notifications not configured" });
+    res.json({ publicKey: key });
+  });
+
+  app.post("/api/push/subscribe", async (req, res) => {
+    try {
+      const parsed = subscribePushSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid subscription" });
+
+      const { endpoint, keys } = parsed.data;
+      const existing = await storage.getPushSubscriptionByEndpoint(endpoint);
+
+      if (existing) {
+        await storage.updatePushSubscription(existing.id, {
+          p256dh: keys.p256dh,
+          auth: keys.auth,
+          isActive: true,
+          userAgent: req.headers["user-agent"] || null,
+        });
+        return res.json({ message: "Subscription updated" });
+      }
+
+      await storage.createPushSubscription({
+        endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        userId: null,
+        userAgent: req.headers["user-agent"] || null,
+        deviceType: "web",
+        isActive: true,
+      });
+      res.status(201).json({ message: "Subscribed successfully" });
+    } catch (err) {
+      console.error("Push subscribe error:", err);
+      res.status(500).json({ message: "Error subscribing to push notifications" });
+    }
+  });
+
+  app.post("/api/push/unsubscribe", async (req, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (!endpoint) return res.status(400).json({ message: "Endpoint required" });
+      await storage.deactivatePushSubscription(endpoint);
+      res.json({ message: "Unsubscribed successfully" });
+    } catch (err) {
+      res.status(500).json({ message: "Error unsubscribing" });
+    }
+  });
+
+  app.post("/api/notifications/send", requireAuth, requireFeature("notifications"), async (req, res) => {
+    try {
+      const parsed = sendNotificationSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid notification" });
+
+      const { title, body, type, url } = parsed.data;
+      const subscriptions = await storage.getActivePushSubscriptions();
+
+      const payload = JSON.stringify({
+        title,
+        body,
+        icon: "/android-chrome-192x192.png",
+        badge: "/favicon-32x32.png",
+        url: url || "/",
+        type: type || "general",
+      });
+
+      let successCount = 0;
+      let failureCount = 0;
+
+      const sendPromises = subscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload
+          );
+          successCount++;
+        } catch (err: any) {
+          failureCount++;
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await storage.deactivatePushSubscription(sub.endpoint);
+          }
+        }
+      });
+
+      await Promise.all(sendPromises);
+
+      await storage.createNotificationLog({
+        title,
+        body,
+        type: type || "general",
+        url: url || null,
+        payload: { title, body, type, url },
+        successCount,
+        failureCount,
+      });
+
+      res.json({ message: "Notification sent", successCount, failureCount, total: subscriptions.length });
+    } catch (err) {
+      console.error("Send notification error:", err);
+      res.status(500).json({ message: "Error sending notification" });
+    }
+  });
+
+  app.get("/api/notifications", requireAuth, requireFeature("notifications"), async (_req, res) => {
+    try {
+      const logs = await storage.getNotificationLogs();
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notification logs" });
+    }
+  });
+
+  app.get("/api/notifications/stats", requireAuth, requireFeature("notifications"), async (_req, res) => {
+    try {
+      const subscriberCount = await storage.getPushSubscriptionCount();
+      const logs = await storage.getNotificationLogs();
+      res.json({
+        subscriberCount,
+        totalSent: logs.length,
+        lastSent: logs[0]?.sentAt || null,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching notification stats" });
     }
   });
 

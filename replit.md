@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **V1 API Tables**: refresh_tokens (JWT refresh token storage with device tracking), event_signups (event registration with waitlist support), children (kids ministry registration)
 - **Form Builder Tables**: forms (configurable forms with slug, status, settings), form_fields (fields with type, order, options), form_submissions (submitted data as JSONB)
 - **Donation Tables**: donation_funds (named giving categories with slug/active status), donations (amount in cents, frequency, Stripe session/payment/subscription IDs, status tracking)
+- **Push Notification Tables**: push_subscriptions (endpoint, VAPID keys, user/device tracking), notification_logs (title, body, type, delivery stats)
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface with a database-backed implementation using Drizzle
@@ -99,6 +100,7 @@ migrations/           # Drizzle migration output directory
 - **YouTube** — Sermon videos embedded via YouTube URLs, thumbnails fetched from `img.youtube.com`
 - **Google Fonts** — Typography (Inter, Montserrat, DM Sans, etc.)
 - **Stripe** — Payment processing for donations (one-time and recurring via Checkout Sessions). Uses STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, and STRIPE_WEBHOOK_SECRET env vars.
+- **Web Push** — Push notifications via Web Push API with VAPID keys (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VITE_VAPID_PUBLIC_KEY). Uses web-push npm package.
 
 ### Key NPM Dependencies
 - `drizzle-orm` + `drizzle-kit` — Database ORM and schema tooling

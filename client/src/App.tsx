@@ -26,6 +26,7 @@ import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import PublicForm from "@/pages/public-form";
 import { useAnalytics } from "@/hooks/use-analytics";
+import NotificationPrompt from "@/components/notification-prompt";
 
 function Router() {
   return (
@@ -67,6 +68,7 @@ function App() {
           <Router />
         </main>
         {!isAdmin && <Footer />}
+        {!isAdmin && <NotificationPrompt />}
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

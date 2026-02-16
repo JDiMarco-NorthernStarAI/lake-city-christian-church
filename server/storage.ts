@@ -3,6 +3,7 @@ import { eq, desc, asc, and, isNull, sql } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
+  pushSubscriptions, notificationLogs,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -20,6 +21,8 @@ import {
   type FormSubmission, type InsertFormSubmission,
   type DonationFund, type InsertDonationFund,
   type Donation, type InsertDonation,
+  type PushSubscription, type InsertPushSubscription,
+  type NotificationLog, type InsertNotificationLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -130,6 +133,17 @@ export interface IStorage {
   createDonation(donation: InsertDonation): Promise<Donation>;
   updateDonation(id: number, data: Partial<InsertDonation>): Promise<Donation | undefined>;
   getDonationStats(): Promise<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }>;
+
+  createPushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
+  getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined>;
+  updatePushSubscription(id: number, data: Partial<InsertPushSubscription>): Promise<PushSubscription | undefined>;
+  deactivatePushSubscription(endpoint: string): Promise<void>;
+  getActivePushSubscriptions(): Promise<PushSubscription[]>;
+  getPushSubscriptionsByUserId(userId: number): Promise<PushSubscription[]>;
+  getPushSubscriptionCount(): Promise<number>;
+
+  createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
+  getNotificationLogs(): Promise<NotificationLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -625,6 +639,47 @@ export class DatabaseStorage implements IStorage {
     const monthlyCount = monthlyDonations.length;
 
     return { totalAmount, totalCount, monthlyAmount, monthlyCount };
+  }
+
+  async createPushSubscription(sub: InsertPushSubscription): Promise<PushSubscription> {
+    const [created] = await db.insert(pushSubscriptions).values(sub).returning();
+    return created;
+  }
+
+  async getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined> {
+    const [sub] = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+    return sub;
+  }
+
+  async updatePushSubscription(id: number, data: Partial<InsertPushSubscription>): Promise<PushSubscription | undefined> {
+    const [updated] = await db.update(pushSubscriptions).set(data).where(eq(pushSubscriptions.id, id)).returning();
+    return updated;
+  }
+
+  async deactivatePushSubscription(endpoint: string): Promise<void> {
+    await db.update(pushSubscriptions).set({ isActive: false }).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+
+  async getActivePushSubscriptions(): Promise<PushSubscription[]> {
+    return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.isActive, true));
+  }
+
+  async getPushSubscriptionsByUserId(userId: number): Promise<PushSubscription[]> {
+    return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  }
+
+  async getPushSubscriptionCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(pushSubscriptions).where(eq(pushSubscriptions.isActive, true));
+    return Number(result[0]?.count || 0);
+  }
+
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    const [created] = await db.insert(notificationLogs).values(log).returning();
+    return created;
+  }
+
+  async getNotificationLogs(): Promise<NotificationLog[]> {
+    return db.select().from(notificationLogs).orderBy(desc(notificationLogs.sentAt));
   }
 }
 

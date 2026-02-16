@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
-  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign,
+  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +28,7 @@ import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSet
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "pages" | "settings" | "users" | "roles";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "pages" | "settings" | "users" | "roles";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -41,6 +41,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "connect", label: "Connect Cards", icon: FileText, feature: "connect" },
   { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
   { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
+  { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "users", label: "Users", icon: UserCog, feature: "users" },
   { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
@@ -142,6 +143,7 @@ export default function AdminDashboard() {
           {activeTab === "connect" && <ConnectCardsTab />}
           {activeTab === "forms" && <FormsTab />}
           {activeTab === "donations" && <DonationsTab />}
+          {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}
@@ -2227,6 +2229,190 @@ function FormSubmissionsView({ formId, onBack }: { formId: number; onBack: () =>
           </Table>
         </div>
       )}
+    </div>
+  );
+}
+
+function NotificationsTab() {
+  const { toast } = useToast();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [type, setType] = useState("general");
+  const [url, setUrl] = useState("");
+
+  const { data: stats } = useQuery<{ subscriberCount: number; totalSent: number; lastSent: string | null }>({
+    queryKey: ["/api/notifications/stats"],
+  });
+
+  const { data: logs, isLoading: logsLoading } = useQuery<any[]>({
+    queryKey: ["/api/notifications"],
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (data: { title: string; body: string; type: string; url?: string }) => {
+      const res = await apiRequest("POST", "/api/notifications/send", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Notification Sent", description: `Delivered to ${data.successCount} subscriber(s)` });
+      setTitle("");
+      setBody("");
+      setType("general");
+      setUrl("");
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/stats"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to send notification", variant: "destructive" });
+    },
+  });
+
+  function handleSend() {
+    if (!title.trim() || !body.trim()) {
+      toast({ title: "Error", description: "Title and message are required", variant: "destructive" });
+      return;
+    }
+    sendMutation.mutate({ title: title.trim(), body: body.trim(), type, url: url.trim() || undefined });
+  }
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold" data-testid="text-notifications-heading">Push Notifications</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card data-testid="card-subscriber-count">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Subscribers</CardTitle>
+            <Bell className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-subscriber-count">{stats?.subscriberCount || 0}</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-total-sent">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Sent</CardTitle>
+            <Send className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-sent">{stats?.totalSent || 0}</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-last-sent">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Last Sent</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-last-sent">
+              {stats?.lastSent ? new Date(stats.lastSent).toLocaleDateString() : "Never"}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Notification</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="notif-title">Title</Label>
+            <Input
+              id="notif-title"
+              placeholder="Notification title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              data-testid="input-notif-title"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notif-body">Message</Label>
+            <Textarea
+              id="notif-body"
+              placeholder="Notification message"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={3}
+              data-testid="input-notif-body"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="notif-type">Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger data-testid="select-notif-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="sermon">New Sermon</SelectItem>
+                  <SelectItem value="event">Event</SelectItem>
+                  <SelectItem value="announcement">Announcement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notif-url">Link (optional)</Label>
+              <Input
+                id="notif-url"
+                placeholder="/announcements or full URL"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                data-testid="input-notif-url"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={handleSend}
+            disabled={sendMutation.isPending || !title.trim() || !body.trim()}
+            data-testid="button-send-notification"
+          >
+            <Send className="mr-2 h-4 w-4" />
+            {sendMutation.isPending ? "Sending..." : "Send Notification"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Notifications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {logsLoading ? (
+            <p className="text-muted-foreground">Loading...</p>
+          ) : !logs || logs.length === 0 ? (
+            <p className="text-muted-foreground" data-testid="text-no-notifications">No notifications sent yet</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Delivered</TableHead>
+                  <TableHead>Failed</TableHead>
+                  <TableHead>Sent</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log: any) => (
+                  <TableRow key={log.id} data-testid={`row-notification-${log.id}`}>
+                    <TableCell className="font-medium">{log.title}</TableCell>
+                    <TableCell className="max-w-xs truncate">{log.body}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{log.type}</Badge>
+                    </TableCell>
+                    <TableCell>{log.successCount}</TableCell>
+                    <TableCell>{log.failureCount}</TableCell>
+                    <TableCell>{new Date(log.sentAt).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

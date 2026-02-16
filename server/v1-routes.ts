@@ -1050,6 +1050,61 @@ v1Router.get("/config/roles", (_req, res) => {
   return apiResponse(res, 200, AVAILABLE_ROLES.map((r) => ({ value: r, label: (ROLE_LABELS as any)[r] || r })));
 });
 
-import { ROLE_LABELS } from "@shared/schema";
+import { ROLE_LABELS, subscribePushSchema } from "@shared/schema";
+
+// ======== PUSH NOTIFICATIONS (V1 - JWT Auth) ========
+
+v1Router.post("/push/subscribe", requireJwt, async (req, res) => {
+  try {
+    const parsed = subscribePushSchema.safeParse(req.body);
+    if (!parsed.success) return apiResponse(res, 400, null, parsed.error.errors[0]?.message || "Invalid subscription");
+
+    const userId = (req as any).jwtUser.userId;
+    const { endpoint, keys } = parsed.data;
+    const existing = await storage.getPushSubscriptionByEndpoint(endpoint);
+
+    if (existing) {
+      await storage.updatePushSubscription(existing.id, {
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        isActive: true,
+        userId,
+        userAgent: req.headers["user-agent"] || null,
+      });
+      return apiResponse(res, 200, { message: "Subscription updated" });
+    }
+
+    const sub = await storage.createPushSubscription({
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+      userId,
+      userAgent: req.headers["user-agent"] || null,
+      deviceType: req.body.deviceType || "mobile",
+      isActive: true,
+    });
+    return apiResponse(res, 201, { id: sub.id, message: "Subscribed successfully" });
+  } catch (err) {
+    console.error("V1 push subscribe error:", err);
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.post("/push/unsubscribe", requireJwt, async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) return apiResponse(res, 400, null, "Endpoint required");
+    await storage.deactivatePushSubscription(endpoint);
+    return apiResponse(res, 200, { message: "Unsubscribed successfully" });
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/push/vapid-key", (_req, res) => {
+  const key = process.env.VAPID_PUBLIC_KEY;
+  if (!key) return apiResponse(res, 500, null, "Push notifications not configured");
+  return apiResponse(res, 200, { publicKey: key });
+});
 
 export default v1Router;
