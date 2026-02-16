@@ -364,6 +364,59 @@ export async function registerRoutes(
     res.json(data);
   });
 
+  app.delete("/api/connect/:id", requireFeature("connect"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await storage.deleteConnectCard(id);
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete" });
+    }
+  });
+
+  app.post("/api/connect/:id/forward", requireFeature("connect"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      const { recipientEmail, recipientName } = req.body;
+      if (!recipientEmail) return res.status(400).json({ message: "Recipient email is required" });
+      const card = await storage.getConnectCard(id);
+      if (!card) return res.status(404).json({ message: "Connect card not found" });
+
+      const { sendEmail } = await import("./email-service");
+      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const interests = card.interests?.map(esc).join(", ") || "None specified";
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #ffffff; padding: 32px; border-radius: 8px;">
+          <h2 style="color: #00D4FF; margin-bottom: 24px;">Connect Card Forwarded</h2>
+          <p style="color: #ccc;">A connect card has been forwarded to you for follow-up.</p>
+          <div style="background: #1a1a1a; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 8px 0;"><strong style="color: #00D4FF;">Name:</strong> ${esc(card.firstName)} ${esc(card.lastName)}</p>
+            <p style="margin: 8px 0;"><strong style="color: #00D4FF;">Email:</strong> <a href="mailto:${esc(card.email)}" style="color: #00D4FF;">${esc(card.email)}</a></p>
+            <p style="margin: 8px 0;"><strong style="color: #00D4FF;">Phone:</strong> ${card.phone ? esc(card.phone) : "Not provided"}</p>
+            <p style="margin: 8px 0;"><strong style="color: #00D4FF;">Address:</strong> ${card.address ? esc(card.address) : "Not provided"}</p>
+            <p style="margin: 8px 0;"><strong style="color: #00D4FF;">Interests:</strong> ${interests}</p>
+            ${card.prayerRequest ? `<div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #333;"><p style="margin: 8px 0;"><strong style="color: #00D4FF;">Prayer Request:</strong></p><p style="color: #ccc; white-space: pre-wrap;">${esc(card.prayerRequest)}</p></div>` : ""}
+          </div>
+          <p style="color: #666; font-size: 12px; margin-top: 24px;">Submitted on ${card.createdAt ? new Date(card.createdAt).toLocaleDateString() : "Unknown"}</p>
+        </div>
+      `;
+      const sent = await sendEmail({
+        to: recipientEmail,
+        subject: `Connect Card: ${card.firstName} ${card.lastName}${card.prayerRequest ? " (Prayer Request)" : ""}`,
+        html,
+      });
+      if (sent) {
+        res.json({ message: `Forwarded to ${recipientEmail}` });
+      } else {
+        res.json({ message: `Email service not configured. Would forward to ${recipientEmail}` });
+      }
+    } catch (err) {
+      res.status(500).json({ message: "Failed to forward" });
+    }
+  });
+
   app.get("/api/settings", async (_req, res) => {
     const data = await storage.getAllSettings();
     res.json(data);

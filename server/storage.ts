@@ -97,6 +97,8 @@ export interface IStorage {
 
   createConnectCard(card: InsertConnectCard): Promise<ConnectCard>;
   getConnectCards(): Promise<ConnectCard[]>;
+  getConnectCard(id: number): Promise<ConnectCard | undefined>;
+  deleteConnectCard(id: number): Promise<void>;
 
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
@@ -483,6 +485,15 @@ export class DatabaseStorage implements IStorage {
 
   async getConnectCards(): Promise<ConnectCard[]> {
     return db.select().from(connectCards).orderBy(desc(connectCards.createdAt));
+  }
+
+  async getConnectCard(id: number): Promise<ConnectCard | undefined> {
+    const [card] = await db.select().from(connectCards).where(eq(connectCards.id, id));
+    return card;
+  }
+
+  async deleteConnectCard(id: number): Promise<void> {
+    await db.delete(connectCards).where(eq(connectCards.id, id));
   }
 
   async getSetting(key: string): Promise<string | undefined> {

@@ -833,7 +833,44 @@ function MessagesTab() {
 }
 
 function ConnectCardsTab() {
+  const { toast } = useToast();
   const { data: cards, isLoading } = useQuery<ConnectCard[]>({ queryKey: ["/api/connect"] });
+  const [selectedCard, setSelectedCard] = useState<ConnectCard | null>(null);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardCardId, setForwardCardId] = useState<number | null>(null);
+  const [forwardEmail, setForwardEmail] = useState("");
+  const [forwarding, setForwarding] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/connect/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/connect"] });
+      toast({ title: "Connect card deleted" });
+      setSelectedCard(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
+    },
+  });
+
+  async function handleForward() {
+    if (!forwardCardId || !forwardEmail) return;
+    setForwarding(true);
+    try {
+      const res = await apiRequest("POST", `/api/connect/${forwardCardId}/forward`, { recipientEmail: forwardEmail });
+      const data = await res.json();
+      toast({ title: "Forwarded", description: data.message });
+      setForwardOpen(false);
+      setForwardEmail("");
+      setForwardCardId(null);
+    } catch {
+      toast({ title: "Error", description: "Failed to forward", variant: "destructive" });
+    } finally {
+      setForwarding(false);
+    }
+  }
 
   return (
     <div data-testid="tab-connect">
@@ -841,30 +878,131 @@ function ConnectCardsTab() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : !cards?.length ? (
+        <p className="text-muted-foreground">No connect cards yet.</p>
       ) : (
-        <Table data-testid="table-connect">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Interests</TableHead>
-              <TableHead>Date</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {cards?.map((card) => (
-              <TableRow key={card.id} data-testid={`row-connect-${card.id}`}>
-                <TableCell>{card.firstName} {card.lastName}</TableCell>
-                <TableCell>{card.email}</TableCell>
-                <TableCell>{card.phone || "-"}</TableCell>
-                <TableCell>{card.interests?.join(", ") || "-"}</TableCell>
-                <TableCell>{card.createdAt ? new Date(card.createdAt).toLocaleDateString() : ""}</TableCell>
+        <div className="space-y-4">
+          <Table data-testid="table-connect">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>Interests</TableHead>
+                <TableHead>Prayer Request</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {cards.map((card) => (
+                <TableRow key={card.id} data-testid={`row-connect-${card.id}`}>
+                  <TableCell className="font-medium">{card.firstName} {card.lastName}</TableCell>
+                  <TableCell>{card.email}</TableCell>
+                  <TableCell>{card.phone || "-"}</TableCell>
+                  <TableCell className="max-w-[150px] truncate">{card.address || "-"}</TableCell>
+                  <TableCell>{card.interests?.join(", ") || "-"}</TableCell>
+                  <TableCell className="max-w-[200px] truncate">{card.prayerRequest || "-"}</TableCell>
+                  <TableCell>{card.createdAt ? new Date(card.createdAt).toLocaleDateString() : ""}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => setSelectedCard(card)} data-testid={`button-view-connect-${card.id}`}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => { setForwardCardId(card.id); setForwardOpen(true); }} data-testid={`button-forward-connect-${card.id}`}>
+                        <Send className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this connect card?")) deleteMutation.mutate(card.id); }} data-testid={`button-delete-connect-${card.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
+
+      <Dialog open={!!selectedCard} onOpenChange={(open) => { if (!open) setSelectedCard(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Connect Card Details</DialogTitle>
+          </DialogHeader>
+          {selectedCard && (
+            <div className="space-y-4" data-testid="dialog-connect-detail">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground text-xs">First Name</Label>
+                  <p className="font-medium" data-testid="text-connect-firstname">{selectedCard.firstName}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Last Name</Label>
+                  <p className="font-medium" data-testid="text-connect-lastname">{selectedCard.lastName}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Email</Label>
+                  <p className="font-medium" data-testid="text-connect-email">{selectedCard.email}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-xs">Phone</Label>
+                  <p className="font-medium" data-testid="text-connect-phone">{selectedCard.phone || "-"}</p>
+                </div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Address</Label>
+                <p className="font-medium" data-testid="text-connect-address">{selectedCard.address || "-"}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground text-xs">Interests</Label>
+                <p className="font-medium" data-testid="text-connect-interests">{selectedCard.interests?.join(", ") || "-"}</p>
+              </div>
+              {selectedCard.prayerRequest && (
+                <div>
+                  <Label className="text-muted-foreground text-xs">Prayer Request</Label>
+                  <p className="font-medium whitespace-pre-wrap" data-testid="text-connect-prayer">{selectedCard.prayerRequest}</p>
+                </div>
+              )}
+              <div>
+                <Label className="text-muted-foreground text-xs">Submitted</Label>
+                <p className="font-medium">{selectedCard.createdAt ? new Date(selectedCard.createdAt).toLocaleString() : "-"}</p>
+              </div>
+              <div className="flex gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => { setForwardCardId(selectedCard.id); setForwardOpen(true); setSelectedCard(null); }} data-testid="button-forward-from-detail">
+                  <Send className="w-4 h-4 mr-2" />
+                  Forward
+                </Button>
+                <Button variant="destructive" onClick={() => { if (confirm("Delete this connect card?")) { deleteMutation.mutate(selectedCard.id); } }} data-testid="button-delete-from-detail">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={forwardOpen} onOpenChange={(open) => { if (!open) { setForwardOpen(false); setForwardEmail(""); setForwardCardId(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forward Connect Card</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Enter the email address to forward this connect card to (e.g. the pastor).</p>
+            <div className="space-y-2">
+              <Label htmlFor="forward-email">Recipient Email</Label>
+              <Input id="forward-email" type="email" placeholder="pastor@example.com" value={forwardEmail} onChange={(e) => setForwardEmail(e.target.value)} data-testid="input-forward-email" />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setForwardOpen(false); setForwardEmail(""); setForwardCardId(null); }}>Cancel</Button>
+              <Button onClick={handleForward} disabled={!forwardEmail || forwarding} data-testid="button-confirm-forward">
+                {forwarding ? "Sending..." : "Send"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
