@@ -218,6 +218,26 @@ async function seedFormsAndSignups() {
   }
 }
 
+async function seedDonationFunds() {
+  try {
+    const existingFunds = await storage.getDonationFunds();
+    if (existingFunds.length > 0) return;
+
+    log("Seeding donation funds...", "seed");
+    const defaultFunds = [
+      { name: "General Fund", slug: "general", description: "Support the overall mission and operations of LC3", isActive: true, sortOrder: 0 },
+      { name: "Missions", slug: "missions", description: "Support local and global mission work", isActive: true, sortOrder: 1 },
+      { name: "Building Fund", slug: "building", description: "Support facility improvements and maintenance", isActive: true, sortOrder: 2 },
+    ];
+    for (const fund of defaultFunds) {
+      await storage.createDonationFund(fund);
+    }
+    log("Donation funds seeded", "seed");
+  } catch (err) {
+    log("Error seeding donation funds: " + err, "seed");
+  }
+}
+
 export async function seedDatabase() {
   try {
     const existingAdmin = await storage.getUserByUsername("admin");
@@ -226,6 +246,7 @@ export async function seedDatabase() {
     await seedSmsDefaults();
 
     await seedFormsAndSignups();
+    await seedDonationFunds();
 
     if (existingAdmin) {
       log("Database already seeded", "seed");
