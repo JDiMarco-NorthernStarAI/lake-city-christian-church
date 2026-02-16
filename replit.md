@@ -46,6 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **Form Builder Tables**: forms (configurable forms with slug, status, settings), form_fields (fields with type, order, options), form_submissions (submitted data as JSONB)
 - **Donation Tables**: donation_funds (named giving categories with slug/active status), donations (amount in cents, frequency, Stripe session/payment/subscription IDs, status tracking)
 - **Push Notification Tables**: push_subscriptions (endpoint, VAPID keys, user/device tracking), notification_logs (title, body, type, delivery stats)
+- **Sign Ups Tables**: signup_events (event registration with form linkage, capacity, waitlist, categories, post-submission display settings), signup_submissions (user registrations with status, check-in tracking, waitlist position)
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface with a database-backed implementation using Drizzle

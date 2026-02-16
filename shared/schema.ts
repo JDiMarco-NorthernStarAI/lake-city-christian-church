@@ -34,6 +34,7 @@ export const AVAILABLE_FEATURES = [
   "donations",
   "notifications",
   "sms",
+  "signups",
   "settings",
   "users",
   "roles",
@@ -52,6 +53,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   donations: "Donations",
   notifications: "Notifications",
   sms: "SMS / Text Messages",
+  signups: "Sign Ups",
   settings: "Settings",
   users: "User Management",
   roles: "Role Permissions",
@@ -771,4 +773,115 @@ export const createFormFieldSchema = z.object({
   options: z.array(z.string()).nullable().optional(),
   defaultValue: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
+});
+
+export const SIGNUP_CATEGORIES = [
+  "kids_ministry", "student_ministry", "small_group", "fellowship",
+  "volunteer", "class", "event", "trip", "other",
+] as const;
+
+export const SIGNUP_EVENT_STATUSES = ["draft", "published", "closed", "archived"] as const;
+export const SIGNUP_VISIBILITY = ["public", "members_only", "unlisted"] as const;
+export const SIGNUP_DISPLAY_TYPES = [
+  "thank_you", "summary_own", "summary_all", "summary_all_anonymous", "redirect", "custom",
+] as const;
+export const SIGNUP_SUBMISSION_STATUSES = [
+  "confirmed", "waitlisted", "cancelled", "no_show", "attended",
+] as const;
+
+export const signupEvents = pgTable("signup_events", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  thumbnailUrl: text("thumbnail_url"),
+  formId: integer("form_id").notNull(),
+  category: text("category").notNull().default("event"),
+  status: text("status").notNull().default("draft"),
+  visibility: text("visibility").notNull().default("public"),
+  signupStartDate: timestamp("signup_start_date"),
+  signupEndDate: timestamp("signup_end_date"),
+  eventDate: timestamp("event_date"),
+  eventEndDate: timestamp("event_end_date"),
+  location: text("location"),
+  maxSignups: integer("max_signups"),
+  currentSignupCount: integer("current_signup_count").notNull().default(0),
+  waitlistEnabled: boolean("waitlist_enabled").notNull().default(false),
+  waitlistCount: integer("waitlist_count").notNull().default(0),
+  cost: text("cost"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  postSubmissionSettings: jsonb("post_submission_settings").default({}),
+  settings: jsonb("settings").default({}),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export const signupSubmissions = pgTable("signup_submissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  signupEventId: integer("signup_event_id").notNull(),
+  formSubmissionId: integer("form_submission_id"),
+  userId: integer("user_id"),
+  signupNumber: integer("signup_number").notNull().default(0),
+  status: text("status").notNull().default("confirmed"),
+  waitlistPosition: integer("waitlist_position"),
+  promotedFromWaitlistAt: timestamp("promoted_from_waitlist_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  checkedIn: boolean("checked_in").notNull().default(false),
+  checkedInAt: timestamp("checked_in_at"),
+  checkedInBy: integer("checked_in_by"),
+  guestCount: integer("guest_count").notNull().default(0),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSignupEventSchema = createInsertSchema(signupEvents).omit({ id: true, createdAt: true, updatedAt: true, currentSignupCount: true, waitlistCount: true, deletedAt: true });
+export const insertSignupSubmissionSchema = createInsertSchema(signupSubmissions).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertSignupEvent = z.infer<typeof insertSignupEventSchema>;
+export type SignupEvent = typeof signupEvents.$inferSelect;
+export type InsertSignupSubmission = z.infer<typeof insertSignupSubmissionSchema>;
+export type SignupSubmission = typeof signupSubmissions.$inferSelect;
+
+export const SIGNUP_CATEGORY_LABELS: Record<string, string> = {
+  kids_ministry: "Kids Ministry",
+  student_ministry: "Student Ministry",
+  small_group: "Small Group",
+  fellowship: "Fellowship",
+  volunteer: "Volunteer",
+  class: "Class",
+  event: "Event",
+  trip: "Trip",
+  other: "Other",
+};
+
+export const createSignupEventSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+  description: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+  thumbnailUrl: z.string().nullable().optional(),
+  formId: z.number().int().positive("A form must be selected"),
+  category: z.enum(SIGNUP_CATEGORIES),
+  status: z.enum(SIGNUP_EVENT_STATUSES).optional(),
+  visibility: z.enum(SIGNUP_VISIBILITY).optional(),
+  signupStartDate: z.string().nullable().optional(),
+  signupEndDate: z.string().nullable().optional(),
+  eventDate: z.string().nullable().optional(),
+  eventEndDate: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  maxSignups: z.number().int().positive().nullable().optional(),
+  waitlistEnabled: z.boolean().optional(),
+  cost: z.string().nullable().optional(),
+  contactName: z.string().nullable().optional(),
+  contactEmail: z.string().nullable().optional(),
+  contactPhone: z.string().nullable().optional(),
+  postSubmissionSettings: z.any().optional(),
+  settings: z.any().optional(),
 });

@@ -23,6 +23,7 @@ const navItems = [
       { label: "Ministries", href: "/ministries" },
     ],
   },
+  { label: "Sign Ups", href: "/signups" },
   { label: "Give", href: "/give" },
   {
     label: "Plan Your Visit",

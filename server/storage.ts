@@ -3,7 +3,7 @@ import { eq, desc, asc, and, isNull, sql, inArray, ne } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
-  pushSubscriptions, notificationLogs,
+  pushSubscriptions, notificationLogs, signupEvents, signupSubmissions,
   smsGroups, smsGroupMembers, userTags, smsMessages, smsRecipients, smsOptOuts, smsTemplates, smsSettings, smsIncomingMessages,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
@@ -24,6 +24,8 @@ import {
   type Donation, type InsertDonation,
   type PushSubscription, type InsertPushSubscription,
   type NotificationLog, type InsertNotificationLog,
+  type SignupEvent, type InsertSignupEvent,
+  type SignupSubmission, type InsertSignupSubmission,
   type SmsGroup, type InsertSmsGroup,
   type SmsGroupMember, type InsertSmsGroupMember,
   type UserTag, type InsertUserTag,
@@ -217,6 +219,27 @@ export interface IStorage {
   // Group Member Resolution
   resolveGroupMembers(groupId: number): Promise<User[]>;
   getEligibleSmsRecipients(userIds: number[]): Promise<User[]>;
+
+  // Signup Events
+  getSignupEvents(): Promise<SignupEvent[]>;
+  getPublishedSignupEvents(): Promise<SignupEvent[]>;
+  getSignupEvent(id: number): Promise<SignupEvent | undefined>;
+  getSignupEventBySlug(slug: string): Promise<SignupEvent | undefined>;
+  createSignupEvent(event: InsertSignupEvent): Promise<SignupEvent>;
+  updateSignupEvent(id: number, data: Partial<InsertSignupEvent>): Promise<SignupEvent | undefined>;
+  deleteSignupEvent(id: number): Promise<void>;
+  incrementSignupCount(id: number): Promise<void>;
+  decrementSignupCount(id: number): Promise<void>;
+
+  // Signup Submissions
+  getSignupSubmissions(signupEventId: number): Promise<SignupSubmission[]>;
+  getSignupSubmission(id: number): Promise<SignupSubmission | undefined>;
+  getSignupSubmissionByUser(signupEventId: number, userId: number): Promise<SignupSubmission | undefined>;
+  getUserSignupSubmissions(userId: number): Promise<SignupSubmission[]>;
+  createSignupSubmission(submission: InsertSignupSubmission): Promise<SignupSubmission>;
+  updateSignupSubmission(id: number, data: Partial<InsertSignupSubmission>): Promise<SignupSubmission | undefined>;
+  deleteSignupSubmission(id: number): Promise<void>;
+  getSignupSubmissionCount(signupEventId: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1027,6 +1050,88 @@ export class DatabaseStorage implements IStorage {
         eq(users.phoneType, "mobile"),
       )
     );
+  }
+
+  // ======== SIGNUP EVENTS ========
+
+  async getSignupEvents(): Promise<SignupEvent[]> {
+    return db.select().from(signupEvents).where(isNull(signupEvents.deletedAt)).orderBy(desc(signupEvents.createdAt));
+  }
+
+  async getPublishedSignupEvents(): Promise<SignupEvent[]> {
+    return db.select().from(signupEvents).where(and(eq(signupEvents.status, "published"), isNull(signupEvents.deletedAt))).orderBy(desc(signupEvents.eventDate));
+  }
+
+  async getSignupEvent(id: number): Promise<SignupEvent | undefined> {
+    const [event] = await db.select().from(signupEvents).where(eq(signupEvents.id, id));
+    return event;
+  }
+
+  async getSignupEventBySlug(slug: string): Promise<SignupEvent | undefined> {
+    const [event] = await db.select().from(signupEvents).where(eq(signupEvents.slug, slug));
+    return event;
+  }
+
+  async createSignupEvent(event: InsertSignupEvent): Promise<SignupEvent> {
+    const [created] = await db.insert(signupEvents).values(event).returning();
+    return created;
+  }
+
+  async updateSignupEvent(id: number, data: Partial<InsertSignupEvent>): Promise<SignupEvent | undefined> {
+    const [updated] = await db.update(signupEvents).set({ ...data, updatedAt: new Date() }).where(eq(signupEvents.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSignupEvent(id: number): Promise<void> {
+    await db.delete(signupSubmissions).where(eq(signupSubmissions.signupEventId, id));
+    await db.delete(signupEvents).where(eq(signupEvents.id, id));
+  }
+
+  async incrementSignupCount(id: number): Promise<void> {
+    await db.update(signupEvents).set({ currentSignupCount: sql`${signupEvents.currentSignupCount} + 1` }).where(eq(signupEvents.id, id));
+  }
+
+  async decrementSignupCount(id: number): Promise<void> {
+    await db.update(signupEvents).set({ currentSignupCount: sql`GREATEST(${signupEvents.currentSignupCount} - 1, 0)` }).where(eq(signupEvents.id, id));
+  }
+
+  // ======== SIGNUP SUBMISSIONS ========
+
+  async getSignupSubmissions(signupEventId: number): Promise<SignupSubmission[]> {
+    return db.select().from(signupSubmissions).where(eq(signupSubmissions.signupEventId, signupEventId)).orderBy(desc(signupSubmissions.createdAt));
+  }
+
+  async getSignupSubmission(id: number): Promise<SignupSubmission | undefined> {
+    const [submission] = await db.select().from(signupSubmissions).where(eq(signupSubmissions.id, id));
+    return submission;
+  }
+
+  async getSignupSubmissionByUser(signupEventId: number, userId: number): Promise<SignupSubmission | undefined> {
+    const [submission] = await db.select().from(signupSubmissions).where(and(eq(signupSubmissions.signupEventId, signupEventId), eq(signupSubmissions.userId, userId)));
+    return submission;
+  }
+
+  async getUserSignupSubmissions(userId: number): Promise<SignupSubmission[]> {
+    return db.select().from(signupSubmissions).where(eq(signupSubmissions.userId, userId)).orderBy(desc(signupSubmissions.createdAt));
+  }
+
+  async createSignupSubmission(submission: InsertSignupSubmission): Promise<SignupSubmission> {
+    const [created] = await db.insert(signupSubmissions).values(submission).returning();
+    return created;
+  }
+
+  async updateSignupSubmission(id: number, data: Partial<InsertSignupSubmission>): Promise<SignupSubmission | undefined> {
+    const [updated] = await db.update(signupSubmissions).set({ ...data, updatedAt: new Date() }).where(eq(signupSubmissions.id, id)).returning();
+    return updated;
+  }
+
+  async deleteSignupSubmission(id: number): Promise<void> {
+    await db.delete(signupSubmissions).where(eq(signupSubmissions.id, id));
+  }
+
+  async getSignupSubmissionCount(signupEventId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(signupSubmissions).where(eq(signupSubmissions.signupEventId, signupEventId));
+    return result[0]?.count ?? 0;
   }
 }
 

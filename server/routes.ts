@@ -14,6 +14,7 @@ import {
   createFormSchema, createFormFieldSchema,
   createDonationFundSchema, createCheckoutSchema,
   subscribePushSchema, sendNotificationSchema,
+  insertSignupEventSchema, insertSignupSubmissionSchema,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { seedDatabase } from "./seed";
@@ -1068,6 +1069,226 @@ export async function registerRoutes(
       });
     } catch (err) {
       res.status(500).json({ message: "Error fetching notification stats" });
+    }
+  });
+
+  // ============================================================
+  // SIGN UPS - Public Endpoints
+  // ============================================================
+
+  app.get("/api/public/signups", async (_req, res) => {
+    try {
+      const events = await storage.getPublishedSignupEvents();
+      res.json(events);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching signup events" });
+    }
+  });
+
+  app.get("/api/public/signups/:slug", async (req, res) => {
+    try {
+      const event = await storage.getSignupEventBySlug(req.params.slug);
+      if (!event || event.status !== "published") {
+        return res.status(404).json({ message: "Signup event not found" });
+      }
+      let form = null;
+      let fields: any[] = [];
+      if (event.formId) {
+        form = await storage.getForm(event.formId);
+        if (form) {
+          fields = await storage.getFormFields(form.id);
+        }
+      }
+      res.json({ event, form, fields });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching signup event" });
+    }
+  });
+
+  app.post("/api/public/signups/:slug/submit", async (req, res) => {
+    try {
+      const event = await storage.getSignupEventBySlug(req.params.slug);
+      if (!event || event.status !== "published") {
+        return res.status(404).json({ message: "Signup event not found" });
+      }
+      const now = new Date();
+      if (event.signupStartDate && now < new Date(event.signupStartDate)) {
+        return res.status(400).json({ message: "Registration has not opened yet" });
+      }
+      if (event.signupEndDate && now > new Date(event.signupEndDate)) {
+        return res.status(400).json({ message: "Registration has closed" });
+      }
+      let submissionStatus: "confirmed" | "waitlisted" = "confirmed";
+      let waitlistPosition: number | null = null;
+      if (event.maxSignups && event.currentSignupCount >= event.maxSignups) {
+        if (!event.waitlistEnabled) {
+          return res.status(400).json({ message: "This event is full" });
+        }
+        submissionStatus = "waitlisted";
+        waitlistPosition = event.waitlistCount + 1;
+      }
+      let formSubmissionId: number | null = null;
+      if (event.formId && req.body.formData) {
+        const formSubmission = await storage.createFormSubmission({
+          formId: event.formId,
+          data: req.body.formData,
+        });
+        formSubmissionId = formSubmission.id;
+      }
+      const submission = await storage.createSignupSubmission({
+        signupEventId: event.id,
+        formSubmissionId,
+        userId: req.session?.userId || null,
+        signupNumber: event.currentSignupCount + 1,
+        status: submissionStatus,
+        waitlistPosition,
+        guestCount: req.body.guestCount || 0,
+      });
+      if (submissionStatus === "waitlisted") {
+        await storage.updateSignupEvent(event.id, {
+          waitlistCount: event.waitlistCount + 1,
+        });
+      } else {
+        await storage.incrementSignupCount(event.id);
+      }
+      res.json({
+        submission,
+        status: submissionStatus,
+        waitlistPosition,
+        postSubmissionSettings: event.postSubmissionSettings,
+      });
+    } catch (err) {
+      console.error("Signup submission error:", err);
+      res.status(500).json({ message: "Error submitting signup" });
+    }
+  });
+
+  app.get("/api/public/signups/:slug/submissions", async (req, res) => {
+    try {
+      const event = await storage.getSignupEventBySlug(req.params.slug);
+      if (!event) {
+        return res.status(404).json({ message: "Signup event not found" });
+      }
+      const pss = (event.postSubmissionSettings as any) || {};
+      const displayType = pss.displayType || "thank_you";
+      if (displayType !== "summary_all" && displayType !== "summary_all_anonymous") {
+        return res.status(403).json({ message: "Submissions are not publicly visible" });
+      }
+      const submissions = await storage.getSignupSubmissions(event.id);
+      if (displayType === "summary_all_anonymous") {
+        const anonymous = submissions.map(s => ({
+          id: s.id,
+          status: s.status,
+          signupNumber: s.signupNumber,
+          guestCount: s.guestCount,
+          createdAt: s.createdAt,
+        }));
+        return res.json(anonymous);
+      }
+      res.json(submissions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching submissions" });
+    }
+  });
+
+  // ============================================================
+  // SIGN UPS - Admin Endpoints
+  // ============================================================
+
+  app.get("/api/signups", requireFeature("signups"), async (_req, res) => {
+    try {
+      const events = await storage.getSignupEvents();
+      res.json(events);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching signup events" });
+    }
+  });
+
+  app.get("/api/signups/:id", requireFeature("signups"), async (req, res) => {
+    try {
+      const event = await storage.getSignupEvent(Number(req.params.id));
+      if (!event) return res.status(404).json({ message: "Signup event not found" });
+      res.json(event);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching signup event" });
+    }
+  });
+
+  app.post("/api/signups", requireFeature("signups"), async (req, res) => {
+    try {
+      const parsed = insertSignupEventSchema.parse({
+        ...req.body,
+        createdBy: req.session.userId,
+      });
+      const event = await storage.createSignupEvent(parsed);
+      res.json(event);
+    } catch (err: any) {
+      if (err.name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: err.errors });
+      }
+      console.error("Create signup event error:", err);
+      res.status(500).json({ message: "Error creating signup event" });
+    }
+  });
+
+  app.patch("/api/signups/:id", requireFeature("signups"), async (req, res) => {
+    try {
+      const event = await storage.updateSignupEvent(Number(req.params.id), req.body);
+      if (!event) return res.status(404).json({ message: "Signup event not found" });
+      res.json(event);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating signup event" });
+    }
+  });
+
+  app.delete("/api/signups/:id", requireFeature("signups"), async (req, res) => {
+    try {
+      await storage.deleteSignupEvent(Number(req.params.id));
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting signup event" });
+    }
+  });
+
+  app.get("/api/signups/:id/submissions", requireFeature("signups"), async (req, res) => {
+    try {
+      const submissions = await storage.getSignupSubmissions(Number(req.params.id));
+      res.json(submissions);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching submissions" });
+    }
+  });
+
+  app.patch("/api/signups/submissions/:id", requireFeature("signups"), async (req, res) => {
+    try {
+      const submission = await storage.updateSignupSubmission(Number(req.params.id), req.body);
+      if (!submission) return res.status(404).json({ message: "Submission not found" });
+      res.json(submission);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating submission" });
+    }
+  });
+
+  app.post("/api/signups/submissions/:id/checkin", requireFeature("signups"), async (req, res) => {
+    try {
+      const submission = await storage.updateSignupSubmission(Number(req.params.id), {
+        checkedIn: true,
+        checkedInAt: new Date(),
+        checkedInBy: req.session.userId,
+      });
+      if (!submission) return res.status(404).json({ message: "Submission not found" });
+      res.json(submission);
+    } catch (err) {
+      res.status(500).json({ message: "Error checking in" });
+    }
+  });
+
+  app.delete("/api/signups/submissions/:id", requireFeature("signups"), async (req, res) => {
+    try {
+      await storage.deleteSignupSubmission(Number(req.params.id));
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting submission" });
     }
   });
 

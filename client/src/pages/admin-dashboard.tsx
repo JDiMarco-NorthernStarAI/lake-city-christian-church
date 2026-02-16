@@ -19,18 +19,18 @@ import {
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
-  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy,
+  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy, UserPlus,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund } from "@shared/schema";
-import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES } from "@shared/schema";
+import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund, SignupEvent, SignupSubmission } from "@shared/schema";
+import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES, SIGNUP_CATEGORIES, SIGNUP_CATEGORY_LABELS, SIGNUP_EVENT_STATUSES, SIGNUP_VISIBILITY, SIGNUP_DISPLAY_TYPES } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 import AdminSmsTab from "@/pages/admin-sms";
 import { MessageSquare } from "lucide-react";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "pages" | "settings" | "users" | "roles";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "pages" | "settings" | "users" | "roles";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -45,6 +45,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
   { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
   { id: "sms", label: "SMS Messaging", icon: MessageSquare, feature: "sms" },
+  { id: "signups", label: "Sign Ups", icon: UserPlus, feature: "signups" },
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "users", label: "Users", icon: UserCog, feature: "users" },
   { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
@@ -148,6 +149,7 @@ export default function AdminDashboard() {
           {activeTab === "donations" && <DonationsTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "sms" && <AdminSmsTab />}
+          {activeTab === "signups" && <SignupsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}
@@ -2745,6 +2747,593 @@ function DonationsTab() {
           </form>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => void }) {
+  const { toast } = useToast();
+  const { data: submissions, isLoading } = useQuery<SignupSubmission[]>({
+    queryKey: ["/api/signups", event.id, "submissions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/signups/${event.id}/submissions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const checkinMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("POST", `/api/signups/submissions/${id}/checkin`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups", event.id, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Checked in" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      await apiRequest("PATCH", `/api/signups/submissions/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups", event.id, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Status updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteSubMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/signups/submissions/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups", event.id, "submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Submission deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const confirmed = submissions?.filter(s => s.status === "confirmed") || [];
+  const waitlisted = submissions?.filter(s => s.status === "waitlisted") || [];
+  const cancelled = submissions?.filter(s => s.status === "cancelled") || [];
+  const checkedInCount = confirmed.filter(s => s.checkedIn).length;
+
+  return (
+    <div data-testid="tab-signups-submissions">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">{event.title}</h1>
+          <p className="text-muted-foreground text-sm">Submissions & Check-In</p>
+        </div>
+        <Button variant="outline" onClick={onBack} data-testid="button-back-submissions">
+          Back to List
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-2xl font-bold" data-testid="text-total-confirmed">{confirmed.length}</div>
+            <div className="text-sm text-muted-foreground">Confirmed</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-2xl font-bold" data-testid="text-total-waitlisted">{waitlisted.length}</div>
+            <div className="text-sm text-muted-foreground">Waitlisted</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-2xl font-bold" data-testid="text-total-checkedin">{checkedInCount}</div>
+            <div className="text-sm text-muted-foreground">Checked In</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-2xl font-bold" data-testid="text-total-cancelled">{cancelled.length}</div>
+            <div className="text-sm text-muted-foreground">Cancelled</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading submissions...</p>
+      ) : !submissions?.length ? (
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            No submissions yet.
+          </CardContent>
+        </Card>
+      ) : (
+        <Table data-testid="table-submissions">
+          <TableHeader>
+            <TableRow>
+              <TableHead>#</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Checked In</TableHead>
+              <TableHead>Guests</TableHead>
+              <TableHead>Submitted</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {submissions.map((sub) => (
+              <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
+                <TableCell data-testid={`text-sub-number-${sub.id}`}>#{sub.signupNumber}</TableCell>
+                <TableCell data-testid={`text-sub-status-${sub.id}`}>
+                  <Badge variant={sub.status === "confirmed" ? "default" : sub.status === "waitlisted" ? "secondary" : "outline"}>
+                    {sub.status}
+                  </Badge>
+                </TableCell>
+                <TableCell data-testid={`text-sub-checkin-${sub.id}`}>
+                  {sub.checkedIn ? (
+                    <Badge variant="default">Yes</Badge>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => checkinMutation.mutate(sub.id)} disabled={checkinMutation.isPending} data-testid={`button-checkin-${sub.id}`}>
+                      Check In
+                    </Button>
+                  )}
+                </TableCell>
+                <TableCell data-testid={`text-sub-guests-${sub.id}`}>{sub.guestCount}</TableCell>
+                <TableCell data-testid={`text-sub-date-${sub.id}`}>
+                  {new Date(sub.createdAt).toLocaleString()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    {sub.status === "waitlisted" && (
+                      <Button size="sm" variant="outline" onClick={() => updateStatusMutation.mutate({ id: sub.id, status: "confirmed" })} data-testid={`button-promote-${sub.id}`}>
+                        Promote
+                      </Button>
+                    )}
+                    {sub.status === "confirmed" && (
+                      <Button size="sm" variant="outline" onClick={() => updateStatusMutation.mutate({ id: sub.id, status: "cancelled" })} data-testid={`button-cancel-${sub.id}`}>
+                        Cancel
+                      </Button>
+                    )}
+                    <Button size="icon" variant="ghost" onClick={() => deleteSubMutation.mutate(sub.id)} data-testid={`button-delete-sub-${sub.id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
+function SignupsTab() {
+  const { toast } = useToast();
+  const { data: signups, isLoading } = useQuery<SignupEvent[]>({ queryKey: ["/api/signups"] });
+  const { data: formsList } = useQuery<Form[]>({ queryKey: ["/api/forms"] });
+  const [view, setView] = useState<"list" | "editor" | "submissions">("list");
+  const [editing, setEditing] = useState<SignupEvent | null>(null);
+  const [viewingSubmissions, setViewingSubmissions] = useState<SignupEvent | null>(null);
+  const [displayType, setDisplayType] = useState("thank_you");
+  const [form, setForm] = useState({
+    title: "",
+    slug: "",
+    description: "",
+    category: "event" as string,
+    status: "draft" as string,
+    visibility: "public" as string,
+    formId: 0,
+    imageUrl: "",
+    thumbnailUrl: "",
+    signupStartDate: "",
+    signupEndDate: "",
+    eventDate: "",
+    eventEndDate: "",
+    location: "",
+    cost: "",
+    maxSignups: "",
+    waitlistEnabled: false,
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+    successMessage: "",
+    redirectUrl: "",
+  });
+
+  function generateSlug(title: string) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  }
+
+  function openCreate() {
+    setEditing(null);
+    setForm({
+      title: "", slug: "", description: "", category: "event", status: "draft", visibility: "public",
+      formId: 0, imageUrl: "", thumbnailUrl: "", signupStartDate: "", signupEndDate: "",
+      eventDate: "", eventEndDate: "", location: "", cost: "", maxSignups: "",
+      waitlistEnabled: false, contactName: "", contactEmail: "", contactPhone: "",
+      successMessage: "", redirectUrl: "",
+    });
+    setDisplayType("thank_you");
+    setView("editor");
+  }
+
+  function openEdit(signup: SignupEvent) {
+    setEditing(signup);
+    const pss = (signup.postSubmissionSettings || {}) as any;
+    setForm({
+      title: signup.title,
+      slug: signup.slug,
+      description: signup.description || "",
+      category: signup.category,
+      status: signup.status,
+      visibility: signup.visibility,
+      formId: signup.formId,
+      imageUrl: signup.imageUrl || "",
+      thumbnailUrl: signup.thumbnailUrl || "",
+      signupStartDate: signup.signupStartDate ? new Date(signup.signupStartDate).toISOString().slice(0, 16) : "",
+      signupEndDate: signup.signupEndDate ? new Date(signup.signupEndDate).toISOString().slice(0, 16) : "",
+      eventDate: signup.eventDate ? new Date(signup.eventDate).toISOString().slice(0, 16) : "",
+      eventEndDate: signup.eventEndDate ? new Date(signup.eventEndDate).toISOString().slice(0, 16) : "",
+      location: signup.location || "",
+      cost: signup.cost || "",
+      maxSignups: signup.maxSignups != null ? String(signup.maxSignups) : "",
+      waitlistEnabled: signup.waitlistEnabled,
+      contactName: signup.contactName || "",
+      contactEmail: signup.contactEmail || "",
+      contactPhone: signup.contactPhone || "",
+      successMessage: pss.successMessage || "",
+      redirectUrl: pss.redirectUrl || "",
+    });
+    setDisplayType(pss.displayType || "thank_you");
+    setView("editor");
+  }
+
+  function closeEditor() {
+    setView("list");
+    setEditing(null);
+  }
+
+  function openSubmissions(signup: SignupEvent) {
+    setViewingSubmissions(signup);
+    setView("submissions");
+  }
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("POST", "/api/signups", data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Sign up created" });
+      closeEditor();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/signups/${id}`, data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Sign up updated" });
+      closeEditor();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/signups/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Sign up deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.title.trim()) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
+    }
+    if (!form.formId) {
+      toast({ title: "Please select a form", variant: "destructive" });
+      return;
+    }
+    const payload: any = {
+      title: form.title,
+      slug: form.slug || generateSlug(form.title),
+      description: form.description || null,
+      category: form.category,
+      status: form.status,
+      visibility: form.visibility,
+      formId: form.formId,
+      imageUrl: form.imageUrl || null,
+      thumbnailUrl: form.thumbnailUrl || null,
+      signupStartDate: form.signupStartDate || null,
+      signupEndDate: form.signupEndDate || null,
+      eventDate: form.eventDate || null,
+      eventEndDate: form.eventEndDate || null,
+      location: form.location || null,
+      cost: form.cost || null,
+      maxSignups: form.maxSignups ? parseInt(form.maxSignups) : null,
+      waitlistEnabled: form.waitlistEnabled,
+      contactName: form.contactName || null,
+      contactEmail: form.contactEmail || null,
+      contactPhone: form.contactPhone || null,
+      postSubmissionSettings: {
+        displayType: displayType,
+        successMessage: form.successMessage || null,
+        redirectUrl: form.redirectUrl || null,
+      },
+    };
+    if (editing) {
+      updateMutation.mutate({ id: editing.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  }
+
+  if (view === "submissions" && viewingSubmissions) {
+    return <SubmissionsView event={viewingSubmissions} onBack={() => { setView("list"); setViewingSubmissions(null); }} />;
+  }
+
+  if (view === "editor") {
+    return (
+      <div data-testid="tab-signups-editor">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+          <h1 className="text-2xl font-bold">{editing ? "Edit Sign Up" : "Create Sign Up"}</h1>
+          <Button variant="outline" onClick={closeEditor} data-testid="button-cancel-signup">
+            Back to List
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Title *</Label>
+                  <Input
+                    value={form.title}
+                    onChange={(e) => {
+                      const title = e.target.value;
+                      setForm({ ...form, title, slug: editing ? form.slug : generateSlug(title) });
+                    }}
+                    required
+                    data-testid="input-signup-title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Slug</Label>
+                  <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} data-testid="input-signup-slug" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="input-signup-description" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                    <SelectTrigger data-testid="select-signup-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIGNUP_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{SIGNUP_CATEGORY_LABELS[cat] || cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                    <SelectTrigger data-testid="select-signup-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIGNUP_EVENT_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Visibility</Label>
+                  <Select value={form.visibility} onValueChange={(v) => setForm({ ...form, visibility: v })}>
+                    <SelectTrigger data-testid="select-signup-visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIGNUP_VISIBILITY.map((v) => (
+                        <SelectItem key={v} value={v}>{v.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Form *</Label>
+                <Select value={form.formId ? String(form.formId) : ""} onValueChange={(v) => setForm({ ...form, formId: parseInt(v) })}>
+                  <SelectTrigger data-testid="select-signup-form">
+                    <SelectValue placeholder="Select a form" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formsList?.map((f) => (
+                      <SelectItem key={f.id} value={String(f.id)}>{f.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Image URL</Label>
+                  <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} data-testid="input-signup-image-url" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Thumbnail URL</Label>
+                  <Input value={form.thumbnailUrl} onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })} data-testid="input-signup-thumbnail-url" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Signup Start Date</Label>
+                  <Input type="datetime-local" value={form.signupStartDate} onChange={(e) => setForm({ ...form, signupStartDate: e.target.value })} data-testid="input-signup-start-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Signup End Date</Label>
+                  <Input type="datetime-local" value={form.signupEndDate} onChange={(e) => setForm({ ...form, signupEndDate: e.target.value })} data-testid="input-signup-end-date" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Event Date</Label>
+                  <Input type="datetime-local" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} data-testid="input-signup-event-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Event End Date</Label>
+                  <Input type="datetime-local" value={form.eventEndDate} onChange={(e) => setForm({ ...form, eventEndDate: e.target.value })} data-testid="input-signup-event-end-date" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Location</Label>
+                  <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} data-testid="input-signup-location" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cost</Label>
+                  <Input value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} data-testid="input-signup-cost" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Max Signups</Label>
+                  <Input type="number" value={form.maxSignups} onChange={(e) => setForm({ ...form, maxSignups: e.target.value })} data-testid="input-signup-max" />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    id="waitlist-enabled"
+                    checked={form.waitlistEnabled}
+                    onCheckedChange={(checked) => setForm({ ...form, waitlistEnabled: !!checked })}
+                    data-testid="checkbox-signup-waitlist"
+                  />
+                  <Label htmlFor="waitlist-enabled">Waitlist Enabled</Label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Contact Name</Label>
+                  <Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} data-testid="input-signup-contact-name" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Email</Label>
+                  <Input value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} data-testid="input-signup-contact-email" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact Phone</Label>
+                  <Input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} data-testid="input-signup-contact-phone" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Post-Submission Display Type</Label>
+                <Select value={displayType} onValueChange={(v) => setDisplayType(v)}>
+                  <SelectTrigger data-testid="select-signup-display-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SIGNUP_DISPLAY_TYPES.map((dt) => (
+                      <SelectItem key={dt} value={dt}>{dt.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Post-Submission Success Message</Label>
+                <Textarea value={form.successMessage} onChange={(e) => setForm({ ...form, successMessage: e.target.value })} data-testid="input-signup-success-message" />
+              </div>
+
+              {displayType === "redirect" && (
+                <div className="space-y-2">
+                  <Label>Post-Submission Redirect URL</Label>
+                  <Input value={form.redirectUrl} onChange={(e) => setForm({ ...form, redirectUrl: e.target.value })} data-testid="input-signup-redirect-url" />
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-signup">
+                {editing ? "Update Sign Up" : "Create Sign Up"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="tab-signups">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-2xl font-bold">Sign Ups</h1>
+        <Button onClick={openCreate} data-testid="button-create-signup">
+          <Plus className="w-4 h-4 mr-2" /> Create Sign Up
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground">Loading...</p>
+      ) : (
+        <Table data-testid="table-signups">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Signups</TableHead>
+              <TableHead>Event Date</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {signups?.map((signup) => (
+              <TableRow key={signup.id} data-testid={`row-signup-${signup.id}`}>
+                <TableCell className="font-medium" data-testid={`text-signup-title-${signup.id}`}>{signup.title}</TableCell>
+                <TableCell data-testid={`text-signup-category-${signup.id}`}>
+                  <Badge variant="secondary">{SIGNUP_CATEGORY_LABELS[signup.category] || signup.category}</Badge>
+                </TableCell>
+                <TableCell data-testid={`text-signup-status-${signup.id}`}>
+                  <Badge variant={signup.status === "published" ? "default" : "secondary"}>{signup.status}</Badge>
+                </TableCell>
+                <TableCell data-testid={`text-signup-count-${signup.id}`}>
+                  {signup.currentSignupCount}{signup.maxSignups != null ? `/${signup.maxSignups}` : ""}
+                </TableCell>
+                <TableCell data-testid={`text-signup-date-${signup.id}`}>
+                  {signup.eventDate ? new Date(signup.eventDate).toLocaleDateString() : "-"}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(signup)} data-testid={`button-edit-signup-${signup.id}`}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => openSubmissions(signup)} data-testid={`button-submissions-signup-${signup.id}`}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(signup.id)} data-testid={`button-delete-signup-${signup.id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }

@@ -1,0 +1,675 @@
+
+Create a "Sign Ups" system that connects events/opportunities to forms, allows users to see what they and others have signed up for, and gives admins control over post-submission visibility. This builds on the existing form builder and events system.
+
+## OVERVIEW
+
+Create a new "Sign Ups" section that serves as a hub for all church sign-up opportunities. Admins create "Sign Up Events" (different from calendar events) that display with an image, description, and details. Each Sign Up Event links to a form. After submission, users see configurable confirmation content based on admin settings.
+
+## DATABASE SCHEMA
+
+### Sign Up Events Table
+- id (primary key, UUID)
+- title (string, required - "VBS 2025 Registration", "Easter Potluck Sign Up", "Serve Team Volunteers")
+- slug (string, unique, URL-friendly - auto-generated from title, editable)
+- description (text - rich text/markdown supported)
+- image_url (string, nullable - hero image for the event)
+- thumbnail_url (string, nullable - smaller version for cards)
+- form_id (foreign key to Forms, required)
+- category (enum: 'kids_ministry', 'student_ministry', 'small_group', 'fellowship', 'volunteer', 'class', 'event', 'other')
+- status (enum: 'draft', 'published', 'closed', 'archived')
+- visibility (enum: 'public', 'members_only', 'unlisted')
+- signup_start_date (timestamp, nullable - when signups open)
+- signup_end_date (timestamp, nullable - when signups close)
+- event_date (timestamp, nullable - when the actual event occurs, for display)
+- event_end_date (timestamp, nullable - for multi-day events)
+- location (string, nullable)
+- max_signups (integer, nullable - null for unlimited)
+- current_signup_count (integer, default 0 - cached count)
+- waitlist_enabled (boolean, default false)
+- waitlist_count (integer, default 0)
+- cost (decimal, nullable - for display, actual payment handled separately if needed)
+- contact_name (string, nullable - "Questions? Contact...")
+- contact_email (string, nullable)
+- contact_phone (string, nullable)
+- post_submission_settings (JSON - see schema below)
+- created_by (foreign key to Users)
+- created_at (timestamp)
+- updated_at (timestamp)
+- deleted_at (timestamp, nullable - soft delete)
+
+### Post-Submission Settings JSON Schema (stored in post_submission_settings column):
+{
+  "display_type": "thank_you" | "summary_own" | "summary_all" | "summary_all_anonymous" | "redirect" | "custom",
+  "thank_you_title": "You're Signed Up!",
+  "thank_you_message": "Thanks for signing up! We're excited to see you there.",
+  "redirect_url": null,
+  "redirect_delay_seconds": 3,
+  "show_signup_number": true,
+  "show_event_details": true,
+  "show_add_to_calendar": true,
+  "show_share_button": false,
+  "summary_fields": null,
+  "summary_grouping_field": null,
+  "allow_edit_submission": false,
+  "allow_cancel_signup": true,
+  "confirmation_email": true,
+  "reminder_enabled": false,
+  "reminder_hours_before": 24
+}
+
+### Post Submission Display Types Explained:
+- 'thank_you': Show custom thank you message only
+- 'summary_own': Show thank you + user's own submission details
+- 'summary_all': Show thank you + ALL submissions with names (great for potlucks, volunteer slots)
+- 'summary_all_anonymous': Show thank you + all submissions WITHOUT names (just see what's taken)
+- 'redirect': Redirect to external URL after brief thank you
+- 'custom': Show custom HTML/content block
+
+### Sign Up Event Settings Table
+- signup_event_id (primary key, foreign key to Sign Up Events)
+- require_login (boolean, default false - must be logged in to sign up)
+- one_signup_per_user (boolean, default true - prevent duplicate signups)
+- one_signup_per_household (boolean, default false - based on shared address/email)
+- show_spots_remaining (boolean, default true - "5 spots left!")
+- show_whos_coming (boolean, default false - list of names on the event page before signup)
+- allow_guest_signups (boolean, default false - can add family members/guests in same form)
+- notify_on_signup (JSON array of emails - who gets notified on each signup)
+- notify_on_full (JSON array of emails - who gets notified when full)
+- auto_close_when_full (boolean, default true)
+- tags (JSON array - for filtering: ["family-friendly", "food", "outdoor"])
+- created_at (timestamp)
+- updated_at (timestamp)
+
+### Sign Up Submissions Table
+- id (primary key, UUID)
+- signup_event_id (foreign key to Sign Up Events)
+- form_submission_id (foreign key to Form Submissions)
+- user_id (foreign key to Users, nullable for guest signups)
+- signup_number (integer - their place in line, e.g., "You are #15")
+- status (enum: 'confirmed', 'waitlisted', 'cancelled', 'no_show', 'attended')
+- waitlist_position (integer, nullable)
+- promoted_from_waitlist_at (timestamp, nullable)
+- cancelled_at (timestamp, nullable)
+- cancellation_reason (text, nullable)
+- checked_in (boolean, default false)
+- checked_in_at (timestamp, nullable)
+- checked_in_by (foreign key to Users, nullable)
+- guest_count (integer, default 0 - additional guests beyond primary signup)
+- admin_notes (text, nullable)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+## API ENDPOINTS
+
+All endpoints under /api/v1/
+
+### Public Sign Up Events
+- GET /signups - List all published sign up events (with filters: category, upcoming, has_spots)
+- GET /signups/featured - Get featured/highlighted sign up events for homepage
+- GET /signups/:slug - Get sign up event details by slug
+- GET /signups/:slug/availability - Get current signup count, spots remaining, waitlist status
+- GET /signups/:slug/preview - Get summary of current signups (respects visibility settings)
+
+### Sign Up Submission
+- POST /signups/:slug/submit - Submit signup (processes form, creates signup record)
+- GET /signups/:slug/my-submission - Get current user's submission for this event
+- PUT /signups/:slug/my-submission - Update submission (if allowed)
+- DELETE /signups/:slug/my-submission - Cancel signup (if allowed)
+- GET /signups/:slug/confirmation - Get confirmation/summary page data
+
+### User's Sign Ups
+- GET /my/signups - Get all of current user's signups (past and upcoming)
+- GET /my/signups/upcoming - Get only upcoming signups
+- GET /my/signups/:id - Get specific signup details
+
+### Admin Sign Up Event Management
+- GET /admin/signups - List all sign up events (all statuses)
+- GET /admin/signups/:id - Get sign up event with full details and stats
+- POST /admin/signups - Create new sign up event
+- PUT /admin/signups/:id - Update sign up event
+- DELETE /admin/signups/:id - Delete sign up event (soft delete, preserves submissions)
+- POST /admin/signups/:id/duplicate - Duplicate event (for recurring events)
+- PUT /admin/signups/:id/status - Change status (publish, close, archive)
+- POST /admin/signups/:id/image - Upload event image
+
+### Admin Submission Management
+- GET /admin/signups/:id/submissions - Get all submissions for event (paginated, filterable)
+- GET /admin/signups/:id/submissions/export - Export as CSV
+- GET /admin/signups/:id/submissions/:subId - Get specific submission
+- PUT /admin/signups/:id/submissions/:subId - Update submission status, notes
+- DELETE /admin/signups/:id/submissions/:subId - Delete/cancel submission
+- POST /admin/signups/:id/submissions/:subId/promote - Promote from waitlist
+- POST /admin/signups/:id/check-in/:subId - Check in attendee
+- POST /admin/signups/:id/check-in/bulk - Bulk check in by list of IDs
+
+### Admin Waitlist Management
+- GET /admin/signups/:id/waitlist - Get waitlist in order
+- POST /admin/signups/:id/waitlist/promote-next - Promote next person on waitlist
+- POST /admin/signups/:id/waitlist/notify - Send "spot available" notification to waitlist
+
+## FORM BUILDER ENHANCEMENTS
+
+Add a new "After Submission" tab in the form builder when a form is linked to a Sign Up Event:
+
+### After Submission Tab Contents:
+
+Post-Submission Display dropdown with options:
+- Thank You Message Only
+- Thank You + Show My Submission
+- Thank You + Show All Signups (with names)
+- Thank You + Show All Signups (anonymous)
+- Redirect to URL
+
+If Thank You variants selected, show:
+- Thank You Title text input (default: "You're Signed Up!")
+- Thank You Message rich text editor
+
+If Show All Signups selected, show:
+- Checkboxes for "Which form fields should appear in the summary?" listing all form fields
+- "Group signups by" dropdown populated with form fields (e.g., group by "Dish Category" for potluck)
+
+If Redirect selected, show:
+- Redirect URL text input
+- Delay before redirect number input (default: 3 seconds)
+
+Additional Options section with toggles:
+- Show signup number ("You are #24")
+- Show event date/time/location
+- Show "Add to Calendar" buttons
+- Show "Share with Friends" button
+- Allow users to edit their submission
+- Allow users to cancel their signup
+
+### Smart Form Templates
+
+When admin creates a new Sign Up Event, suggest form templates based on category:
+
+Fellowship/Potluck template fields:
+- Name, Email, Phone
+- What are you bringing? (text)
+- Dish Category (select: Main Dish, Side Dish, Dessert, Drinks, Paper Goods)
+- Serves how many? (number)
+- Contains allergens? (multiselect: Nuts, Dairy, Gluten, Eggs, None)
+
+Volunteer/Serve Team template fields:
+- Name, Email, Phone
+- Which role? (select from defined roles)
+- Which time slot? (select from defined slots)
+- Have you served in this area before? (yes/no)
+- Any training needed? (textarea)
+
+Event Registration template fields:
+- Name, Email, Phone
+- Number attending (number)
+- Names of additional attendees (textarea)
+- Special accommodations needed? (textarea)
+
+Kids/Youth Event template fields:
+- Parent Name, Email, Phone
+- Child Name, Age, Grade
+- Allergies/Medical info (textarea)
+- Emergency Contact Name and Phone
+- Photo release (checkbox)
+
+Class/Study Sign Up template fields:
+- Name, Email, Phone
+- Which session? (select if multiple)
+- Childcare needed? (yes/no)
+- If yes, how many children and ages? (text)
+- How did you hear about this? (select)
+
+## PUBLIC PAGES
+
+### Main Sign Ups Hub Page (/signups)
+
+Header section:
+- Title: "Sign Ups & Registration"
+- Subtitle: "Find opportunities to connect, serve, and grow"
+
+Filter bar:
+- Category filter pills: All, Kids, Youth, Fellowship, Volunteer, Classes
+- Toggle: "Show only events with spots available"
+- Search box
+
+Sign Up Cards Grid displaying each published event as a card with:
+- Event image (or category placeholder gradient)
+- Title
+- Date (if applicable)
+- Category badge
+- Brief description (truncated to 2-3 lines)
+- Status indicator showing one of:
+  - "Open" (green badge) with spots remaining count
+  - "Almost Full" (yellow badge) with "Only X spots left!"
+  - "Waitlist Available" (orange badge) 
+  - "Closed" (gray badge)
+  - "Coming Soon" (blue badge) with date signups open
+- "Sign Up" button
+
+### Sign Up Event Detail Page (/signups/:slug)
+
+Hero section:
+- Large event image (or gradient placeholder with icon)
+- Title
+- Date/time and location
+- Category badge
+- Signup status with count: "23 people signed up" or "5 spots remaining"
+
+Description section:
+- Full rich text description
+- Contact info if provided
+
+Current Signups Preview section (if show_whos_coming enabled or if summary display mode):
+- Show what people have signed up for/bringing
+- Grouped by specified field if grouping configured
+- Example for potluck display:
+WHAT'S BEING BROUGHT:
+Main Dishes (4)
+
+Pulled Pork - John S.
+Lasagna - Jane D.
+Fried Chicken - Bob W.
+Brisket - Tom M.
+
+Side Dishes (3)
+
+Mac & Cheese - Mary J.
+Coleslaw - Sarah K.
+Baked Beans - Mike R.
+
+Desserts (2)
+
+Brownies - Lisa P.
+Apple Pie - Dave C.
+
+Still Needed: Drinks, Paper Goods
+
+Sign Up Action section showing contextually:
+- If not logged in and login required: "Log in to sign up" button
+- If already signed up: "You're signed up!" with "View Details" and "Edit" buttons
+- If full and waitlist enabled: "Join Waitlist" button with waitlist position info
+- If full and no waitlist: "This event is full" disabled state
+- If before signup_start_date: "Signups open [date]" disabled state
+- If after signup_end_date: "Signups are closed" disabled state
+- Otherwise: "Sign Up Now" button
+
+Form section:
+- Embed the linked form inline on the page
+- Or show "Sign Up Now" button that scrolls to/reveals form
+
+### Confirmation Page (/signups/:slug/confirmation)
+
+Display based on post_submission_settings.display_type:
+
+For "thank_you" display type:
+✓ [thank_you_title]
+[thank_you_message]
+Event: [Event Title]
+Date: [Event Date/Time]
+Location: [Location]
+[Add to Google Calendar] [Add to Apple Calendar] [Add to Outlook]
+[View My Sign Ups] [Back to All Sign Ups]
+
+For "summary_own" display type:
+✓ [thank_you_title]
+[thank_you_message]
+YOUR SUBMISSION:
+[Display each form field and value]
+Name: John Smith
+Bringing: Pulled Pork
+Category: Main Dish
+Serves: 12 people
+You are signup #[signup_number]
+[Edit My Submission] [Cancel Signup] (if allowed)
+Event: [Event Title]
+Date: [Event Date/Time]
+Location: [Location]
+[Add to Calendar] [View My Sign Ups]
+
+For "summary_all" display type:
+✓ [thank_you_title]
+[thank_you_message]
+WHAT EVERYONE IS BRINGING:
+[Grouped by summary_grouping_field if set]
+Main Dishes:
+
+John Smith - Pulled Pork (serves 12)
+Jane Doe - Lasagna (serves 8)
+Mike Johnson - Fried Chicken (serves 10)
+
+Side Dishes:
+
+Bob Wilson - Mac & Cheese (serves 15)
+Mary Clark - Green Bean Casserole (serves 12)
+
+Desserts:
+
+Sarah Brown - Brownies (serves 24)
+Tom White - Apple Pie (serves 8)
+
+Drinks:
+
+Lisa Green - Lemonade (serves 20)
+
+Paper Goods:
+
+(None yet - consider signing up!)
+
+[signup_count] people signed up
+[Share This Event] [View My Sign Ups]
+
+For "summary_all_anonymous" display type:
+Same as above but without names:
+WHAT'S BEING BROUGHT:
+Main Dishes (3):
+
+Pulled Pork (serves 12)
+Lasagna (serves 8)
+Fried Chicken (serves 10)
+
+Side Dishes (2):
+
+Mac & Cheese (serves 15)
+Green Bean Casserole (serves 12)
+
+...
+
+For "redirect" display type:
+✓ You're Signed Up!
+Redirecting you in [countdown] seconds...
+[Click here if not redirected]
+Then redirect to redirect_url after redirect_delay_seconds
+
+### My Sign Ups Page (/my/signups)
+
+User dashboard showing all their signups:
+
+Upcoming Sign Ups section:
+- Cards for each upcoming signup showing:
+  - Event image thumbnail
+  - Event title
+  - Date/time
+  - Their status badge (Confirmed, Waitlisted)
+  - Quick summary of their submission (key fields)
+  - [View Details] [Edit] [Cancel] buttons based on permissions
+
+Past Sign Ups section:
+- Collapsed/expandable list of past events
+- Shows event title, date attended, their submission summary
+- Option to sign up again if similar event exists
+
+Empty state:
+- "You haven't signed up for anything yet"
+- [Browse Sign Up Opportunities] button
+
+## ADMIN UI
+
+### Sign Up Events List Page (/admin/signups)
+
+Header with "Sign Up Events" title and [Create New] button
+
+Filter bar:
+- Status filter: All, Draft, Published, Closed, Archived
+- Category filter dropdown
+- Date range picker
+- Search by title
+
+Table with columns:
+- Thumbnail image
+- Title (linked to edit page)
+- Category badge
+- Status badge
+- Event Date
+- Signups (showing "X / max" or "X" if unlimited)
+- Linked Form name
+- Created date
+- Actions dropdown
+
+Actions dropdown options:
+- View Submissions
+- Edit Event
+- View Public Page (opens in new tab)
+- Duplicate
+- Change Status submenu (Publish, Close, Archive, Return to Draft)
+- Delete
+
+Quick stats row above table:
+- Total Published Events
+- Total Signups This Month
+- Events Closing Soon
+
+### Create/Edit Sign Up Event Page (/admin/signups/new and /admin/signups/:id/edit)
+
+Tabbed interface:
+
+Tab 1 - Basic Info:
+- Title text input (required)
+- Slug text input (auto-generated from title, editable)
+- Category dropdown (required)
+- Description rich text editor
+- Event Image upload with drag-drop, preview, and remove button
+- Thumbnail auto-generated from image
+
+Tab 2 - Event Details:
+- Event Date datetime picker (when the event occurs)
+- Event End Date datetime picker (for multi-day events)
+- Location text input
+- Cost number input (for display only, shows "$X" on public page)
+- Contact section:
+  - Contact Name
+  - Contact Email
+  - Contact Phone
+- Tags multi-select/create input
+
+Tab 3 - Form & Limits:
+- Select Form dropdown (lists all forms) with [Create New Form] and [Edit Selected Form] buttons
+- [Preview Form] button
+- Maximum Signups number input (leave empty for unlimited)
+- Enable Waitlist toggle
+- When waitlist enabled, show: "Notify these emails when spot opens" email list input
+- Signup Opens datetime picker (when registration begins)
+- Signup Closes datetime picker (registration deadline)
+
+Tab 4 - Requirements:
+- Require Login toggle with help text "Users must have an account to sign up"
+- One Signup Per User toggle with help text "Prevent users from signing up multiple times"
+- One Signup Per Household toggle with help text "Prevent multiple signups from same address"
+- Allow Guest Additions toggle with help text "Let users add family members in their signup"
+- Show Spots Remaining toggle with help text "Display 'X spots left' on public page"
+- Show Who's Signed Up toggle with help text "Display list of names on public page before signup"
+- Auto-Close When Full toggle
+
+Tab 5 - After Signup (this is the key configuration):
+
+Section header: "What should users see after signing up?"
+
+Post-Submission Display dropdown:
+- Thank You Message
+- Thank You + My Submission Details
+- Thank You + All Signups (show names)
+- Thank You + All Signups (anonymous)
+- Redirect to External URL
+
+Dynamic fields based on selection:
+
+If any Thank You option selected:
+- Thank You Title: text input, default "You're Signed Up!"
+- Thank You Message: rich text editor with placeholder "Thanks for signing up! We're excited to see you there."
+
+If "All Signups" options selected:
+- "Fields to show in signup summary:" section with checkboxes for each field in the linked form
+- "Group signups by:" dropdown populated with form field options, with "None" as default
+- Help text: "Grouping example: For a potluck, group by 'Dish Category' to show Main Dishes, Side Dishes, Desserts, etc."
+
+If "Redirect" selected:
+- Redirect URL: text input
+- Seconds before redirect: number input, default 3
+
+Additional Options section:
+- Show signup number toggle ("You are #24 of 50")
+- Show event details toggle (date/time/location on confirmation)
+- Show "Add to Calendar" buttons toggle (Google, Apple, Outlook links)
+- Show "Share" button toggle
+- Allow users to edit their submission toggle
+- Allow users to cancel their signup toggle
+
+Tab 6 - Notifications:
+- Send confirmation email toggle (default on)
+- Send reminder toggle
+  - When enabled, show: Hours before event number input, default 24
+- Notify on each signup section:
+  - Email addresses input (comma separated or tag input)
+- Notify when event is full section:
+  - Email addresses input
+
+Tab 7 - Status & Visibility:
+- Current Status display with badge
+- Visibility dropdown: Public, Members Only, Unlisted
+- Status action buttons: [Save as Draft] [Publish] [Close Signups] based on current status
+- Danger zone: [Delete Event] with confirmation
+
+Save button fixed at bottom or top right
+
+### View Submissions Page (/admin/signups/:id/submissions)
+
+Header:
+- Event title with status badge
+- Quick stats cards: Total Signups, Confirmed, Waitlisted, Cancelled, Checked In
+- Action buttons: [Export CSV] [Send Message to All] [Print List]
+
+View toggle: Table View | Summary View
+
+Tabs or filter pills: All | Confirmed | Waitlisted | Cancelled | Checked In | No Show
+
+Table View columns:
+- Checkbox for bulk select
+- # (signup number)
+- Name (linked to user profile if logged in user)
+- Email
+- Phone
+- Status dropdown (can change inline)
+- Key form fields (configurable which to show)
+- Submitted date/time
+- Checked In indicator
+- Actions dropdown
+
+Actions dropdown:
+- View Full Submission
+- Edit Submission
+- Check In / Undo Check In
+- Move to Waitlist
+- Promote from Waitlist (if waitlisted)
+- Mark as No Show
+- Mark as Attended
+- Cancel Signup
+- Send Email
+- Send SMS
+- Delete
+
+Bulk actions bar (appears when items selected):
+- [Check In Selected] [Cancel Selected] [Send Email] [Send SMS] [Export Selected]
+
+Summary View (toggle from table):
+- Displays signups grouped by the configured grouping field
+- Matches what users see in "summary_all" confirmation
+- Print-friendly layout for event day reference
+- Example:
+MAIN DISHES (4)
+✓ John Smith - Pulled Pork (serves 12) - Checked In
+✓ Jane Doe - Lasagna (serves 8) - Checked In
+○ Mike Johnson - Fried Chicken (serves 10)
+○ Bob Williams - Brisket (serves 15)
+SIDE DISHES (3)
+...
+
+Click any row to expand full submission details inline or open modal
+
+### Check-In Mode Page (/admin/signups/:id/check-in)
+
+Simplified interface for day-of event check-in:
+
+Header:
+- Event title
+- Large counter: "Checked In: 15 / 47"
+- [Exit Check-In Mode] button
+
+Search section:
+- Large search input: "Search by name, email, or phone..."
+- Auto-filters list as typing
+
+Attendee list:
+- Shows all confirmed (not cancelled) signups
+- Each row shows: Name, Key info (what they're bringing, etc.)
+- Large [Check In] button for each that turns to [✓ Checked In] after tap
+- Already checked in items show at bottom or can be hidden
+
+Quick actions:
+- [Add Walk-In] button to add someone not on list
+- [Mark All Present] for small events
+- [Print Remaining] to print who hasn't checked in yet
+
+## INTEGRATION WITH EXISTING SYSTEMS
+
+1. Sign Up Events are separate from calendar Events but can link via event_date for calendar display
+2. Forms used for sign ups work normally in the existing form builder, they just get extra "After Submission" options when linked to a Sign Up Event
+3. Sign Up Submissions create records in BOTH sign_up_submissions AND the existing form_submissions tables (linked via form_submission_id)
+4. The existing form submission viewer should show a link to the Sign Up Event if the submission came from a sign up
+5. User's "My Sign Ups" section should be accessible from their profile/dashboard alongside existing "My Forms" or similar
+6. Cancellation updates sign_up_submissions.status to 'cancelled' but preserves the form_submission record
+7. Waitlist promotions should trigger notification via existing notification system (push and/or SMS if enabled)
+8. Confirmation emails use the existing email template system
+
+## MOBILE RESPONSIVE REQUIREMENTS
+
+1. Sign Ups hub page cards stack vertically on mobile
+2. Event detail page hero image scales appropriately
+3. Form embedding works fully on mobile
+4. Confirmation page is touch-friendly with large tap targets
+5. "Add to Calendar" generates proper mobile-compatible links
+6. My Sign Ups page is easily accessible from mobile navigation
+7. Admin pages function on tablet at minimum for on-site check-in
+
+## SAMPLE USE CASES TO TEST
+
+Use Case 1 - Easter Potluck:
+- Create sign up with category "fellowship"
+- Form fields: Name, Email, Dish Name, Dish Category (Main/Side/Dessert/Drinks/Paper Goods), Serves How Many
+- Post-submission: "Show All Signups (with names)"
+- Group by: "Dish Category"
+- Summary fields: Name, Dish Name, Serves
+- Result: After signup, users see grouped list of what everyone is bringing
+
+Use Case 2 - VBS Registration:
+- Create sign up with category "kids_ministry"
+- Max signups: 100, Waitlist enabled
+- Require login: Yes
+- One per user: No (parents can register multiple children in separate submissions)
+- Form: Child name, DOB, grade, allergies, emergency contact, photo release
+- Post-submission: "Thank You + My Submission"
+- Allow edit: Yes
+- Send reminder: Yes, 1 week before
+- Result: Parents see confirmation with their child's info, can edit, get reminder
+
+Use Case 3 - Serve Team Volunteers:
+- Create sign up with category "volunteer"
+- Form fields: Name, Email, Phone, Role (select: Greeter/Usher/Parking/Kids/Tech), Time Slot (select: 7am/9am/11am)
+- Post-submission: "Show All Signups (with names)"
+- Group by: "Role"
+- Summary fields: Name, Time Slot
+- Show who's coming: Yes (so people see slots filling on event page before signing up)
+- Result: Volunteers see all positions and who's filling them, can pick open slots
+
+Use Case 4 - Small Group Sign Up:
+- Create sign up with category "small_group"
+- Max signups: 12
+- Form fields: Name, Email, Phone, How did you hear about this group?
+- Post-submission: "Thank You Message" only (don't show other members for privacy)
+- Notify on signup: smallgroups@lakecitychristian.org
+- Result: Simple registration with admin notification
+
+Create initial sample Sign Up Event as demo:
+- Title: "Sample Potluck Sign Up"
+- Category: fellowship
+- Status: draft
+- Description: "Join us for food and fellowship! Sign up below and let us know what you're bringing."
+- Basic potluck form attached
+- Post-submission: summary_all with grouping by dish category
