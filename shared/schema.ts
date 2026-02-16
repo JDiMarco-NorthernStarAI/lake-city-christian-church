@@ -766,9 +766,9 @@ export const createFormFieldSchema = z.object({
   label: z.string().min(1, "Label is required"),
   fieldType: z.enum(FORM_FIELD_TYPES),
   required: z.boolean().optional(),
-  placeholder: z.string().optional(),
-  helpText: z.string().optional(),
-  options: z.array(z.string()).optional(),
-  defaultValue: z.string().optional(),
+  placeholder: z.string().nullable().optional(),
+  helpText: z.string().nullable().optional(),
+  options: z.array(z.string()).nullable().optional(),
+  defaultValue: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
