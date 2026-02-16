@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, useInView } from "framer-motion";
-import { Heart, Users, Play, ArrowUp, ArrowRight } from "lucide-react";
+import { Heart, Users, Play, ArrowUp, ArrowRight, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import colorLogoPath from "@assets/color_Logo_1770933488638.png";
@@ -176,6 +176,16 @@ export default function Home() {
               data-testid="link-plan-visit-hero"
             >
               Plan Your Visit
+            </Button>
+          </Link>
+          <Link href="/signups">
+            <Button
+              variant="outline"
+              className="text-white border-white/50 backdrop-blur-sm bg-white/5"
+              data-testid="link-signups-hero"
+            >
+              <ClipboardList className="w-4 h-4 mr-2" />
+              Sign Ups
             </Button>
           </Link>
           <Link href="/encounter">
