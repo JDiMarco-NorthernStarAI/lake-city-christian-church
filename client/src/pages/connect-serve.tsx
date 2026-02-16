@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckCircle, ArrowRight } from "lucide-react";
+import { CheckCircle, ArrowRight, ExternalLink } from "lucide-react";
 import coffeeImgPath from "@assets/LC_Coffe_Shop_1770933498062.png";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -48,8 +48,9 @@ export default function ConnectServe() {
     hero_title: "Connect & Serve",
     intro_heading: "We would like to get to know you better!",
     intro_description: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus. Join us as we serve together, grow together, and experience the joy of making a lasting impact while connecting people to a life-changing relationship with Jesus.",
-    volunteer_heading: "Ready to Serve?",
+    volunteer_heading: "Volunteer and Connect",
     volunteer_description: "There is a place for everyone to serve at Lake City. Whether you love greeting people, working with kids, or serving behind the scenes, we would love to have you on the team.",
+    volunteer_url: "https://docs.google.com/forms/d/e/1FAIpQLSd4-YBkgZV6FI76SNW7ijofq5TDCdXaaD5fj2-P5iHx4A9EIg/viewform",
   });
   const [submitted, setSubmitted] = useState(false);
 
@@ -327,16 +328,17 @@ export default function ConnectServe() {
           <p className="text-white/70 text-lg mb-8 max-w-xl mx-auto">
             {c.volunteer_description}
           </p>
-          <Link href="/contact">
+          <a href={c.volunteer_url} target="_blank" rel="noopener noreferrer">
             <Button
+              size="lg"
               className="text-white border-transparent"
               style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
               data-testid="link-volunteer-signup"
             >
-              Volunteer Sign Up
-              <ArrowRight className="w-4 h-4 ml-1" />
+              I'm Ready!
+              <ExternalLink className="w-4 h-4 ml-2" />
             </Button>
-          </Link>
+          </a>
         </FadeInSection>
       </section>
     </div>

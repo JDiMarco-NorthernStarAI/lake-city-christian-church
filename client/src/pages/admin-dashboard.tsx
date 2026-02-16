@@ -972,8 +972,9 @@ const pageConfigs: PageConfig[] = [
       { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Connect & Serve" },
       { key: "intro_heading", label: "Intro Heading", type: "input", placeholder: "We would like to get to know you better!" },
       { key: "intro_description", label: "Intro Description", type: "textarea", placeholder: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus." },
-      { key: "volunteer_heading", label: "Volunteer Section - Heading", type: "input", placeholder: "Ready to Serve?" },
-      { key: "volunteer_description", label: "Volunteer Section - Description", type: "textarea", placeholder: "There is a place for everyone to serve at Lake City." },
+      { key: "volunteer_heading", label: "Volunteer Section - Heading", type: "input", placeholder: "Volunteer and Connect" },
+      { key: "volunteer_description", label: "Volunteer Section - Description", type: "textarea", placeholder: "There is a place for everyone to serve at Lake City. Whether you love greeting people, working with kids, or serving behind the scenes, we would love to have you on the team." },
+      { key: "volunteer_url", label: "Volunteer Form URL", type: "input", placeholder: "https://docs.google.com/forms/d/e/1FAIpQLSd4-YBkgZV6FI76SNW7ijofq5TDCdXaaD5fj2-P5iHx4A9EIg/viewform" },
     ],
   },
   {
