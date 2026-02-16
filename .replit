@@ -46,4 +46,4 @@ VITE_VAPID_PUBLIC_KEY = "BOzQBy91aj3V-yp_paDwblxBV7qAOGul7zyr2hnK_DZLGMLryPGvz58
 VAPID_PRIVATE_KEY = "Y_C1cHkOuSGAp4V1DNUXb9svwbfV81W6noS2C9xOWjc"
 
 [agent]
-integrations = ["javascript_object_storage:2.0.0"]
+integrations = ["javascript_object_storage:2.0.0", "javascript_stripe:1.0.0"]

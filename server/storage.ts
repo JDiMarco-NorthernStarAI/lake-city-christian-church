@@ -246,6 +246,8 @@ export interface IStorage {
   getSignupSubmissionsByUserId(userId: number): Promise<SignupSubmission[]>;
   getFormSubmissionsByUserId(userId: number): Promise<FormSubmission[]>;
   getDonationsByEmail(email: string): Promise<Donation[]>;
+  getAllFormSubmissions(): Promise<FormSubmission[]>;
+  getAllSignupSubmissions(): Promise<SignupSubmission[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1159,6 +1161,14 @@ export class DatabaseStorage implements IStorage {
 
   async getDonationsByEmail(email: string): Promise<Donation[]> {
     return db.select().from(donations).where(eq(donations.donorEmail, email)).orderBy(desc(donations.createdAt));
+  }
+
+  async getAllFormSubmissions(): Promise<FormSubmission[]> {
+    return db.select().from(formSubmissions).orderBy(desc(formSubmissions.submittedAt));
+  }
+
+  async getAllSignupSubmissions(): Promise<SignupSubmission[]> {
+    return db.select().from(signupSubmissions).orderBy(desc(signupSubmissions.createdAt));
   }
 }
 

@@ -366,6 +366,31 @@ export async function registerRoutes(
     res.status(201).json(submission);
   });
 
+  app.get("/api/admin/dashboard-stats", async (req, res) => {
+    if (!req.session?.userId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const since = req.query.since ? new Date(req.query.since as string) : null;
+      const [connectCardsAll, formSubsAll, signupSubsAll, messagesAll] = await Promise.all([
+        storage.getConnectCards(),
+        storage.getAllFormSubmissions(),
+        storage.getAllSignupSubmissions(),
+        storage.getContactSubmissions(),
+      ]);
+      const connectNew = since ? connectCardsAll.filter(c => c.createdAt && new Date(c.createdAt) > since).length : 0;
+      const formSubsNew = since ? formSubsAll.filter(s => s.submittedAt && new Date(s.submittedAt) > since).length : 0;
+      const signupSubsNew = since ? signupSubsAll.filter(s => s.createdAt && new Date(s.createdAt) > since).length : 0;
+      const messagesNew = since ? messagesAll.filter(m => m.createdAt && new Date(m.createdAt) > since).length : 0;
+      res.json({
+        connectCards: { total: connectCardsAll.length, new: connectNew },
+        formSubmissions: { total: formSubsAll.length, new: formSubsNew },
+        signupSubmissions: { total: signupSubsAll.length, new: signupSubsNew },
+        messages: { total: messagesAll.length, new: messagesNew },
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching dashboard stats" });
+    }
+  });
+
   app.get("/api/contact", requireFeature("messages"), async (_req, res) => {
     const data = await storage.getContactSubmissions();
     res.json(data);

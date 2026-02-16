@@ -174,20 +174,47 @@ function DashboardTab() {
   const { data: sermons } = useQuery<Sermon[]>({ queryKey: ["/api/sermons"] });
   const { data: events } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: team } = useQuery<TeamMember[]>({ queryKey: ["/api/team"] });
-  const { data: messages } = useQuery<ContactSubmission[]>({ queryKey: ["/api/contact"] });
 
-  const stats = [
+  const lastSeen = localStorage.getItem("admin_dashboard_last_seen") || new Date(0).toISOString();
+
+  const { data: dashStats } = useQuery<{
+    connectCards: { total: number; new: number };
+    formSubmissions: { total: number; new: number };
+    signupSubmissions: { total: number; new: number };
+    messages: { total: number; new: number };
+  }>({
+    queryKey: ["/api/admin/dashboard-stats", lastSeen],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/dashboard-stats?since=${encodeURIComponent(lastSeen)}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    localStorage.setItem("admin_dashboard_last_seen", new Date().toISOString());
+  }, []);
+
+  const contentStats = [
     { label: "Sermons", count: sermons?.length ?? 0, icon: Play },
     { label: "Events", count: events?.length ?? 0, icon: Calendar },
     { label: "Team Members", count: team?.length ?? 0, icon: Users },
-    { label: "Messages", count: messages?.length ?? 0, icon: Mail },
+  ];
+
+  const activityItems = [
+    { label: "Messages", total: dashStats?.messages.total ?? 0, newCount: dashStats?.messages.new ?? 0, icon: Mail },
+    { label: "Connect Cards", total: dashStats?.connectCards.total ?? 0, newCount: dashStats?.connectCards.new ?? 0, icon: FileText },
+    { label: "Sign Ups", total: dashStats?.signupSubmissions.total ?? 0, newCount: dashStats?.signupSubmissions.new ?? 0, icon: UserPlus },
+    { label: "Form Submissions", total: dashStats?.formSubmissions.total ?? 0, newCount: dashStats?.formSubmissions.new ?? 0, icon: ClipboardList },
   ];
 
   return (
     <div data-testid="tab-dashboard">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+
+      <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Content</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        {contentStats.map((stat) => (
           <Card key={stat.label} data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
@@ -196,6 +223,30 @@ function DashboardTab() {
             <CardContent>
               <div className="text-2xl font-bold" data-testid={`count-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
                 {stat.count}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Recent Activity</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {activityItems.map((item) => (
+          <Card key={item.label} data-testid={`stat-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{item.label}</CardTitle>
+              <item.icon className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-2xl font-bold" data-testid={`count-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                  {item.total}
+                </span>
+                {item.newCount > 0 && (
+                  <Badge variant="default" data-testid={`badge-new-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                    {item.newCount} new
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>
