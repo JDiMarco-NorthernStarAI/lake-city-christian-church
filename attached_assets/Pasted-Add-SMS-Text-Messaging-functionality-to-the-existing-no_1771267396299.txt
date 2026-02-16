@@ -1,0 +1,473 @@
+Add SMS/Text Messaging functionality to the existing notification system using Twilio. This should integrate with the current push notification feature as an additional channel option. Here are the requirements:
+
+## OVERVIEW
+
+Extend the existing notification system to support SMS as a delivery channel alongside push notifications. Admins should be able to choose "Push Notification", "SMS Text", or "Both" when sending messages. The SMS system will use Twilio for delivery.
+
+## ENVIRONMENT VARIABLES NEEDED
+
+Add these to the project secrets:
+- TWILIO_ACCOUNT_SID
+- TWILIO_AUTH_TOKEN
+- TWILIO_PHONE_NUMBER
+- TWILIO_WEBHOOK_SECRET
+
+## DATABASE SCHEMA ADDITIONS
+
+### SMS Groups Table
+- id (primary key, UUID)
+- name (string, required - "All Members", "Student Ministry", "Kids Ministry Parents", etc.)
+- description (text, nullable)
+- group_type (enum: 'all', 'role_based', 'ministry', 'custom', 'event_based')
+- filter_criteria (JSON - stores rules for dynamic groups, see schema below)
+- is_active (boolean, default true)
+- member_count (integer, default 0 - cached count, updated on changes)
+- created_by (foreign key to Users)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+### Filter Criteria JSON Schema:
+{
+  "roles": ["Member", "Student Ministry", "Kids Ministry"],
+  "ministries": ["kids", "student", "small_group"],
+  "events": ["event_id_123"],
+  "tags": ["volunteer", "parent", "choir"],
+  "include_user_ids": [],
+  "exclude_user_ids": [],
+  "has_children": true|false|null,
+  "phone_verified_only": true
+}
+
+### SMS Group Members Table (for custom groups with manual membership)
+- id (primary key, UUID)
+- group_id (foreign key to SMS Groups)
+- user_id (foreign key to Users)
+- added_by (foreign key to Users)
+- created_at (timestamp)
+
+### User Tags Table
+- id (primary key, UUID)
+- user_id (foreign key to Users)
+- tag (string, lowercase - "volunteer", "parent", "choir", "greeter", etc.)
+- created_by (foreign key to Users, nullable)
+- created_at (timestamp)
+- UNIQUE constraint on (user_id, tag)
+
+### SMS Messages Table
+- id (primary key, UUID)
+- group_id (foreign key to SMS Groups, nullable - null for individual messages)
+- sender_id (foreign key to Users)
+- message_body (text, max 1600 characters)
+- message_type (enum: 'broadcast', 'individual', 'scheduled', 'automated')
+- delivery_channel (enum: 'sms', 'push', 'both')
+- scheduled_for (timestamp, nullable)
+- sent_at (timestamp, nullable)
+- status (enum: 'draft', 'scheduled', 'sending', 'sent', 'partially_sent', 'failed', 'cancelled')
+- recipient_count (integer, default 0)
+- sms_delivered_count (integer, default 0)
+- sms_failed_count (integer, default 0)
+- push_delivered_count (integer, default 0)
+- push_failed_count (integer, default 0)
+- estimated_cost (decimal, nullable)
+- actual_cost (decimal, nullable)
+- segment_count (integer, default 1)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+### SMS Recipients Table
+- id (primary key, UUID)
+- message_id (foreign key to SMS Messages)
+- user_id (foreign key to Users)
+- phone_number (string - stored for historical record)
+- channel (enum: 'sms', 'push')
+- twilio_message_sid (string, nullable - Twilio's message ID)
+- status (enum: 'pending', 'queued', 'sent', 'delivered', 'failed', 'undelivered', 'opted_out')
+- error_code (string, nullable)
+- error_message (text, nullable)
+- sent_at (timestamp, nullable)
+- delivered_at (timestamp, nullable)
+- cost (decimal, nullable - actual cost from Twilio)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+### SMS Opt Out Table
+- id (primary key, UUID)
+- phone_number (string, unique - E.164 format)
+- user_id (foreign key to Users, nullable)
+- opted_out_at (timestamp)
+- opt_out_method (enum: 'reply_stop', 'manual', 'admin', 'user_preference')
+- opted_back_in_at (timestamp, nullable)
+- opt_in_method (enum: 'reply_start', 'manual', 'admin', 'user_preference', nullable)
+- created_at (timestamp)
+
+### SMS Templates Table
+- id (primary key, UUID)
+- name (string - "Event Reminder", "Welcome Message", "Service Cancelled", etc.)
+- body (text)
+- variables (JSON array - ["{{name}}", "{{first_name}}", "{{event_name}}"])
+- category (enum: 'reminder', 'announcement', 'welcome', 'emergency', 'custom')
+- is_active (boolean, default true)
+- use_count (integer, default 0)
+- created_by (foreign key to Users)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+### SMS Settings Table (single row configuration)
+- id (primary key, integer, default 1)
+- twilio_phone_number (string - display only, actual number in env var)
+- church_name_prefix (string, default "Lake City Christian: ")
+- daily_limit (integer, default 1000)
+- monthly_limit (integer, default 10000)
+- quiet_hours_enabled (boolean, default true)
+- quiet_hours_start (time, default '21:00')
+- quiet_hours_end (time, default '08:00')
+- quiet_hours_timezone (string, default 'America/New_York')
+- auto_reply_enabled (boolean, default true)
+- auto_reply_message (text, default "Thanks for your message! For immediate assistance, please call the church office at [PHONE]. This is an automated system that does not receive replies.")
+- opt_out_confirmation (text, default "You've been unsubscribed from Lake City Christian Church texts. Reply START to resubscribe.")
+- opt_in_confirmation (text, default "You're now subscribed to Lake City Christian Church texts. Reply STOP to unsubscribe.")
+- include_opt_out_footer (boolean, default true - adds "Reply STOP to unsubscribe" to first message)
+- messages_sent_today (integer, default 0)
+- messages_sent_this_month (integer, default 0)
+- cost_this_month (decimal, default 0.00)
+- last_daily_reset (date)
+- last_monthly_reset (date)
+- updated_at (timestamp)
+
+### SMS Incoming Messages Table (log replies)
+- id (primary key, UUID)
+- from_number (string)
+- user_id (foreign key to Users, nullable - matched by phone)
+- message_body (text)
+- twilio_message_sid (string)
+- is_opt_out (boolean, default false)
+- is_opt_in (boolean, default false)
+- requires_response (boolean, default false)
+- responded (boolean, default false)
+- responded_by (foreign key to Users, nullable)
+- responded_at (timestamp, nullable)
+- created_at (timestamp)
+
+## USER TABLE MODIFICATIONS
+
+Add these columns to the existing Users table:
+- sms_opt_in (boolean, default true)
+- sms_opted_in_at (timestamp, nullable)
+- sms_opted_out_at (timestamp, nullable)
+- phone_type (enum: 'mobile', 'landline', 'voip', 'unknown', default 'unknown')
+- phone_verified (boolean, default false)
+- phone_verified_at (timestamp, nullable)
+- phone_carrier (string, nullable)
+- phone_country_code (string, default 'US')
+
+## API ENDPOINTS
+
+All endpoints under /api/v1/ and require authentication unless noted.
+
+### SMS Groups
+- GET /sms/groups - List all SMS groups with member counts (Admin, ministry leaders see their groups)
+- GET /sms/groups/:id - Get group details
+- GET /sms/groups/:id/members - Get paginated member list with phone status
+- GET /sms/groups/:id/preview - Preview recipients (who would receive, how many can receive SMS)
+- POST /sms/groups - Create new group (Admin only)
+- PUT /sms/groups/:id - Update group (Admin only)
+- DELETE /sms/groups/:id - Soft delete group (Admin only)
+- POST /sms/groups/:id/members - Add members to custom group (Admin only)
+- DELETE /sms/groups/:id/members/:userId - Remove member from custom group (Admin only)
+- POST /sms/groups/:id/refresh-count - Recalculate member count for dynamic group
+
+### SMS Messages (integrate with existing notification system)
+- GET /sms/messages - List all messages with delivery stats (paginated, filterable)
+- GET /sms/messages/:id - Get message details with recipient breakdown
+- GET /sms/messages/:id/recipients - Get recipient list with individual delivery status (paginated)
+- POST /sms/messages/send - Send message immediately
+- POST /sms/messages/schedule - Schedule message for later
+- PUT /sms/messages/:id/cancel - Cancel scheduled message
+- POST /sms/messages/:id/resend-failed - Resend to failed recipients only
+- DELETE /sms/messages/:id - Delete message record (Admin only)
+
+### Send Message Request Body:
+{
+  "group_id": "uuid" | null,
+  "user_ids": ["uuid"] | null,  // for individual messages, ignored if group_id provided
+  "message_body": "string (max 1600 chars)",
+  "delivery_channel": "sms" | "push" | "both",
+  "template_id": "uuid" | null,  // if using template
+  "personalize": true | false,  // replace {{name}}, {{first_name}} variables
+  "respect_quiet_hours": true | false,
+  "schedule_for": "ISO timestamp" | null
+}
+
+### SMS Templates
+- GET /sms/templates - List all templates
+- GET /sms/templates/:id - Get template details
+- POST /sms/templates - Create template (Admin only)
+- PUT /sms/templates/:id - Update template (Admin only)
+- DELETE /sms/templates/:id - Delete template (Admin only)
+
+### SMS Settings (Admin only)
+- GET /sms/settings - Get current settings
+- PUT /sms/settings - Update settings
+- POST /sms/settings/test - Send test message to admin's phone
+- GET /sms/stats - Get usage statistics (today, this month, delivery rates, costs)
+- GET /sms/stats/daily - Get daily breakdown for date range
+- GET /sms/stats/by-group - Get stats broken down by group
+
+### User SMS Management
+- GET /users/:id/sms-status - Get user's SMS eligibility and status
+- PUT /users/:id/sms-preferences - Update user's SMS opt-in status (Admin or self)
+- POST /sms/verify-phone - Send verification code to user's phone
+- POST /sms/verify-phone/confirm - Confirm verification code
+- GET /sms/opt-outs - List all opted-out numbers (Admin only)
+- POST /sms/opt-outs/:phone/restore - Manually opt a number back in (Admin only)
+
+### User Tags
+- GET /users/tags - List all unique tags in system with counts
+- GET /users/:id/tags - Get specific user's tags
+- POST /users/:id/tags - Add tag to user { "tag": "volunteer" }
+- DELETE /users/:id/tags/:tag - Remove tag from user
+- POST /users/tags/bulk-add - Add tag to multiple users { "user_ids": [], "tag": "string" }
+- POST /users/tags/bulk-remove - Remove tag from multiple users
+
+### Twilio Webhooks (public, verified by Twilio signature)
+- POST /webhooks/twilio/incoming - Handle incoming SMS messages
+- POST /webhooks/twilio/status - Handle delivery status callbacks
+
+### Incoming Message Webhook Handler:
+1. Verify Twilio signature using TWILIO_WEBHOOK_SECRET
+2. Log the incoming message to sms_incoming_messages table
+3. Check for opt-out keywords: STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT
+4. Check for opt-in keywords: START, YES, UNSTOP, SUBSCRIBE
+5. If opt-out: add to opt_out table, update user sms_opt_in=false, send opt_out_confirmation
+6. If opt-in: remove from opt_out table, update user sms_opt_in=true, send opt_in_confirmation
+7. For other messages: mark requires_response=true, optionally notify admins
+8. Return TwiML response (empty or auto-reply based on settings)
+
+### Status Webhook Handler:
+1. Verify Twilio signature
+2. Find recipient record by twilio_message_sid
+3. Update status: queued, sent, delivered, undelivered, failed
+4. If delivered: set delivered_at timestamp
+5. If failed: store error_code and error_message
+6. Update message aggregate counts (delivered_count, failed_count)
+7. If available, store cost from Twilio
+
+## TWILIO INTEGRATION SERVICE
+
+Create a TwilioService class/module:
+
+### Phone Lookup (on user registration or phone update):
+- Use Twilio Lookup API to validate phone number
+- Detect phone type (mobile, landline, voip)
+- Get carrier information
+- Format to E.164 standard
+- Only mobile phones can receive SMS
+
+### Send Single SMS:
+- Check if phone is opted out first
+- Check quiet hours if enabled
+- Format message with church prefix if configured
+- Add opt-out footer for first message to recipient
+- Send via Twilio Messages API
+- Store twilio_message_sid for tracking
+- Return success/failure
+
+### Send Bulk SMS (for groups):
+- Get list of eligible recipients (opted in, mobile phone, not in quiet hours)
+- Calculate estimated cost before sending
+- Process in batches of 100 to respect rate limits
+- Use 100ms delay between messages to avoid throttling
+- Track progress and update message status
+- Handle personalization (replace variables per recipient)
+- Queue processing for large groups (>500 recipients)
+
+### Message Personalization:
+Replace these variables in message body:
+- {{name}} → user's full name
+- {{first_name}} → first word of name
+- {{last_name}} → last word of name
+- {{church_name}} → "Lake City Christian Church"
+
+### Cost Calculation:
+- Base rate: $0.0079 per SMS segment
+- Segment = 160 characters (GSM) or 70 characters (Unicode)
+- Calculate: Math.ceil(message.length / 160) * recipient_count * 0.0079
+- Display estimated cost before send confirmation
+
+### Quiet Hours Check:
+- Get current time in configured timezone
+- If quiet_hours_enabled and current time is within quiet hours:
+  - For immediate send: queue for next available time (quiet_hours_end)
+  - For scheduled send: adjust if scheduled during quiet hours
+- Return whether message can be sent now or when it will be sent
+
+## ADMIN UI MODIFICATIONS
+
+### Extend Existing Notification Panel
+
+Modify the current notification composer to include:
+
+1. **Delivery Channel Selector** (at top of compose form):
+   - Radio buttons or dropdown: "Push Notification" | "Text Message (SMS)" | "Both"
+   - Show different UI hints based on selection
+   - For SMS: show character count and segment indicator
+
+2. **Recipient Selection** (shared for both channels):
+   - Keep existing push notification targeting
+   - Add SMS Groups dropdown when SMS or Both selected
+   - Show recipient preview with breakdown:
+     - "X users will receive push notification"
+     - "Y users will receive SMS (Z opted out, W have landlines)"
+
+3. **Message Composer Updates**:
+   - Character counter showing "X / 160 characters (Y segments)"
+   - Warning at 160, 320, 480 chars about multi-segment costs
+   - Template selector dropdown
+   - Variable insertion buttons: [Name] [First Name]
+   - Preview panel showing personalized example
+
+4. **Send Options**:
+   - "Send Now" button
+   - "Schedule" button with datetime picker
+   - "Respect quiet hours" checkbox (default checked for SMS)
+   - Confirmation modal showing:
+     - Recipient count by channel
+     - Estimated SMS cost
+     - Scheduled time or "Immediately"
+
+### New SMS Section in Admin Dashboard
+
+Add "SMS / Text Messages" section to admin sidebar with:
+
+#### SMS Dashboard Page (/admin/sms):
+- Stats cards: Messages Today, This Month, Delivery Rate, Cost This Month
+- Quick actions: "Send New Message", "Manage Groups", "View Templates"
+- Recent messages table with status indicators
+- Usage chart (messages per day for last 30 days)
+- Opt-out count and trend
+
+#### SMS Groups Page (/admin/sms/groups):
+- Table: Name, Type, Member Count, Last Used, Actions
+- Create Group button → modal/page with:
+  - Group name and description
+  - Type selector (All Members, Role-Based, Ministry, Custom, Event-Based)
+  - Dynamic filter builder based on type:
+    - Role-Based: checkboxes for each role
+    - Ministry: checkboxes for each ministry
+    - Custom: user search and select
+    - Event-Based: event selector
+  - Additional filters: has verified phone, has children, specific tags
+  - Preview members button
+  - Save button
+- Edit and Delete actions
+- Click row to view members
+
+#### SMS Templates Page (/admin/sms/templates):
+- Table: Name, Category, Preview, Use Count, Actions
+- Create Template button → modal with:
+  - Template name
+  - Category dropdown
+  - Message body with variable insertion buttons
+  - Character count display
+  - Preview with sample data
+- Edit and Delete actions
+- "Use Template" quick action to go to compose with template loaded
+
+#### SMS Message History Page (/admin/sms/messages):
+- Table: Date, Recipients/Group, Message Preview, Channel, Delivered, Failed, Status
+- Filters: Date range, Group, Status, Channel
+- Click row to view full details:
+  - Complete message text
+  - Recipient breakdown with individual statuses
+  - Error details for failed messages
+  - "Resend to Failed" button
+- Export to CSV button
+
+#### SMS Settings Page (/admin/sms/settings):
+- Twilio Configuration (display only, actual config in env vars)
+- Church name prefix input
+- Daily/Monthly limits with current usage display
+- Quiet hours toggle with time pickers
+- Timezone selector
+- Auto-reply toggle and message editor
+- Opt-out/opt-in confirmation message editors
+- Include opt-out footer toggle
+- "Send Test Message" button (sends to admin's phone)
+
+#### SMS Inbox Page (/admin/sms/inbox):
+- List of incoming messages that need attention (requires_response = true)
+- Show: From number, Matched User (if any), Message, Received Time
+- Mark as "Responded" with notes
+- Quick view of user's profile if matched
+- Filter: All, Needs Response, Responded
+
+### User Management Updates
+
+On user detail/edit pages, add SMS section:
+- SMS Opt-In Status toggle
+- Phone Type indicator (Mobile/Landline/VOIP)
+- Phone Verified indicator with "Send Verification" button
+- User's tags (editable)
+- SMS history for this user
+- Opt-out/opt-in history
+
+### Role-Based Access for SMS
+
+- Admin / Super Admin: Full access to all SMS features
+- Student Ministry role: Can send to Student Ministry group only, view own sent messages
+- Kids Ministry role: Can send to Kids Ministry Parents group only, view own sent messages
+- Small Group Leader role: Can send to their Small Group only, view own sent messages
+- Member role: Can manage own SMS preferences only, no sending capability
+
+## AUTOMATED FEATURES (Phase 2 - can implement later)
+
+Structure the code to easily add these later:
+- Event reminder SMS (X hours before event)
+- Welcome SMS to new registrants
+- Birthday SMS
+- Follow-up SMS after first visit
+
+Create an automation_triggers table to support this later:
+- id, trigger_type, trigger_config (JSON), message_template_id, is_active, created_at
+
+## COMPLIANCE & BEST PRACTICES
+
+1. Always include church identification in messages
+2. First message to any recipient must include opt-out instructions
+3. Honor opt-outs immediately (within same webhook request)
+4. Never send during quiet hours unless emergency
+5. Maintain opt-out records indefinitely
+6. Provide easy opt-out management for users in their profile
+7. Log all messages for audit trail
+8. Rate limit sending to avoid carrier blocking
+
+## ERROR HANDLING
+
+1. Invalid phone numbers: Mark user's phone_type as 'unknown', skip for SMS
+2. Twilio API errors: Log, mark message as failed, alert admin
+3. Rate limiting: Implement exponential backoff, queue excess messages
+4. Delivery failures: Track error codes, provide actionable info in admin UI
+5. Webhook failures: Return 200 to Twilio, log error, alert admin
+
+## INITIAL DATA SETUP
+
+Create default SMS groups:
+1. "All Members" - filter: { "roles": ["Member", "Admin", "Super Admin", "Kids Ministry", "Student Ministry", "Small Group Leader"] }
+2. "Kids Ministry Parents" - filter: { "has_children": true }
+3. "Student Ministry" - filter: { "roles": ["Student Ministry"] } OR { "ministries": ["student"] }
+4. "Volunteers" - filter: { "tags": ["volunteer"] }
+5. "Leadership" - filter: { "roles": ["Admin", "Super Admin"] }
+
+Create default SMS templates:
+1. "Service Cancelled" - "Lake City Christian: Due to [REASON], services on [DATE] are cancelled. Stay safe and we'll see you next week!"
+2. "Event Reminder" - "Lake City Christian: Reminder! {{event_name}} is tomorrow at {{event_time}}. We look forward to seeing you!"
+3. "Welcome" - "Welcome to Lake City Christian Church, {{first_name}}! We're so glad you're here. Questions? Reply to this text or call [PHONE]."
+4. "General Announcement" - "Lake City Christian: [Your message here]"
+
+Create default SMS settings row with sensible defaults.
+
+## MIGRATION NOTES
+
+1. Run phone lookup on all existing users with phone numbers to populate phone_type
+2. Set sms_opt_in = true for all existing users (grandfather them in)
+3. Create indexes on: phone_number (users, opt_outs), twilio_message_sid, message status, group filters
