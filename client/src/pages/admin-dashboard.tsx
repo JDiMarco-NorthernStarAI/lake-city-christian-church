@@ -79,7 +79,7 @@ export default function AdminDashboard() {
     try {
       await apiRequest("POST", "/api/auth/logout");
       queryClient.clear();
-      setLocation("/admin");
+      setLocation("/");
     } catch {
       toast({ title: "Error", description: "Failed to logout", variant: "destructive" });
     }
