@@ -1,0 +1,583 @@
+Build a complete backend system for this church app with user authentication, role-based access, event/signup management, and a dynamic form builder. This backend must be designed as a REST API that will serve a web app, iOS app, and Android app. Here are the requirements:
+
+## ARCHITECTURE REQUIREMENTS FOR MULTI-PLATFORM SUPPORT
+
+### API Design Principles
+- Build a fully RESTful API that is platform-agnostic (no server-side rendering dependencies)
+- All endpoints return JSON responses with consistent structure: { success: boolean, data: object|array, error: string|null, meta: object }
+- Include pagination metadata on all list endpoints: { page, limit, total, totalPages }
+- Use proper HTTP status codes (200, 201, 400, 401, 403, 404, 500)
+- All dates/times in ISO 8601 format (UTC) - clients handle timezone conversion
+- Version the API with /api/v1/ prefix for future compatibility
+
+### Authentication for Mobile
+- Implement JWT access tokens (short-lived, 15 minutes) + refresh tokens (long-lived, 30 days)
+- Store refresh tokens in database with device_id, device_type (web|ios|android), and last_used timestamp
+- POST /api/v1/auth/refresh - Exchange refresh token for new access token
+- POST /api/v1/auth/logout-all-devices - Invalidate all refresh tokens for user
+- GET /api/v1/auth/devices - List all logged-in devices for user
+- DELETE /api/v1/auth/devices/:deviceId - Log out specific device
+- Support Apple Sign-In (Sign in with Apple) for iOS
+- Support Google Sign-In for Android and web
+- Include endpoints:
+  - POST /api/v1/auth/social/apple - Authenticate with Apple ID token
+  - POST /api/v1/auth/social/google - Authenticate with Google ID token
+
+### Push Notifications Infrastructure
+- Create device_tokens table:
+  - id (primary key)
+  - user_id (foreign key to Users)
+  - token (string, required)
+  - platform (enum: 'ios', 'android', 'web')
+  - is_active (boolean, default true)
+  - created_at
+  - updated_at
+- Endpoints:
+  - POST /api/v1/notifications/register-device - Register push token
+  - DELETE /api/v1/notifications/unregister-device - Remove push token
+  - GET /api/v1/notifications - Get user's notification history
+  - PUT /api/v1/notifications/:id/read - Mark notification as read
+  - PUT /api/v1/notifications/read-all - Mark all as read
+- Create notification_preferences table:
+  - user_id (foreign key)
+  - event_reminders (boolean, default true)
+  - new_events (boolean, default true)
+  - donation_receipts (boolean, default true)
+  - form_responses (boolean, default true)
+  - ministry_updates (boolean, default true)
+- Structure notification sending to easily integrate with Firebase Cloud Messaging (FCM) for Android and Apple Push Notification Service (APNs) for iOS
+
+### File Upload for Mobile
+- Support multipart/form-data uploads for mobile compatibility
+- Return file URLs that work across all platforms
+- Generate thumbnails for images (store reference in database)
+- Include file metadata in responses: { url, thumbnailUrl, mimeType, size, filename }
+- Structure storage abstraction layer for easy migration to AWS S3:
+  - Current: Local storage with /uploads/ directory
+  - Future: S3 bucket with CloudFront CDN URLs
+
+### Offline Support Considerations
+- Include updated_at timestamps on all records for sync
+- GET /api/v1/sync/changes?since=ISO_TIMESTAMP - Get all changes since timestamp for offline sync
+- Use soft deletes with deleted_at column so mobile apps can sync deletions
+- Return deleted record IDs in sync endpoint
+
+## DATABASE SCHEMA
+
+### Users Table
+- id (primary key, UUID recommended for mobile sync)
+- email (unique, required)
+- password (hashed, nullable for social auth users)
+- auth_provider (enum: 'email', 'apple', 'google', default 'email')
+- auth_provider_id (string, nullable - external ID from Apple/Google)
+- name (required)
+- phone (required)
+- address (optional)
+- city (optional)
+- state (optional)
+- zip (optional)
+- date_of_birth (optional)
+- profile_photo_url (optional)
+- role (enum: 'Member', 'Student Ministry', 'Kids Ministry', 'Small Group', 'Admin') - default 'Member'
+- is_active (boolean, default true)
+- created_at
+- updated_at
+- deleted_at (nullable, for soft delete)
+
+### Refresh Tokens Table
+- id (primary key)
+- user_id (foreign key to Users)
+- token (hashed)
+- device_id (string - unique identifier from device)
+- device_name (string - "iPhone 14", "Chrome on Windows", etc.)
+- device_type (enum: 'web', 'ios', 'android')
+- ip_address (string)
+- expires_at (datetime)
+- last_used_at (datetime)
+- created_at
+
+### Device Tokens Table (Push Notifications)
+- id (primary key)
+- user_id (foreign key to Users)
+- token (string, required)
+- platform (enum: 'ios', 'android', 'web')
+- is_active (boolean, default true)
+- created_at
+- updated_at
+
+### Notification Preferences Table
+- user_id (primary key, foreign key to Users)
+- event_reminders (boolean, default true)
+- new_events (boolean, default true)
+- donation_receipts (boolean, default true)
+- form_responses (boolean, default true)
+- ministry_updates (boolean, default true)
+- updated_at
+
+### Notifications Table
+- id (primary key)
+- user_id (foreign key to Users)
+- title (string)
+- body (text)
+- notification_type (enum: 'event_reminder', 'new_event', 'donation_receipt', 'form_update', 'ministry_update', 'general')
+- data (JSON - additional payload for deep linking)
+- is_read (boolean, default false)
+- sent_at (datetime)
+- read_at (datetime, nullable)
+- created_at
+
+### Children Table (for Kids Ministry registration)
+- id (primary key)
+- parent_user_id (foreign key to Users)
+- child_name (required)
+- date_of_birth (required)
+- grade (optional)
+- allergies (text, optional)
+- medical_notes (text, optional)
+- emergency_contact_name (required)
+- emergency_contact_phone (required)
+- photo_release (boolean, default false)
+- profile_photo_url (optional)
+- created_at
+- updated_at
+- deleted_at (nullable)
+
+### Events Table
+- id (primary key)
+- title (required)
+- description (text)
+- event_type (enum: 'Kids Ministry', 'Student Ministry', 'Fellowship', 'Small Group', 'General')
+- event_date (datetime)
+- end_date (datetime, optional - for multi-day events)
+- location (string)
+- location_address (string, optional - for map integration)
+- location_lat (decimal, optional)
+- location_lng (decimal, optional)
+- image_url (optional)
+- max_signups (integer, nullable for unlimited)
+- signup_deadline (datetime, optional)
+- created_by (foreign key to Users)
+- is_active (boolean, default true)
+- send_reminders (boolean, default true)
+- reminder_hours_before (integer, default 24)
+- created_at
+- updated_at
+- deleted_at (nullable)
+
+### Event Signups Table
+- id (primary key)
+- event_id (foreign key to Events)
+- user_id (foreign key to Users)
+- signup_details (JSON - for flexible data like "dish bringing", "volunteer role", etc.)
+- status (enum: 'registered', 'waitlist', 'cancelled')
+- reminder_sent (boolean, default false)
+- created_at
+- updated_at
+
+### Fellowship Dishes Table (for potluck/fellowship signups)
+- id (primary key)
+- event_id (foreign key to Events)
+- user_id (foreign key to Users)
+- dish_category (enum: 'Main Dish', 'Side Dish', 'Dessert', 'Drinks', 'Paper Goods')
+- dish_description (string)
+- serves (integer)
+- created_at
+- updated_at
+
+### Donations Table
+- id (primary key)
+- user_id (foreign key to Users, nullable for anonymous)
+- amount (decimal)
+- donation_type (enum: 'Tithe', 'Offering', 'Missions', 'Building Fund', 'Other')
+- payment_method (enum: 'card', 'bank_transfer', 'apple_pay', 'google_pay')
+- payment_processor_id (string - for Stripe transaction ID)
+- is_recurring (boolean)
+- recurring_frequency (enum: 'weekly', 'biweekly', 'monthly', nullable)
+- status (enum: 'pending', 'completed', 'failed', 'refunded')
+- receipt_sent (boolean, default false)
+- created_at
+
+### Recurring Donations Table
+- id (primary key)
+- user_id (foreign key to Users)
+- amount (decimal)
+- donation_type (enum: 'Tithe', 'Offering', 'Missions', 'Building Fund', 'Other')
+- frequency (enum: 'weekly', 'biweekly', 'monthly')
+- stripe_subscription_id (string)
+- payment_method_id (string - Stripe payment method)
+- next_payment_date (date)
+- is_active (boolean, default true)
+- created_at
+- updated_at
+- cancelled_at (datetime, nullable)
+
+### Forms Table (Form Builder)
+- id (primary key)
+- title (required)
+- description (text)
+- slug (unique, URL-friendly identifier for public access)
+- form_schema (JSON - stores field definitions, see structure below)
+- settings (JSON - stores form settings)
+- ministry_type (enum: 'Kids Ministry', 'Student Ministry', 'Small Group', 'General', nullable)
+- is_active (boolean, default true)
+- requires_auth (boolean, default false - whether user must be logged in)
+- max_submissions (integer, nullable for unlimited)
+- submission_deadline (datetime, optional)
+- confirmation_message (text - shown after submission)
+- notification_emails (array of emails to notify on submission)
+- created_by (foreign key to Users)
+- created_at
+- updated_at
+- deleted_at (nullable)
+
+### Form Fields Schema (stored as JSON in form_schema):
+{
+  "fields": [
+    {
+      "id": "uuid",
+      "type": "text|email|phone|number|textarea|select|multiselect|checkbox|radio|date|time|file|heading|paragraph|signature",
+      "label": "Field Label",
+      "placeholder": "Optional placeholder",
+      "required": true|false,
+      "validation": {
+        "min": 0,
+        "max": 100,
+        "pattern": "regex pattern",
+        "customError": "Custom error message"
+      },
+      "options": ["Option 1", "Option 2"],
+      "conditional": {
+        "field_id": "uuid of other field",
+        "operator": "equals|not_equals|contains|greater_than|less_than",
+        "value": "value to compare"
+      },
+      "width": "full|half",
+      "order": 1
+    }
+  ]
+}
+
+### Form Settings Schema (stored as JSON in settings):
+{
+  "allowMultipleSubmissions": false,
+  "showProgressBar": true,
+  "submitButtonText": "Submit",
+  "theme": "default|minimal|card",
+  "redirectUrl": null,
+  "collectUserInfo": true,
+  "enableFileUploads": false,
+  "maxFileSize": 5242880,
+  "enableSignature": false
+}
+
+### Form Submissions Table
+- id (primary key)
+- form_id (foreign key to Forms)
+- user_id (foreign key to Users, nullable for anonymous submissions)
+- submission_data (JSON - stores all field values)
+- files (JSON - array of file references if form has file uploads)
+- signature_url (string, optional - stored signature image)
+- ip_address (for spam prevention)
+- user_agent (string)
+- platform (enum: 'web', 'ios', 'android')
+- status (enum: 'submitted', 'reviewed', 'approved', 'rejected', 'archived')
+- admin_notes (text - internal notes from admin review)
+- reviewed_by (foreign key to Users, nullable)
+- reviewed_at (datetime, nullable)
+- created_at
+- updated_at
+
+### Form Field Templates Table
+- id (primary key)
+- name (string - "Contact Info Bundle", "Emergency Contact", etc.)
+- description (text)
+- fields_schema (JSON - reusable field definitions)
+- created_by (foreign key to Users)
+- is_system (boolean - true for pre-built templates)
+- created_at
+
+## API ENDPOINTS
+
+All endpoints prefixed with /api/v1/
+
+### Authentication
+- POST /auth/register - Create new user (require: name, email, phone; optional: full address info)
+- POST /auth/login - Login with email/password, returns access_token + refresh_token
+- POST /auth/refresh - Exchange refresh token for new access token
+- POST /auth/logout - Logout current device (invalidate refresh token)
+- POST /auth/logout-all - Logout all devices
+- POST /auth/forgot-password - Send password reset email
+- POST /auth/reset-password - Reset password with token
+- POST /auth/social/apple - Authenticate with Apple Sign-In token
+- POST /auth/social/google - Authenticate with Google Sign-In token
+- GET /auth/me - Get current user profile
+- PUT /auth/me - Update current user profile
+- PUT /auth/me/password - Change password
+- PUT /auth/me/photo - Upload profile photo
+- GET /auth/devices - List all logged-in devices
+- DELETE /auth/devices/:deviceId - Log out specific device
+
+### Push Notifications
+- POST /notifications/register-device - Register push token { token, platform }
+- DELETE /notifications/unregister-device - Remove push token
+- GET /notifications - Get user's notifications (paginated)
+- GET /notifications/unread-count - Get count of unread notifications
+- PUT /notifications/:id/read - Mark as read
+- PUT /notifications/read-all - Mark all as read
+- GET /notifications/preferences - Get notification preferences
+- PUT /notifications/preferences - Update notification preferences
+
+### User Management (Admin only)
+- GET /users - List all users with filtering/pagination/search
+- GET /users/:id - Get specific user
+- PUT /users/:id - Update user (Admin only)
+- PUT /users/:id/role - Update user role
+- DELETE /users/:id - Soft delete user
+- POST /users/:id/restore - Restore soft-deleted user
+
+### Children/Kids Ministry
+- POST /children - Register a child (authenticated users)
+- GET /children - Get current user's children
+- GET /children/:id - Get specific child
+- PUT /children/:id - Update child info
+- DELETE /children/:id - Soft delete child registration
+- GET /children/all - Get all registered children (Kids Ministry + Admin roles only)
+- GET /children/all/export - Export children list as CSV (Kids Ministry + Admin)
+
+### Events
+- GET /events - List all active events (with filters for event_type, date range)
+- GET /events/upcoming - Get upcoming events (next 30 days)
+- GET /events/calendar - Get events in calendar format (month view)
+- GET /events/:id - Get event details with signup count
+- POST /events - Create event (role-based: Admin can create all, ministry roles can create their type)
+- PUT /events/:id - Update event (creator or Admin)
+- DELETE /events/:id - Soft delete event
+- POST /events/:id/image - Upload event image
+
+### Event Signups
+- POST /events/:id/signup - Sign up for event
+- DELETE /events/:id/signup - Cancel signup
+- GET /events/:id/signups - List signups (event creator, relevant ministry role, or Admin)
+- GET /events/:id/signups/export - Export signups as CSV
+- GET /my/signups - Get current user's event signups
+
+### Fellowship Dishes
+- POST /events/:id/dishes - Sign up to bring a dish
+- GET /events/:id/dishes - See what dishes are signed up (shows categories filled)
+- PUT /dishes/:id - Update dish signup
+- DELETE /dishes/:id - Cancel dish signup
+
+### Donations (integrate with Stripe)
+- POST /donations/create-intent - Create Stripe payment intent
+- POST /donations/confirm - Confirm and record donation
+- POST /donations/apple-pay - Process Apple Pay payment
+- POST /donations/google-pay - Process Google Pay payment
+- GET /donations/history - Get user's donation history
+- GET /donations/:id - Get donation details/receipt
+- GET /donations/:id/receipt - Generate PDF receipt
+- POST /donations/recurring - Set up recurring donation
+- GET /donations/recurring - Get user's recurring donations
+- PUT /donations/recurring/:id - Update recurring donation
+- DELETE /donations/recurring/:id - Cancel recurring donation
+- GET /donations/payment-methods - Get saved payment methods
+- POST /donations/payment-methods - Add payment method
+- DELETE /donations/payment-methods/:id - Remove payment method
+
+### Form Builder (Admin only for create/edit, ministry roles can view their forms)
+- GET /forms - List all forms (Admin sees all, ministry roles see their ministry's forms)
+- GET /forms/:id - Get form details with schema
+- GET /forms/slug/:slug - Get form by slug (public endpoint for rendering)
+- POST /forms - Create new form
+- PUT /forms/:id - Update form (title, description, schema, settings)
+- DELETE /forms/:id - Soft delete form (keeps submissions)
+- POST /forms/:id/duplicate - Duplicate a form
+- PUT /forms/:id/toggle-active - Activate/deactivate form
+- GET /forms/:id/stats - Get form statistics
+
+### Form Field Templates (Admin only)
+- GET /form-templates - Get all field templates
+- GET /form-templates/:id - Get specific template
+- POST /form-templates - Save a custom field template
+- PUT /form-templates/:id - Update template
+- DELETE /form-templates/:id - Delete template
+
+### Form Submissions
+- POST /forms/:id/submit - Submit form (public or authenticated based on form settings)
+- POST /forms/:id/submit/file - Upload file for form submission
+- POST /forms/:id/submit/signature - Upload signature for form submission
+- GET /forms/:id/submissions - Get all submissions for a form (Admin or form creator)
+- GET /forms/:id/submissions/:submissionId - Get specific submission
+- PUT /forms/:id/submissions/:submissionId - Update submission status/notes
+- DELETE /forms/:id/submissions/:submissionId - Delete submission
+- GET /forms/:id/submissions/export - Export submissions as CSV
+- GET /my/submissions - Get current user's form submissions
+
+### Admin Dashboard Endpoints
+- GET /admin/stats - Dashboard statistics
+- GET /admin/stats/donations - Donation statistics (totals, by type, by period)
+- GET /admin/stats/users - User statistics (new signups, by role)
+- GET /admin/stats/events - Event statistics (attendance, popular events)
+- GET /admin/donations - All donations with filtering
+- GET /admin/reports/donations - Donation reports (by date range, type)
+- GET /admin/reports/signups - Event signup reports
+- GET /admin/reports/forms - Form submission reports
+- GET /admin/activity-log - System activity log
+
+### Sync Endpoint (for mobile offline support)
+- GET /sync/changes?since=ISO_TIMESTAMP&entities=events,forms - Get changes since timestamp
+
+### App Configuration (for mobile apps)
+- GET /config/app - Get app configuration (feature flags, minimum app version, maintenance mode, etc.)
+- GET /config/ministry-types - Get list of ministry types
+- GET /config/donation-types - Get list of donation types
+
+## FORM BUILDER UI (Admin Dashboard - Web)
+
+Create a drag-and-drop form builder interface with:
+
+### Left Sidebar - Field Types Palette:
+- Basic Fields: Text, Email, Phone, Number, Textarea
+- Choice Fields: Dropdown Select, Multi-Select, Radio Buttons, Checkboxes
+- Date/Time Fields: Date Picker, Time Picker, Date Range
+- Special Fields: File Upload, Signature Pad
+- Layout Elements: Section Heading, Paragraph/Instructions, Divider
+- Pre-built Bundles: Contact Info, Full Address, Emergency Contact, Medical Info, Parent/Guardian Info
+
+### Center - Form Canvas:
+- Drag fields from sidebar to canvas
+- Reorder fields by dragging
+- Click field to edit properties in right panel
+- Preview mode toggle
+- Responsive preview (desktop/tablet/mobile)
+
+### Right Sidebar - Field Properties:
+- Label text
+- Placeholder text
+- Required toggle
+- Validation rules
+- Help text
+- Conditional logic
+- Field width (full/half)
+
+### Form Settings Panel:
+- Form title and description
+- URL slug
+- Ministry assignment
+- Require login to submit
+- Allow multiple submissions
+- Submission limit
+- Deadline
+- Confirmation message
+- Redirect URL
+- Notification emails
+- Submit button text
+
+### Form Manager Dashboard:
+- Table view of all forms
+- Quick actions: Edit, View Submissions, Duplicate, Toggle Active, Delete
+- Filters and search
+- Bulk actions
+
+### Submission Viewer:
+- Table view with sortable columns
+- Expandable submission details
+- Status management
+- Admin notes
+- Export to CSV
+- Filter and search
+
+## ROLE-BASED ACCESS CONTROL
+
+Implement middleware that checks user roles:
+- Member: View events, sign up, register children, donate, submit forms, manage own profile
+- Student Ministry: All Member + manage Student Ministry events/forms, view ministry signups/submissions
+- Kids Ministry: All Member + manage Kids Ministry events/forms, view all children, view ministry signups/submissions
+- Small Group: All Member + manage Small Group events/forms, view ministry signups/submissions
+- Admin: Full access to everything
+
+## TECHNICAL REQUIREMENTS
+
+1. Use JWT access tokens (15 min) + refresh tokens (30 days) stored in database
+2. Hash passwords with bcrypt (minimum 12 rounds)
+3. Validate all inputs with comprehensive error messages
+4. Use environment variables for all sensitive configuration
+5. Set up Stripe integration with support for Apple Pay and Google Pay
+6. Add rate limiting on auth endpoints (5 attempts per 15 minutes) and form submissions (10 per minute per IP)
+7. Include proper error handling with consistent JSON error responses
+8. Add database migrations for version control
+9. Structure file storage for easy S3 migration with abstraction layer
+10. Implement CORS configuration for web app domain
+11. Add request logging for debugging
+12. Generate API documentation (Swagger/OpenAPI)
+13. Implement database connection pooling
+14. Add health check endpoint: GET /health
+15. Implement graceful shutdown handling
+16. Add compression for API responses
+17. Implement ETag support for caching
+18. Add support for image resizing/thumbnails
+19. Include background job processing for emails, push notifications, and scheduled tasks (event reminders)
+
+## MOBILE APP CONSIDERATIONS
+
+1. All endpoints return consistent JSON structure for easy parsing
+2. Include platform field in relevant requests for analytics
+3. Support multipart/form-data for all file uploads
+4. Return proper error codes mobile apps can handle
+5. Include deep link URLs in notifications data payload
+6. Support pagination with cursor-based option for infinite scroll
+7. Return image URLs with multiple sizes (thumbnail, medium, full)
+8. Include app version checking endpoint for forced updates
+9. Support background refresh with minimal payload endpoints
+
+## EMAIL TEMPLATES
+
+Create email templates for:
+1. Welcome email (after registration)
+2. Password reset
+3. Event signup confirmation
+4. Event reminder (24 hours before)
+5. Donation receipt
+6. Form submission confirmation
+7. Form submission notification (to admins)
+8. Recurring donation setup confirmation
+9. Recurring donation failed notification
+
+## INITIAL SETUP
+
+Create a default Admin user:
+- Email: admin@lakecitychristian.org
+- Password: (use environment variable ADMIN_INITIAL_PASSWORD)
+- Role: Admin
+
+Create sample form templates:
+1. "VBS Registration" - Name, DOB, Grade, Parent Contact, Emergency Contact, Medical Info, Photo Release
+2. "Small Group Interest" - Name, Contact Info, Preferred Day/Time, Topics of Interest
+3. "Volunteer Application" - Contact Info, Ministry Interest (multi-select), Availability, Background Check Consent
+4. "Prayer Request" - Name (optional), Email (optional), Request (textarea), Share Publicly (checkbox)
+
+Create system field templates:
+1. Contact Info Bundle (Name, Email, Phone)
+2. Full Address (Street, City, State, Zip)
+3. Emergency Contact (Name, Phone, Relationship)
+4. Medical Info (Allergies, Conditions, Medications)
+5. Parent/Guardian Info (Name, Phone, Email, Relationship)
+
+## FRONTEND PAGES (Web App)
+
+1. Public Pages: Home, About, Events List, Event Details, Public Forms, Online Giving
+2. Auth Pages: Login, Register, Forgot Password, Reset Password
+3. Member Dashboard: My Profile, My Events, My Children, My Donations, My Submissions
+4. Admin Dashboard: Overview Stats, User Management, Event Management, Form Builder, Form Manager, Submission Viewer, Donation Reports, Settings
+5. Ministry Dashboards: Ministry-specific views for each role
+
+Make sure the registration form clearly indicates which fields are required (Name, Email, Phone) vs optional (Address, City, State, Zip, Date of Birth).
+
+## STRIPE CONFIGURATION
+
+Set up Stripe with:
+1. Payment Intents API for one-time donations
+2. Subscriptions API for recurring donations
+3. Apple Pay and Google Pay support
+4. Webhook handling for payment events
+5. Customer portal for managing payment methods
+6. Automatic receipt emails (can disable if sending custom)
