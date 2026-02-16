@@ -29,10 +29,10 @@ export default function StudentMinistry() {
     schedule: "Wednesday 6:30 PM - 8:00 PM",
     meal_heading: "Sponsor a Meal for Students",
     meal_description: "Providing an opportunity for students to sit around the table and cultivate meaningful conversation and grow in friendship.",
-    meal_sponsor_url: "https://docs.google.com/forms/d/e/1FAIpQLSdxoQ6sz59iAQPAJ_uuTo7PZTv7MzetKynFFzWVFP0ADTM7AQ/viewform",
+    meal_sponsor_url: "/forms/club419-meal-sponsor",
     student_info_heading: "Student Info Form",
     student_info_description: "Please fill out this form if your student is attending a Club 419 Wednesday gathering.",
-    student_info_url: "https://docs.google.com/forms/d/e/1FAIpQLSe3Bp5P6JjCL4ramNFwoOsEqHg0ABZbd0QS9rKyyGvdB9rAvQ/viewform",
+    student_info_url: "/forms/student-info",
     cta_heading: "Get Involved",
     cta_description: "We would love for your student to be a part of Club 419.",
   });
@@ -118,7 +118,7 @@ export default function StudentMinistry() {
                 <p className="text-muted-foreground leading-relaxed">
                   {c.meal_description}
                 </p>
-                <Link href="/forms/club419-meal-sponsor">
+                <Link href={c.meal_sponsor_url}>
                   <Button
                     size="lg"
                     className="text-white border-transparent"
@@ -143,7 +143,7 @@ export default function StudentMinistry() {
                 <p className="text-muted-foreground leading-relaxed">
                   {c.student_info_description}
                 </p>
-                <Link href="/forms/student-info">
+                <Link href={c.student_info_url}>
                   <Button
                     size="lg"
                     className="text-white border-transparent"

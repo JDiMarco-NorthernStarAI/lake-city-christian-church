@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
-  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send,
+  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1664,6 +1664,7 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
+              <TableHead>URL</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Fields</TableHead>
               <TableHead>Submissions</TableHead>
@@ -1672,9 +1673,32 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {forms.map((form) => (
+            {forms.map((form) => {
+              const formPath = `/forms/${form.slug}`;
+              return (
               <TableRow key={form.id} data-testid={`row-form-${form.id}`}>
                 <TableCell className="font-medium">{form.title}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <code className="text-xs bg-muted px-2 py-1 rounded" data-testid={`text-form-url-${form.id}`}>{formPath}</code>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}${formPath}`);
+                        toast({ title: "URL copied to clipboard" });
+                      }}
+                      data-testid={`button-copy-url-${form.id}`}
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                    <a href={formPath} target="_blank" rel="noopener noreferrer">
+                      <Button size="icon" variant="ghost" data-testid={`button-open-form-${form.id}`}>
+                        <Link2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </a>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant={statusVariant(form.status)} data-testid={`badge-status-${form.id}`}>
                     {form.status}
@@ -1700,7 +1724,8 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       )}
