@@ -13,7 +13,7 @@ export default function GiveSuccess() {
     receipt_note: "A receipt has been sent to your email address. Your donation may be tax-deductible.",
   });
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pt-20">
       <section className="relative flex items-center justify-center min-h-[50vh] bg-black overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 to-black/60" />
         <div className="relative z-10 text-center px-4 py-20">

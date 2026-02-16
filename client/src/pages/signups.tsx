@@ -86,7 +86,7 @@ export default function Signups() {
     : (events || []).filter((e) => activeTab?.categories.includes(e.category));
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black pt-20">
       <section className="relative flex items-center justify-center bg-black overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-black to-neutral-950" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0033AA]/20 via-[#0088DD]/10 to-[#00D4FF]/20" />

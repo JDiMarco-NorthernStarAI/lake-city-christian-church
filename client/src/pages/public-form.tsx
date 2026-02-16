@@ -343,7 +343,7 @@ export default function PublicForm() {
 
   if (error || !formData) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen pt-20">
         <section className="relative py-24 bg-gradient-to-br from-black via-gray-900 to-black">
           <div className="absolute inset-0 bg-gradient-to-r from-[#0033AA]/20 via-[#0088DD]/10 to-[#00D4FF]/20" />
           <div className="relative container mx-auto px-4 text-center">
@@ -356,7 +356,7 @@ export default function PublicForm() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pt-20">
       <section className="relative py-24 bg-gradient-to-br from-black via-gray-900 to-black">
         <div className="absolute inset-0 bg-gradient-to-r from-[#0033AA]/20 via-[#0088DD]/10 to-[#00D4FF]/20" />
         <div className="relative container mx-auto px-4 text-center">
