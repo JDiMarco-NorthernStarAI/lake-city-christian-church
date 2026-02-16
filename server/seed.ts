@@ -5,21 +5,32 @@ import { AVAILABLE_ROLES, AVAILABLE_FEATURES } from "@shared/schema";
 
 async function seedRolePermissions() {
   const existingPerms = await storage.getRolePermissions();
-  if (existingPerms.length > 0) return;
 
-  log("Seeding role permissions...", "seed");
   const defaultPermissions: Record<string, string[]> = {
     member: ["dashboard"],
-    student_ministry: ["dashboard", "events", "pages", "messages", "connect"],
-    kids_ministry: ["dashboard", "events", "pages", "messages", "connect"],
-    small_group: ["dashboard", "events", "pages"],
+    student_ministry: ["dashboard", "events", "pages", "messages", "connect", "forms", "signups"],
+    kids_ministry: ["dashboard", "events", "pages", "messages", "connect", "forms", "signups"],
+    small_group: ["dashboard", "events", "pages", "signups"],
     admin: [...AVAILABLE_FEATURES],
+    super_admin: [...AVAILABLE_FEATURES],
   };
 
-  for (const [role, features] of Object.entries(defaultPermissions)) {
+  const existingKeys = new Set(existingPerms.map((p) => `${p.role}:${p.feature}`));
+
+  let added = 0;
+  for (const role of AVAILABLE_ROLES) {
+    const enabledFeatures = defaultPermissions[role] || [];
     for (const feature of AVAILABLE_FEATURES) {
-      await storage.setRolePermission(role, feature, features.includes(feature));
+      const key = `${role}:${feature}`;
+      if (!existingKeys.has(key)) {
+        await storage.setRolePermission(role, feature, enabledFeatures.includes(feature));
+        added++;
+      }
     }
+  }
+
+  if (added > 0) {
+    log(`Role permissions updated: ${added} entries added`, "seed");
   }
 }
 

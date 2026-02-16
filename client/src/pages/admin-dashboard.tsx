@@ -2011,14 +2011,13 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     if (permissions) {
       const map: Record<string, Record<string, boolean>> = {};
       for (const role of AVAILABLE_ROLES) {
-        if (role === "super_admin") continue;
         map[role] = {};
         for (const feature of AVAILABLE_FEATURES) {
-          map[role][feature] = false;
+          map[role][feature] = role === "super_admin" ? true : false;
         }
       }
       for (const p of permissions) {
-        if (map[p.role]) {
+        if (map[p.role] && p.role !== "super_admin") {
           map[p.role][p.feature] = p.enabled;
         }
       }
@@ -2058,6 +2057,7 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   }
 
   const editableRoles = AVAILABLE_ROLES.filter((r) => r !== "super_admin");
+  const allDisplayRoles = [...AVAILABLE_ROLES];
 
   if (!isSuperAdmin) {
     return (
@@ -2071,8 +2071,8 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
             <Table data-testid="table-roles-readonly">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Feature</TableHead>
-                  {editableRoles.map((role) => (
+                  <TableHead className="sticky left-0 bg-background z-[999]">Feature</TableHead>
+                  {allDisplayRoles.map((role) => (
                     <TableHead key={role} className="text-center">{ROLE_LABELS[role] || role}</TableHead>
                   ))}
                 </TableRow>
@@ -2080,10 +2080,12 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
               <TableBody>
                 {AVAILABLE_FEATURES.map((feature) => (
                   <TableRow key={feature}>
-                    <TableCell className="font-medium">{FEATURE_LABELS[feature] || feature}</TableCell>
-                    {editableRoles.map((role) => (
+                    <TableCell className="font-medium sticky left-0 bg-background z-[999]">{FEATURE_LABELS[feature] || feature}</TableCell>
+                    {allDisplayRoles.map((role) => (
                       <TableCell key={role} className="text-center">
-                        {localPerms[role]?.[feature] ? (
+                        {role === "super_admin" ? (
+                          <Badge variant="default" className="text-xs">Always On</Badge>
+                        ) : localPerms[role]?.[feature] ? (
                           <Badge variant="default" className="text-xs">On</Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs">Off</Badge>
@@ -2116,8 +2118,8 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <Table data-testid="table-roles">
             <TableHeader>
               <TableRow>
-                <TableHead>Feature</TableHead>
-                {editableRoles.map((role) => (
+                <TableHead className="sticky left-0 bg-background z-[999]">Feature</TableHead>
+                {allDisplayRoles.map((role) => (
                   <TableHead key={role} className="text-center">{ROLE_LABELS[role] || role}</TableHead>
                 ))}
               </TableRow>
@@ -2125,14 +2127,18 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
             <TableBody>
               {AVAILABLE_FEATURES.map((feature) => (
                 <TableRow key={feature}>
-                  <TableCell className="font-medium">{FEATURE_LABELS[feature] || feature}</TableCell>
-                  {editableRoles.map((role) => (
+                  <TableCell className="font-medium sticky left-0 bg-background z-[999]">{FEATURE_LABELS[feature] || feature}</TableCell>
+                  {allDisplayRoles.map((role) => (
                     <TableCell key={role} className="text-center">
-                      <Switch
-                        checked={localPerms[role]?.[feature] ?? false}
-                        onCheckedChange={() => togglePerm(role, feature)}
-                        data-testid={`switch-${role}-${feature}`}
-                      />
+                      {role === "super_admin" ? (
+                        <Badge variant="default" className="text-xs no-default-hover-elevate no-default-active-elevate">Always On</Badge>
+                      ) : (
+                        <Switch
+                          checked={localPerms[role]?.[feature] ?? false}
+                          onCheckedChange={() => togglePerm(role, feature)}
+                          data-testid={`switch-${role}-${feature}`}
+                        />
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
