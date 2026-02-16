@@ -9,10 +9,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Menu, ChevronDown, UserCircle, Shield, LogOut } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 import { useAuth } from "@/hooks/use-auth";
 import { getAccessToken } from "@/lib/v1Api";
+
+function getPhotoSrc(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/objects/")) return url;
+  if (url.startsWith("/")) return `/objects${url}`;
+  return url;
+}
+
+function UserAvatar({ user, size = "sm" }: { user: { name?: string | null; profilePhotoUrl?: string | null }; size?: "sm" | "md" }) {
+  const photoSrc = getPhotoSrc(user.profilePhotoUrl);
+  const initials = (user.name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+  const cls = size === "sm" ? "h-5 w-5" : "h-6 w-6";
+  return (
+    <Avatar className={cls} data-testid="user-avatar">
+      {photoSrc && <AvatarImage src={photoSrc} alt={user.name || "User"} />}
+      <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+    </Avatar>
+  );
+}
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -193,7 +213,11 @@ export default function Navbar() {
                     }`}
                     data-testid="nav-link-account"
                   >
-                    <UserCircle className="w-4 h-4 mr-1" />
+                    {user?.profilePhotoUrl ? (
+                      <UserAvatar user={user} size="sm" />
+                    ) : (
+                      <UserCircle className="w-4 h-4 mr-1" />
+                    )}
                     {user?.name?.split(" ")[0] || "Account"}
                   </Button>
                 </Link>
@@ -298,7 +322,11 @@ export default function Navbar() {
                           data-testid="mobile-link-account"
                         >
                           <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
-                            <UserCircle className="w-4 h-4" />
+                            {user?.profilePhotoUrl ? (
+                              <UserAvatar user={user} size="sm" />
+                            ) : (
+                              <UserCircle className="w-4 h-4" />
+                            )}
                             My Account
                           </span>
                         </Link>

@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
   Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy, UserPlus,
-  Camera, Loader2,
+  Camera, Loader2, ExternalLink,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -110,6 +110,10 @@ export default function AdminDashboard() {
               className="h-10 object-contain"
               data-testid="img-sidebar-logo"
             />
+            <a href="/" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground mt-2" data-testid="link-back-to-site">
+              <ExternalLink className="w-3 h-3" />
+              Back to Site
+            </a>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
