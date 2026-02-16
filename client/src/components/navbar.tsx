@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, ChevronDown, UserCircle } from "lucide-react";
+import { Menu, ChevronDown, UserCircle, Shield } from "lucide-react";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -139,20 +139,38 @@ export default function Navbar() {
           )}
           {!authLoading && (
             isAuthenticated ? (
-              <Link href="/account">
-                <Button
-                  variant="ghost"
-                  className={`text-sm font-medium no-default-hover-elevate no-default-active-elevate ${
-                    isActive("/account")
-                      ? "text-white"
-                      : "text-white/70 hover:text-white"
-                  }`}
-                  data-testid="nav-link-account"
-                >
-                  <UserCircle className="w-4 h-4 mr-1" />
-                  {user?.name?.split(" ")[0] || "Account"}
-                </Button>
-              </Link>
+              <>
+                {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin")) && (
+                  <Link href="/admin/dashboard">
+                    <Button
+                      variant="ghost"
+                      className={`text-sm font-medium no-default-hover-elevate no-default-active-elevate ${
+                        location.startsWith("/admin")
+                          ? "text-white"
+                          : "text-white/70 hover:text-white"
+                      }`}
+                      data-testid="nav-link-admin"
+                    >
+                      <Shield className="w-4 h-4 mr-1" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
+                <Link href="/account">
+                  <Button
+                    variant="ghost"
+                    className={`text-sm font-medium no-default-hover-elevate no-default-active-elevate ${
+                      isActive("/account")
+                        ? "text-white"
+                        : "text-white/70 hover:text-white"
+                    }`}
+                    data-testid="nav-link-account"
+                  >
+                    <UserCircle className="w-4 h-4 mr-1" />
+                    {user?.name?.split(" ")[0] || "Account"}
+                  </Button>
+                </Link>
+              </>
             ) : (
               <Link href="/login">
                 <Button
@@ -225,16 +243,30 @@ export default function Navbar() {
                 <div className="mt-4 pt-4 border-t border-white/10">
                   {!authLoading && (
                     isAuthenticated ? (
-                      <Link
-                        href="/account"
-                        onClick={() => setMobileOpen(false)}
-                        data-testid="mobile-link-account"
-                      >
-                        <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
-                          <UserCircle className="w-4 h-4" />
-                          My Account
-                        </span>
-                      </Link>
+                      <>
+                        {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin")) && (
+                          <Link
+                            href="/admin/dashboard"
+                            onClick={() => setMobileOpen(false)}
+                            data-testid="mobile-link-admin"
+                          >
+                            <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
+                              <Shield className="w-4 h-4" />
+                              Admin
+                            </span>
+                          </Link>
+                        )}
+                        <Link
+                          href="/account"
+                          onClick={() => setMobileOpen(false)}
+                          data-testid="mobile-link-account"
+                        >
+                          <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
+                            <UserCircle className="w-4 h-4" />
+                            My Account
+                          </span>
+                        </Link>
+                      </>
                     ) : (
                       <>
                         <Link
