@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,11 +100,13 @@ export default function SignupDetail() {
   const [, navigate] = useLocation();
   const slug = params?.slug || "";
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResponse | null>(null);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [guestCount, setGuestCount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [autoFilled, setAutoFilled] = useState(false);
 
   const { data, isLoading, error } = useQuery<SignupDetailData>({
     queryKey: ["/api/public/signups", slug],
@@ -114,6 +117,41 @@ export default function SignupDetail() {
     },
     enabled: !!slug,
   });
+
+  useEffect(() => {
+    if (!data?.fields || !user || autoFilled || !isAuthenticated) return;
+    const prefilled: Record<string, any> = {};
+    for (const field of data.fields) {
+      const label = field.label.toLowerCase();
+      const fType = field.fieldType;
+      if (fType === "email" || label.includes("email")) {
+        if (user.email) prefilled[field.id] = user.email;
+      } else if (fType === "phone" || label.includes("phone")) {
+        if (user.phone) prefilled[field.id] = user.phone;
+      } else if (label.includes("name") && !label.includes("last") && !label.includes("first")) {
+        if (user.name) prefilled[field.id] = user.name;
+      } else if (label.includes("first name")) {
+        if (user.name) prefilled[field.id] = user.name.split(" ")[0];
+      } else if (label.includes("last name")) {
+        if (user.name) {
+          const parts = user.name.split(" ");
+          if (parts.length > 1) prefilled[field.id] = parts.slice(1).join(" ");
+        }
+      } else if (label.includes("address") && !label.includes("city") && !label.includes("state") && !label.includes("zip")) {
+        if (user.address) prefilled[field.id] = user.address;
+      } else if (label.includes("city")) {
+        if (user.city) prefilled[field.id] = user.city;
+      } else if (label.includes("state")) {
+        if (user.state) prefilled[field.id] = user.state;
+      } else if (label.includes("zip")) {
+        if (user.zip) prefilled[field.id] = user.zip;
+      }
+    }
+    if (Object.keys(prefilled).length > 0) {
+      setFormValues((prev) => ({ ...prefilled, ...prev }));
+      setAutoFilled(true);
+    }
+  }, [data?.fields, user, isAuthenticated, autoFilled]);
 
   const submitMutation = useMutation({
     mutationFn: async (payload: { formData: Record<string, any>; guestCount: number }) => {

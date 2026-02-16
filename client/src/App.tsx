@@ -3,6 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/hooks/use-auth";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import NotFound from "@/pages/not-found";
@@ -22,6 +23,9 @@ import Give from "@/pages/give";
 import GiveSuccess from "@/pages/give-success";
 import PlanVisit from "@/pages/plan-visit";
 import Contact from "@/pages/contact";
+import Login from "@/pages/login";
+import Register from "@/pages/register";
+import Account from "@/pages/account";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import PublicForm from "@/pages/public-form";
@@ -49,6 +53,9 @@ function Router() {
       <Route path="/give/success" component={GiveSuccess} />
       <Route path="/plan-visit" component={PlanVisit} />
       <Route path="/contact" component={Contact} />
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/account" component={Account} />
       <Route path="/signups/:slug" component={SignupDetail} />
       <Route path="/signups" component={Signups} />
       <Route path="/forms/:slug" component={PublicForm} />
@@ -67,12 +74,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        {!isAdmin && <Navbar />}
-        <main>
-          <Router />
-        </main>
-        {!isAdmin && <Footer />}
-        {!isAdmin && <NotificationPrompt />}
+        <AuthProvider>
+          {!isAdmin && <Navbar />}
+          <main>
+            <Router />
+          </main>
+          {!isAdmin && <Footer />}
+          {!isAdmin && <NotificationPrompt />}
+        </AuthProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

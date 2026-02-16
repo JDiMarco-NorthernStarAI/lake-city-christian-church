@@ -240,6 +240,10 @@ export interface IStorage {
   updateSignupSubmission(id: number, data: Partial<InsertSignupSubmission>): Promise<SignupSubmission | undefined>;
   deleteSignupSubmission(id: number): Promise<void>;
   getSignupSubmissionCount(signupEventId: number): Promise<number>;
+
+  getSignupSubmissionsByUserId(userId: number): Promise<SignupSubmission[]>;
+  getFormSubmissionsByUserId(userId: number): Promise<FormSubmission[]>;
+  getDonationsByEmail(email: string): Promise<Donation[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1132,6 +1136,18 @@ export class DatabaseStorage implements IStorage {
   async getSignupSubmissionCount(signupEventId: number): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(signupSubmissions).where(eq(signupSubmissions.signupEventId, signupEventId));
     return result[0]?.count ?? 0;
+  }
+
+  async getSignupSubmissionsByUserId(userId: number): Promise<SignupSubmission[]> {
+    return db.select().from(signupSubmissions).where(eq(signupSubmissions.userId, userId)).orderBy(desc(signupSubmissions.createdAt));
+  }
+
+  async getFormSubmissionsByUserId(userId: number): Promise<FormSubmission[]> {
+    return db.select().from(formSubmissions).where(eq(formSubmissions.userId, userId)).orderBy(desc(formSubmissions.submittedAt));
+  }
+
+  async getDonationsByEmail(email: string): Promise<Donation[]> {
+    return db.select().from(donations).where(eq(donations.donorEmail, email)).orderBy(desc(donations.createdAt));
   }
 }
 

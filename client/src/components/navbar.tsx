@@ -8,8 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, ChevronDown } from "lucide-react";
+import { Menu, ChevronDown, UserCircle } from "lucide-react";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
+import { useAuth } from "@/hooks/use-auth";
 
 const navItems = [
   { label: "Home", href: "/" },
@@ -40,6 +41,7 @@ export default function Navbar() {
   const [location] = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -135,6 +137,34 @@ export default function Navbar() {
               </Link>
             )
           )}
+          {!authLoading && (
+            isAuthenticated ? (
+              <Link href="/account">
+                <Button
+                  variant="ghost"
+                  className={`text-sm font-medium no-default-hover-elevate no-default-active-elevate ${
+                    isActive("/account")
+                      ? "text-white"
+                      : "text-white/70 hover:text-white"
+                  }`}
+                  data-testid="nav-link-account"
+                >
+                  <UserCircle className="w-4 h-4 mr-1" />
+                  {user?.name?.split(" ")[0] || "Account"}
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <Button
+                  variant="ghost"
+                  className="text-sm font-medium text-white/70 hover:text-white no-default-hover-elevate no-default-active-elevate"
+                  data-testid="nav-link-login"
+                >
+                  Sign In
+                </Button>
+              </Link>
+            )
+          )}
         </div>
 
         <div className="lg:hidden">
@@ -192,6 +222,43 @@ export default function Navbar() {
                     </Link>
                   )
                 )}
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  {!authLoading && (
+                    isAuthenticated ? (
+                      <Link
+                        href="/account"
+                        onClick={() => setMobileOpen(false)}
+                        data-testid="mobile-link-account"
+                      >
+                        <span className="flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
+                          <UserCircle className="w-4 h-4" />
+                          My Account
+                        </span>
+                      </Link>
+                    ) : (
+                      <>
+                        <Link
+                          href="/login"
+                          onClick={() => setMobileOpen(false)}
+                          data-testid="mobile-link-login"
+                        >
+                          <span className="block rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
+                            Sign In
+                          </span>
+                        </Link>
+                        <Link
+                          href="/register"
+                          onClick={() => setMobileOpen(false)}
+                          data-testid="mobile-link-register"
+                        >
+                          <span className="block rounded-md px-3 py-2.5 text-sm font-medium text-white/70 hover:text-white">
+                            Create Account
+                          </span>
+                        </Link>
+                      </>
+                    )
+                  )}
+                </div>
               </div>
             </SheetContent>
           </Sheet>

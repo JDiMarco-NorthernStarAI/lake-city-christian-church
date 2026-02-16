@@ -631,6 +631,63 @@ v1Router.get("/my/signups", requireJwt, async (req, res) => {
   }
 });
 
+v1Router.get("/my/signup-submissions", requireJwt, async (req, res) => {
+  try {
+    const userId = (req as any).jwtUser.userId;
+    const subs = await storage.getSignupSubmissionsByUserId(userId);
+
+    const enriched = await Promise.all(
+      subs.map(async (s) => {
+        const event = await storage.getSignupEvent(s.signupEventId);
+        return { ...s, signupEvent: event || null };
+      })
+    );
+
+    return apiResponse(res, 200, enriched);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/my/donations", requireJwt, async (req, res) => {
+  try {
+    const userId = (req as any).jwtUser.userId;
+    const user = await storage.getUser(userId);
+    if (!user || !user.email) return apiResponse(res, 200, []);
+
+    const userDonations = await storage.getDonationsByEmail(user.email);
+
+    const enriched = await Promise.all(
+      userDonations.map(async (d) => {
+        const fund = d.fundId ? await storage.getDonationFund(d.fundId) : null;
+        return { ...d, fund: fund || null };
+      })
+    );
+
+    return apiResponse(res, 200, enriched);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+v1Router.get("/my/form-submissions", requireJwt, async (req, res) => {
+  try {
+    const userId = (req as any).jwtUser.userId;
+    const subs = await storage.getFormSubmissionsByUserId(userId);
+
+    const enriched = await Promise.all(
+      subs.map(async (s) => {
+        const form = await storage.getForm(s.formId);
+        return { ...s, form: form || null };
+      })
+    );
+
+    return apiResponse(res, 200, enriched);
+  } catch (err) {
+    return apiResponse(res, 500, null, "Server error");
+  }
+});
+
 v1Router.post("/children", requireJwt, async (req, res) => {
   try {
     const parsed = createChildSchema.safeParse(req.body);

@@ -30,7 +30,7 @@ Preferred communication style: Simple, everyday language.
   - `/api/*` — Legacy endpoints for web admin dashboard (session-based auth)
   - `/api/v1/*` — Versioned RESTful API for web app, iOS, and Android (JWT-based auth)
 - **Authentication (Web Admin)**: Session-based auth using express-session with connect-pg-simple for session storage in PostgreSQL.
-- **Authentication (V1 API)**: JWT access tokens (15-minute expiry) + refresh tokens (30-day expiry, hashed and stored in database). Supports device tracking and multi-device logout.
+- **Authentication (V1 API)**: JWT access tokens (15-minute expiry) + refresh tokens (30-day expiry, hashed and stored in database). Supports device tracking and multi-device logout. Frontend auth via AuthProvider context (`client/src/hooks/use-auth.tsx`) with localStorage token storage and automatic refresh. Public pages: /login, /register, /account.
 - **RBAC**: 6 roles (member, student_ministry, kids_ministry, small_group, admin, super_admin) with configurable feature permissions via rolePermissions table. Users can have multiple roles simultaneously; enabled features are the union of all role permissions. super_admin always has full access.
 - **Passwords**: Hashed with bcryptjs (12 rounds for v1 API, 10 rounds for legacy admin).
 - **Development**: Vite dev server middleware integrated into Express for HMR during development
