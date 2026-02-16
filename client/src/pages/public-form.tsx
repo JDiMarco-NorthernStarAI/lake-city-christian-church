@@ -28,6 +28,16 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
   );
 }
 
+interface OptionUsageInfo {
+  capacity?: number;
+  used: number;
+  remaining?: number;
+}
+
+interface PublicFormField extends FormField {
+  optionUsage?: Record<string, OptionUsageInfo>;
+}
+
 interface PublicFormData {
   id: number;
   title: string;
@@ -37,7 +47,7 @@ interface PublicFormData {
   successMessage: string | null;
   requireAuth: boolean;
   allowMultiple: boolean;
-  fields: FormField[];
+  fields: PublicFormField[];
 }
 
 export default function PublicForm() {
@@ -122,9 +132,32 @@ export default function PublicForm() {
     submitMutation.mutate(formValues);
   }
 
-  function renderField(field: FormField) {
+  function getOptionLabels(field: PublicFormField): string[] {
+    if (!Array.isArray(field.options)) return [];
+    return (field.options as any[]).map((o: any) => {
+      if (typeof o === "string") return o;
+      if (o && typeof o === "object" && o.label) return o.label;
+      return String(o);
+    });
+  }
+
+  function isOptionFull(field: PublicFormField, optLabel: string): boolean {
+    if (!field.optionUsage) return false;
+    const info = field.optionUsage[optLabel];
+    return !!(info && info.capacity && info.remaining !== undefined && info.remaining <= 0);
+  }
+
+  function getOptionSuffix(field: PublicFormField, optLabel: string): string {
+    if (!field.optionUsage) return "";
+    const info = field.optionUsage[optLabel];
+    if (!info || !info.capacity) return "";
+    if (info.remaining !== undefined && info.remaining <= 0) return " (Full)";
+    return ` (${info.remaining} spot${info.remaining === 1 ? "" : "s"} left)`;
+  }
+
+  function renderField(field: PublicFormField) {
     const fieldError = errors[field.id];
-    const options: string[] = Array.isArray(field.options) ? field.options : [];
+    const options: string[] = getOptionLabels(field);
 
     switch (field.fieldType) {
       case "text":
@@ -161,28 +194,42 @@ export default function PublicForm() {
               <SelectValue placeholder={field.placeholder || "Select an option"} />
             </SelectTrigger>
             <SelectContent>
-              {options.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-              ))}
+              {options.map((opt) => {
+                const full = isOptionFull(field, opt);
+                const suffix = getOptionSuffix(field, opt);
+                return (
+                  <SelectItem key={opt} value={opt} disabled={full} data-testid={`select-option-${field.id}-${opt.replace(/\s+/g, "-")}`}>
+                    {opt}{suffix}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         );
       case "radio":
         return (
           <div className="space-y-2" data-testid={`radio-field-${field.id}`}>
-            {options.map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`field-${field.id}`}
-                  value={opt}
-                  checked={formValues[field.id] === opt}
-                  onChange={() => handleFieldChange(field.id, opt)}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm">{opt}</span>
-              </label>
-            ))}
+            {options.map((opt) => {
+              const full = isOptionFull(field, opt);
+              const suffix = getOptionSuffix(field, opt);
+              return (
+                <label key={opt} className={`flex items-center gap-3 ${full ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                  <input
+                    type="radio"
+                    name={`field-${field.id}`}
+                    value={opt}
+                    checked={formValues[field.id] === opt}
+                    onChange={() => handleFieldChange(field.id, opt)}
+                    className="w-4 h-4"
+                    disabled={full}
+                  />
+                  <span className="text-sm">
+                    {opt}
+                    {suffix && <span className={`ml-1 text-xs ${full ? "text-muted-foreground" : "text-blue-400"}`}>{suffix}</span>}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         );
       case "checkbox":
@@ -198,15 +245,24 @@ export default function PublicForm() {
       case "checkbox_group":
         return (
           <div className="space-y-2" data-testid={`checkbox-group-field-${field.id}`}>
-            {options.map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer">
-                <Checkbox
-                  checked={((formValues[field.id] as string[]) || []).includes(opt)}
-                  onCheckedChange={(checked) => handleCheckboxGroupChange(field.id, opt, checked === true)}
-                />
-                <span className="text-sm">{opt}</span>
-              </label>
-            ))}
+            {options.map((opt) => {
+              const full = isOptionFull(field, opt);
+              const suffix = getOptionSuffix(field, opt);
+              const isChecked = ((formValues[field.id] as string[]) || []).includes(opt);
+              return (
+                <label key={opt} className={`flex items-center gap-3 ${full && !isChecked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                  <Checkbox
+                    checked={isChecked}
+                    onCheckedChange={(checked) => handleCheckboxGroupChange(field.id, opt, checked === true)}
+                    disabled={full && !isChecked}
+                  />
+                  <span className="text-sm">
+                    {opt}
+                    {suffix && <span className={`ml-1 text-xs ${full ? "text-muted-foreground" : "text-blue-400"}`}>{suffix}</span>}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         );
       default:

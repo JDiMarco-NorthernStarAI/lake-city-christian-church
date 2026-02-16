@@ -783,7 +783,7 @@ export const createFormFieldSchema = z.object({
   required: z.boolean().optional(),
   placeholder: z.string().nullable().optional(),
   helpText: z.string().nullable().optional(),
-  options: z.array(z.string()).nullable().optional(),
+  options: z.array(z.union([z.string(), z.object({ label: z.string(), capacity: z.number().int().positive().optional() })])).nullable().optional(),
   defaultValue: z.string().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });

@@ -1043,12 +1043,60 @@ export async function registerRoutes(
     }
   });
 
+  function parseFieldOptions(options: any): Array<{ label: string; capacity?: number }> {
+    if (!Array.isArray(options)) return [];
+    return options.map((o: any) => {
+      if (typeof o === "string") return { label: o };
+      if (o && typeof o === "object" && o.label) return { label: o.label, capacity: o.capacity || undefined };
+      return { label: String(o) };
+    });
+  }
+
+  function computeOptionUsage(fieldId: number, options: Array<{ label: string; capacity?: number }>, submissions: any[]): Record<string, { capacity?: number; used: number; remaining?: number }> {
+    const usage: Record<string, { capacity?: number; used: number; remaining?: number }> = {};
+    for (const opt of options) {
+      usage[opt.label] = { capacity: opt.capacity, used: 0, remaining: opt.capacity };
+    }
+    const fieldKey = String(fieldId);
+    for (const sub of submissions) {
+      const data = sub.data as Record<string, any>;
+      const val = data[fieldId] ?? data[fieldKey];
+      if (typeof val === "string" && usage[val] !== undefined) {
+        usage[val].used++;
+      } else if (Array.isArray(val)) {
+        for (const v of val) {
+          if (typeof v === "string" && usage[v] !== undefined) {
+            usage[v].used++;
+          }
+        }
+      }
+    }
+    for (const key of Object.keys(usage)) {
+      if (usage[key].capacity) {
+        usage[key].remaining = Math.max(0, usage[key].capacity! - usage[key].used);
+      } else {
+        usage[key].remaining = undefined;
+      }
+    }
+    return usage;
+  }
+
   app.get("/api/public/forms/:slug", async (req, res) => {
     try {
       const form = await storage.getFormBySlug(req.params.slug);
       if (!form || form.status !== "published") return res.status(404).json({ message: "Form not found" });
       const fields = await storage.getFormFields(form.id);
-      res.json({ ...form, fields });
+      const submissions = await storage.getFormSubmissions(form.id);
+      const optionTypes = ["select", "radio", "checkbox_group"];
+      const fieldsWithUsage = fields.map((field) => {
+        if (!optionTypes.includes(field.fieldType) || !field.options) return field;
+        const parsed = parseFieldOptions(field.options);
+        const hasCapacity = parsed.some((o) => o.capacity);
+        if (!hasCapacity) return field;
+        const optionUsage = computeOptionUsage(field.id, parsed, submissions);
+        return { ...field, optionUsage };
+      });
+      res.json({ ...form, fields: fieldsWithUsage });
     } catch (err) {
       res.status(500).json({ message: "Error fetching form" });
     }
@@ -1066,11 +1114,39 @@ export async function registerRoutes(
           return res.status(400).json({ message: `${field.label} is required` });
         }
       }
-      const submission = await storage.createFormSubmission({
-        formId: form.id,
-        data,
-        userId: null,
-      });
+      const optionTypes = ["select", "radio", "checkbox_group"];
+      const hasCapacityFields = fields.some((f) =>
+        optionTypes.includes(f.fieldType) && f.options && parseFieldOptions(f.options).some((o) => o.capacity)
+      );
+
+      if (hasCapacityFields) {
+        const result = await db.transaction(async (tx) => {
+          const submissions = await storage.getFormSubmissions(form.id);
+          for (const field of fields) {
+            if (!optionTypes.includes(field.fieldType) || !field.options) continue;
+            const parsed = parseFieldOptions(field.options);
+            if (!parsed.some((o) => o.capacity)) continue;
+            const usage = computeOptionUsage(field.id, parsed, submissions);
+            const val = data[field.id];
+            if (typeof val === "string" && usage[val] && usage[val].capacity && usage[val].remaining !== undefined && usage[val].remaining! <= 0) {
+              return { error: `"${val}" for ${field.label} is full. Please choose a different option.` };
+            }
+            if (Array.isArray(val)) {
+              for (const v of val) {
+                if (typeof v === "string" && usage[v] && usage[v].capacity && usage[v].remaining !== undefined && usage[v].remaining! <= 0) {
+                  return { error: `"${v}" for ${field.label} is full. Please choose a different option.` };
+                }
+              }
+            }
+          }
+          const submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
+          return { submission };
+        });
+        if ("error" in result) return res.status(400).json({ message: result.error });
+        return res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission: result.submission });
+      }
+
+      const submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
       res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission });
     } catch (err) {
       res.status(500).json({ message: "Error submitting form" });

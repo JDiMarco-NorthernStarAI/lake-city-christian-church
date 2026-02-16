@@ -2358,7 +2358,16 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
 
   function openEditField(field: FormField) {
     setEditingField(field);
-    const opts = Array.isArray(field.options) ? (field.options as string[]).join("\n") : "";
+    let opts = "";
+    if (Array.isArray(field.options)) {
+      opts = (field.options as any[]).map((o: any) => {
+        if (typeof o === "string") return o;
+        if (o && typeof o === "object" && o.label) {
+          return o.capacity ? `${o.label}|${o.capacity}` : o.label;
+        }
+        return String(o);
+      }).join("\n");
+    }
     setFieldForm({
       label: field.label,
       fieldType: field.fieldType,
@@ -2373,15 +2382,28 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
   function handleFieldSubmit(e: React.FormEvent) {
     e.preventDefault();
     const optionTypes = ["select", "radio", "checkbox_group"];
+    let parsedOptions: any = null;
+    if (optionTypes.includes(fieldForm.fieldType)) {
+      parsedOptions = fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean).map((line) => {
+        const pipeIdx = line.lastIndexOf("|");
+        if (pipeIdx > 0) {
+          const label = line.substring(0, pipeIdx).trim();
+          const capStr = line.substring(pipeIdx + 1).trim();
+          const cap = parseInt(capStr, 10);
+          if (label && !isNaN(cap) && cap > 0) {
+            return { label, capacity: cap };
+          }
+        }
+        return { label: line };
+      });
+    }
     const data: any = {
       label: fieldForm.label,
       fieldType: fieldForm.fieldType,
       required: fieldForm.required,
       placeholder: fieldForm.placeholder || null,
       helpText: fieldForm.helpText || null,
-      options: optionTypes.includes(fieldForm.fieldType)
-        ? fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean)
-        : null,
+      options: parsedOptions,
     };
 
     if (editingField) {
@@ -2553,6 +2575,9 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
                         <div className="flex items-center gap-2 flex-wrap mt-1">
                           <Badge variant="secondary">{FORM_FIELD_TYPE_LABELS[field.fieldType] || field.fieldType}</Badge>
                           {field.required && <Badge variant="outline">Required</Badge>}
+                          {Array.isArray(field.options) && (field.options as any[]).some((o: any) => typeof o === "object" && o?.capacity) && (
+                            <Badge variant="outline">Has Limits</Badge>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
@@ -2627,9 +2652,13 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
             {showOptionsField && (
               <div className="space-y-2">
                 <Label>Options (one per line)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Add a limit by using the format: Option|limit (e.g., Milk|3 means max 3 sign-ups for Milk). Leave off the |number for unlimited.
+                </p>
                 <Textarea
                   value={fieldForm.options}
                   onChange={(e) => setFieldForm({ ...fieldForm, options: e.target.value })}
+                  placeholder={"Milk|3\nCookies|5\nNapkins"}
                   data-testid="input-field-options"
                 />
               </div>
