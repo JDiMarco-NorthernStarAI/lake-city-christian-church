@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,13 +51,45 @@ interface PublicFormData {
   fields: PublicFormField[];
 }
 
+function getAutoFillValue(field: PublicFormField, user: any): string | undefined {
+  const label = field.label.toLowerCase().trim();
+  const type = field.fieldType;
+
+  if (type !== "text" && type !== "email" && type !== "phone") return undefined;
+
+  if (type === "email" || label.includes("email")) {
+    return user.email || undefined;
+  }
+  if (type === "phone" || label.includes("phone number") || label === "phone" || label.includes("cell phone")) {
+    return user.phone || undefined;
+  }
+  if (label.includes("first and last name") || label.includes("first & last name") || label === "full name" || label === "name" || label === "your name") {
+    const parts = [user.firstName, user.lastName].filter(Boolean);
+    if (parts.length > 0) return parts.join(" ");
+    return user.name || undefined;
+  }
+  if (label.includes("first name") && !label.includes("last")) {
+    return user.firstName || undefined;
+  }
+  if (label.includes("last name") && !label.includes("first")) {
+    return user.lastName || undefined;
+  }
+  if (label.includes("address") && !label.includes("email")) {
+    return user.address || undefined;
+  }
+
+  return undefined;
+}
+
 export default function PublicForm() {
   const [, params] = useRoute("/forms/:slug");
   const slug = params?.slug || "";
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [autoFilled, setAutoFilled] = useState(false);
 
   const { data: formData, isLoading, error } = useQuery<PublicFormData>({
     queryKey: ["/api/public/forms", slug],
@@ -67,6 +100,30 @@ export default function PublicForm() {
     },
     enabled: !!slug,
   });
+
+  useEffect(() => {
+    if (authUser && formData && !autoFilled && !submitted) {
+      const prefilled: Record<string, any> = {};
+      for (const field of formData.fields) {
+        const val = getAutoFillValue(field, authUser);
+        if (val) {
+          prefilled[field.id] = val;
+        }
+      }
+      if (Object.keys(prefilled).length > 0) {
+        setFormValues((prev) => {
+          const merged = { ...prefilled };
+          for (const [k, v] of Object.entries(prev)) {
+            if (v !== undefined && v !== null && v !== "") {
+              merged[k] = v;
+            }
+          }
+          return merged;
+        });
+      }
+      setAutoFilled(true);
+    }
+  }, [authUser, formData, autoFilled, submitted]);
 
   const submitMutation = useMutation({
     mutationFn: async (data: Record<string, any>) => {
