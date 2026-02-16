@@ -14,7 +14,7 @@ import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 const navItems = [
   { label: "Home", href: "/" },
   {
-    label: "About Us",
+    label: "Who We Are",
     href: "/about",
     children: [
       { label: "Our Story", href: "/our-story" },
@@ -30,7 +30,7 @@ const navItems = [
     children: [
       { label: "Contact", href: "/contact" },
       { label: "Announcements", href: "/announcements" },
-      { label: "Encounter", href: "/encounter" },
+      { label: "Watch", href: "/encounter" },
     ],
   },
 ];

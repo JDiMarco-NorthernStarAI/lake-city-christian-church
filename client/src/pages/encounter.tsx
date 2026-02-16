@@ -32,7 +32,7 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 
 export default function Encounter() {
   const c = usePageContent("encounter", {
-    hero_title: "Encounter",
+    hero_title: "Watch",
     hero_subtitle: "Watch & Listen",
   });
 

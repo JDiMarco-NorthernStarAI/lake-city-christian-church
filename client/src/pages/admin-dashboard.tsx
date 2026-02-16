@@ -191,7 +191,7 @@ function AnalyticsTab() {
     "/ministries/students": "Students",
     "/ministries/small-groups": "Small Groups",
     "/ministries/connect-serve": "Connect & Serve",
-    "/encounter": "Encounter (Sermons)",
+    "/encounter": "Watch",
     "/announcements": "What's Happening",
     "/give": "Give",
     "/plan-a-visit": "Plan a Visit",
@@ -868,7 +868,7 @@ const pageConfigs: PageConfig[] = [
   },
   {
     id: "about",
-    label: "About Us",
+    label: "Who We Are",
     fields: [
       { key: "hero_title", label: "Hero Title", type: "input" },
       { key: "mission_heading", label: "Mission Heading", type: "input" },
@@ -997,7 +997,7 @@ const pageConfigs: PageConfig[] = [
   },
   {
     id: "encounter",
-    label: "Encounter (Sermons)",
+    label: "Watch (Sermons)",
     fields: [
       { key: "hero_title", label: "Hero Title", type: "input" },
       { key: "hero_subtitle", label: "Hero Subtitle", type: "textarea" },

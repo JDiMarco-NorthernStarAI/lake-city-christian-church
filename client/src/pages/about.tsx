@@ -42,7 +42,7 @@ const subPages = [
 
 export default function About() {
   const c = usePageContent("about", {
-    hero_title: "About Us",
+    hero_title: "Who We Are",
     mission_heading: "Lake City Christian Church exists to connect people to a life-changing relationship with Jesus.",
     mission_description: "We are a community of Christ-followers committed to making disciples, serving our neighbors, and growing together in faith. Whether you are exploring faith for the first time or looking for a church to call home, we would love to walk alongside you.",
   });
@@ -99,7 +99,7 @@ export default function About() {
             style={{ fontFamily: "Montserrat, sans-serif" }}
             data-testid="text-about-learn-more"
           >
-            Learn More About Us
+            Learn More
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {subPages.map((page, index) => (

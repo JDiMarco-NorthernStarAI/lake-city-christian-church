@@ -4,8 +4,8 @@ import whiteLogoPath from "@assets/White_Logo_1770933488639.png";
 
 const quickLinks = [
   { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  { label: "Encounter", href: "/encounter" },
+  { label: "Who We Are", href: "/about" },
+  { label: "Watch", href: "/encounter" },
   { label: "Give", href: "/give" },
   { label: "Contact", href: "/contact" },
 ];
