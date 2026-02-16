@@ -2191,6 +2191,18 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/forms/${id}/duplicate`);
+      return res.json();
+    },
+    onSuccess: (newForm: Form) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      toast({ title: "Form duplicated", description: `"${newForm.title}" created as draft` });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const statusVariant = (status: string) => {
     if (status === "published") return "default" as const;
     if (status === "archived") return "secondary" as const;
@@ -2272,6 +2284,9 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
                   <div className="flex items-center gap-1">
                     <Button size="icon" variant="ghost" onClick={() => onEdit(form.id)} data-testid={`button-edit-form-${form.id}`}>
                       <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => duplicateMutation.mutate(form.id)} disabled={duplicateMutation.isPending} data-testid={`button-duplicate-form-${form.id}`}>
+                      <Copy className="w-4 h-4" />
                     </Button>
                     <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(form.id)} data-testid={`button-delete-form-${form.id}`}>
                       <Trash2 className="w-4 h-4" />

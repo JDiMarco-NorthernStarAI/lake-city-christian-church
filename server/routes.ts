@@ -738,6 +738,41 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/forms/:id/duplicate", requireFeature("forms"), async (req, res) => {
+    try {
+      const original = await storage.getForm(Number(req.params.id));
+      if (!original) return res.status(404).json({ message: "Form not found" });
+      const fields = await storage.getFormFields(original.id);
+      const newForm = await storage.createForm({
+        title: `${original.title} (Copy)`,
+        description: original.description,
+        slug: `${original.slug}-copy-${Date.now()}`,
+        status: "draft",
+        submitButtonText: original.submitButtonText,
+        successMessage: original.successMessage,
+        requireAuth: original.requireAuth,
+        allowMultiple: original.allowMultiple,
+        createdBy: (req as any).session?.userId || original.createdBy,
+      });
+      for (const field of fields) {
+        await storage.createFormField({
+          formId: newForm.id,
+          label: field.label,
+          fieldType: field.fieldType,
+          required: field.required,
+          placeholder: field.placeholder,
+          helpText: field.helpText,
+          options: field.options,
+          defaultValue: field.defaultValue,
+          sortOrder: field.sortOrder,
+        } as any);
+      }
+      res.status(201).json(newForm);
+    } catch (err) {
+      res.status(500).json({ message: "Error duplicating form" });
+    }
+  });
+
   app.get("/api/forms/:id/fields", requireFeature("forms"), async (req, res) => {
     try {
       const fields = await storage.getFormFields(Number(req.params.id));

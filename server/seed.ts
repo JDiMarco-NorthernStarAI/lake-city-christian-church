@@ -164,6 +164,144 @@ export async function seedDatabase() {
       imageUrl: null,
     });
 
+    const existingForms = await storage.getForms();
+    if (existingForms.length === 0) {
+      const studentForm = await storage.createForm({
+        title: "Required Student/Guardian Information",
+        description: "Student Ministry Director: Joey Ekers. Please fill out this form if your student is attending a Club 419 Wednesday gathering.",
+        slug: "student-info",
+        status: "published",
+        submitButtonText: "Submit",
+        successMessage: "Thank you for submitting your student information! We look forward to seeing them at Club 419.",
+        requireAuth: false,
+        allowMultiple: true,
+        createdBy: 1,
+      });
+
+      const studentFields = [
+        { formId: studentForm.id, label: "Student First & Last Name", fieldType: "text" as const, required: true, placeholder: "Enter student full name", sortOrder: 0 },
+        { formId: studentForm.id, label: "Student Cell Phone", fieldType: "text" as const, required: false, placeholder: "Enter phone number", sortOrder: 1 },
+        { formId: studentForm.id, label: "Student Address", fieldType: "text" as const, required: false, placeholder: "Enter student address", sortOrder: 2 },
+        { formId: studentForm.id, label: "Student Date of Birth", fieldType: "text" as const, required: true, placeholder: "MM/DD/YYYY", sortOrder: 3 },
+        { formId: studentForm.id, label: "Parent/Guardian First and Last Name", fieldType: "text" as const, required: true, placeholder: "Enter parent/guardian full name", sortOrder: 4 },
+        { formId: studentForm.id, label: "2nd Parent/Guardian First and Last Name", fieldType: "text" as const, required: false, placeholder: "Enter second parent/guardian full name", sortOrder: 5 },
+        { formId: studentForm.id, label: "Emergency Contact: Name and Number", fieldType: "text" as const, required: true, placeholder: "Enter name and phone number", sortOrder: 6 },
+        { formId: studentForm.id, label: "2nd Emergency Contact: Name and Number", fieldType: "text" as const, required: true, placeholder: "Enter name and phone number", sortOrder: 7 },
+        { formId: studentForm.id, label: "Any Medical Concerns or Limitations?", fieldType: "textarea" as const, required: false, placeholder: "List any medical concerns or limitations", sortOrder: 8 },
+        { formId: studentForm.id, label: "Allergies", fieldType: "checkbox" as const, required: true, options: ["Nuts", "Seasonal", "Medication", "None", "Other"], sortOrder: 9 },
+        { formId: studentForm.id, label: "Does the student have a drivers license?", fieldType: "select" as const, required: true, options: ["Yes", "No", "Learners Permit: must be accompanied by an adult"], sortOrder: 10 },
+        { formId: studentForm.id, label: "Questions or Concerns?", fieldType: "textarea" as const, required: false, placeholder: "Any questions or concerns you would like to share", sortOrder: 11 },
+      ];
+      for (const field of studentFields) {
+        await storage.createFormField(field as any);
+      }
+
+      const sponsorForm = await storage.createForm({
+        title: "Club 419 Meal Sponsors",
+        description: "Lake City Student Ministry Director: Joey Ekers",
+        slug: "club419-meal-sponsor",
+        status: "published",
+        submitButtonText: "Submit",
+        successMessage: "Thank you for sponsoring a meal for Club 419! The students truly appreciate your generosity.",
+        requireAuth: false,
+        allowMultiple: true,
+        createdBy: 1,
+      });
+
+      const sponsorFields = [
+        { formId: sponsorForm.id, label: "First and Last Name", fieldType: "text" as const, required: true, placeholder: "Enter your full name", sortOrder: 0 },
+        { formId: sponsorForm.id, label: "Phone Number", fieldType: "text" as const, required: true, placeholder: "Enter your phone number", sortOrder: 1 },
+        { formId: sponsorForm.id, label: "Select what you'd like to sponsor", fieldType: "radio" as const, required: true, options: ["Meal", "Snack", "Drinks"], sortOrder: 2 },
+        { formId: sponsorForm.id, label: "What items are you providing?", fieldType: "textarea" as const, required: false, placeholder: "Describe what items you will be providing", sortOrder: 3 },
+        { formId: sponsorForm.id, label: "Select the date you are sponsoring a Meal/Snack", fieldType: "select" as const, required: false, options: ["Wednesday February 4", "Wednesday February 11", "Wednesday February 18", "Wednesday February 25", "Wednesday March 4", "Wednesday March 11", "Wednesday March 18", "Wednesday March 25", "Wednesday April 1", "Wednesday April 8", "Wednesday April 15", "Wednesday April 22", "Wednesday April 29"], sortOrder: 4 },
+      ];
+      for (const field of sponsorFields) {
+        await storage.createFormField(field as any);
+      }
+
+      log("Forms seeded", "seed");
+    }
+
+    const existingSignups = await storage.getSignupEvents();
+    const seededForms = await storage.getForms();
+    const defaultFormId = seededForms[0]?.id || null;
+    if (existingSignups.length === 0) {
+      await storage.createSignupEvent({
+        title: "VBS 2026 Registration",
+        slug: "vbs-2026",
+        description: 'Vacation Bible School is back! Register your children for an amazing week of fun, learning, and faith. This year\'s theme is "Deep Sea Adventure" - exploring God\'s love through underwater exploration.',
+        formId: defaultFormId,
+        category: "event",
+        status: "published",
+        visibility: "public",
+        eventDate: new Date("2026-06-15T09:00:00"),
+        location: "Lake City Christian Church, 6717 Fry Rd",
+        maxSignups: 60,
+        waitlistEnabled: true,
+        cost: "Free",
+        contactName: "Pastor Sarah",
+        contactEmail: "kids@lakecitycc.org",
+        postSubmissionSettings: { displayType: "thank_you", successMessage: "Thank you for registering your child for VBS 2026! You will receive a confirmation email shortly." },
+        createdBy: 1,
+      } as any);
+
+      await storage.createSignupEvent({
+        title: "Spring Retreat 2026",
+        slug: "spring-retreat-2026",
+        description: "Join us for a refreshing weekend getaway at Mohican State Park. A time of worship, fellowship, and renewal. Cabins and meals provided. All adults welcome!",
+        formId: defaultFormId,
+        category: "trip",
+        status: "published",
+        visibility: "public",
+        eventDate: new Date("2026-04-10T18:00:00"),
+        location: "Mohican State Park, Loudonville, OH",
+        maxSignups: 30,
+        waitlistEnabled: true,
+        cost: "$75 per person",
+        contactName: "Pastor Mike",
+        contactEmail: "info@lakecitycc.org",
+        postSubmissionSettings: { displayType: "summary_all", successMessage: "You're signed up for the Spring Retreat!" },
+        createdBy: 1,
+      } as any);
+
+      await storage.createSignupEvent({
+        title: "Wednesday Night Volunteer Team",
+        slug: "wednesday-volunteers",
+        description: "Help serve at our Wednesday night programming. Volunteers are needed for hospitality, tech, kids ministry, and student ministry. Choose your preferred area when you sign up.",
+        formId: defaultFormId,
+        category: "volunteer",
+        status: "published",
+        visibility: "public",
+        location: "Lake City Christian Church",
+        waitlistEnabled: false,
+        contactName: "Volunteer Coordinator",
+        contactEmail: "volunteer@lakecitycc.org",
+        postSubmissionSettings: { displayType: "thank_you", successMessage: "Thank you for volunteering! Our coordinator will reach out to confirm your placement." },
+        createdBy: 1,
+      } as any);
+
+      await storage.createSignupEvent({
+        title: "New Member Class - Spring Session",
+        slug: "new-member-spring",
+        description: "Interested in learning more about Lake City Christian Church? This 4-week class covers our beliefs, mission, and how to get connected. Meets Sundays at 11:30 AM.",
+        formId: defaultFormId,
+        category: "class",
+        status: "draft",
+        visibility: "public",
+        eventDate: new Date("2026-03-08T11:30:00"),
+        location: "Room 201, LC3",
+        maxSignups: 20,
+        waitlistEnabled: false,
+        cost: "Free",
+        contactName: "Pastor John",
+        contactEmail: "john@lakecitycc.org",
+        postSubmissionSettings: { displayType: "thank_you" },
+        createdBy: 1,
+      } as any);
+
+      log("Signup events seeded", "seed");
+    }
+
     const defaultSettings = [
       { key: "church_name", value: "Lake City Christian Church" },
       { key: "address", value: "6717 Fry Road, Middleburg Heights, OH" },
