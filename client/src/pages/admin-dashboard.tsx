@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
   Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy, UserPlus,
-  Camera, Loader2, ExternalLink,
+  Camera, Loader2, ExternalLink, Download, Search, Filter,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -3314,10 +3314,26 @@ function NotificationsTab() {
 
 function DonationsTab() {
   const { toast } = useToast();
-  const [view, setView] = useState<"history" | "funds">("history");
+  const [view, setView] = useState<"history" | "funds" | "reports">("history");
   const [fundDialogOpen, setFundDialogOpen] = useState(false);
+  const [manualDonationOpen, setManualDonationOpen] = useState(false);
   const [editingFund, setEditingFund] = useState<DonationFund | null>(null);
   const [fundForm, setFundForm] = useState({ name: "", slug: "", description: "", isActive: true });
+  const [manualForm, setManualForm] = useState({ donorName: "", donorEmail: "", amountDollars: "", fundId: "", paymentMethod: "cash", notes: "", donationDate: new Date().toISOString().split("T")[0] });
+
+  const [reportStartDate, setReportStartDate] = useState("");
+  const [reportEndDate, setReportEndDate] = useState("");
+  const [reportDonorEmail, setReportDonorEmail] = useState("");
+  const [reportFundId, setReportFundId] = useState("");
+
+  function buildReportQueryKey() {
+    const params = new URLSearchParams();
+    if (reportStartDate) params.set("startDate", reportStartDate);
+    if (reportEndDate) params.set("endDate", reportEndDate);
+    if (reportDonorEmail) params.set("donorEmail", reportDonorEmail);
+    if (reportFundId && reportFundId !== "all") params.set("fundId", reportFundId);
+    return `/api/donations/report?${params.toString()}`;
+  }
 
   const { data: stats } = useQuery<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }>({
     queryKey: ["/api/donations/stats"],
@@ -3329,6 +3345,16 @@ function DonationsTab() {
 
   const { data: funds, isLoading: fundsLoading } = useQuery<DonationFund[]>({
     queryKey: ["/api/donation-funds"],
+  });
+
+  const { data: reportData, isLoading: reportLoading, refetch: refetchReport } = useQuery<{ donations: Donation[]; totalAmount: number; totalCount: number }>({
+    queryKey: ["/api/donations/report", reportStartDate, reportEndDate, reportDonorEmail, reportFundId],
+    queryFn: async () => {
+      const res = await fetch(buildReportQueryKey(), { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch report");
+      return res.json();
+    },
+    enabled: view === "reports",
   });
 
   const createFundMutation = useMutation({
@@ -3360,6 +3386,19 @@ function DonationsTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const manualDonationMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("POST", "/api/donations/manual", data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/report"] });
+      toast({ title: "Donation recorded" });
+      setManualDonationOpen(false);
+      setManualForm({ donorName: "", donorEmail: "", amountDollars: "", fundId: "", paymentMethod: "cash", notes: "", donationDate: new Date().toISOString().split("T")[0] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   function openAddFund() {
     setEditingFund(null);
     setFundForm({ name: "", slug: "", description: "", isActive: true });
@@ -3385,6 +3424,24 @@ function DonationsTab() {
     } else {
       createFundMutation.mutate(data);
     }
+  }
+
+  function handleManualDonationSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const amount = parseFloat(manualForm.amountDollars);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Invalid amount", variant: "destructive" });
+      return;
+    }
+    manualDonationMutation.mutate({
+      donorName: manualForm.donorName || "Anonymous",
+      donorEmail: manualForm.donorEmail || null,
+      amountDollars: amount,
+      fundId: manualForm.fundId && manualForm.fundId !== "none" ? Number(manualForm.fundId) : null,
+      paymentMethod: manualForm.paymentMethod,
+      notes: manualForm.notes || null,
+      donationDate: manualForm.donationDate || null,
+    });
   }
 
   function handleDeleteFund(id: number) {
@@ -3417,11 +3474,35 @@ function DonationsTab() {
     }
   }
 
+  function exportCSV() {
+    if (!reportData?.donations?.length) return;
+    const headers = ["Date", "Donor Name", "Donor Email", "Amount", "Fund", "Payment Method", "Frequency", "Status", "Notes"];
+    const rows = reportData.donations.map((d) => [
+      d.donationDate ? formatDate(d.donationDate.toString()) : (d.createdAt ? formatDate(d.createdAt.toString()) : ""),
+      d.donorName || "Anonymous",
+      d.donorEmail || "",
+      (d.amountCents / 100).toFixed(2),
+      getFundName(d.fundId),
+      d.paymentMethod || "stripe",
+      d.frequency,
+      d.status,
+      d.notes || "",
+    ]);
+    const csvContent = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `donations-report-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div data-testid="tab-donations">
       <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <h1 className="text-2xl font-bold">Donations</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={view === "history" ? "default" : "outline"}
             onClick={() => setView("history")}
@@ -3435,6 +3516,13 @@ function DonationsTab() {
             data-testid="button-view-funds"
           >
             <Heart className="w-4 h-4 mr-2" /> Funds
+          </Button>
+          <Button
+            variant={view === "reports" ? "default" : "outline"}
+            onClick={() => setView("reports")}
+            data-testid="button-view-reports"
+          >
+            <BarChart3 className="w-4 h-4 mr-2" /> Reports
           </Button>
         </div>
       </div>
@@ -3488,6 +3576,12 @@ function DonationsTab() {
             </Card>
           </div>
 
+          <div className="flex items-center justify-end mb-4">
+            <Button onClick={() => setManualDonationOpen(true)} data-testid="button-add-manual-donation">
+              <Plus className="w-4 h-4 mr-2" /> Record Donation
+            </Button>
+          </div>
+
           {donationsLoading ? (
             <p className="text-muted-foreground">Loading donations...</p>
           ) : (
@@ -3498,6 +3592,7 @@ function DonationsTab() {
                   <TableHead>Donor</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Fund</TableHead>
+                  <TableHead>Method</TableHead>
                   <TableHead>Frequency</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -3505,7 +3600,7 @@ function DonationsTab() {
               <TableBody>
                 {donations?.map((donation) => (
                   <TableRow key={donation.id} data-testid={`row-donation-${donation.id}`}>
-                    <TableCell>{donation.createdAt ? formatDate(donation.createdAt.toString()) : "—"}</TableCell>
+                    <TableCell>{donation.donationDate ? formatDate(donation.donationDate.toString()) : (donation.createdAt ? formatDate(donation.createdAt.toString()) : "—")}</TableCell>
                     <TableCell>
                       <div>{donation.donorName || "Anonymous"}</div>
                       {donation.donorEmail && (
@@ -3514,6 +3609,7 @@ function DonationsTab() {
                     </TableCell>
                     <TableCell className="font-medium">{formatCents(donation.amountCents)}</TableCell>
                     <TableCell>{getFundName(donation.fundId)}</TableCell>
+                    <TableCell className="capitalize">{(donation.paymentMethod || "stripe").replace("_", " ")}</TableCell>
                     <TableCell className="capitalize">{donation.frequency.replace("_", " ")}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(donation.status)} data-testid={`badge-status-${donation.id}`}>
@@ -3578,6 +3674,117 @@ function DonationsTab() {
         </div>
       )}
 
+      {view === "reports" && (
+        <div>
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input type="date" value={reportStartDate} onChange={(e) => setReportStartDate(e.target.value)} data-testid="input-report-start-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Input type="date" value={reportEndDate} onChange={(e) => setReportEndDate(e.target.value)} data-testid="input-report-end-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Donor Email</Label>
+                  <Input placeholder="Filter by email" value={reportDonorEmail} onChange={(e) => setReportDonorEmail(e.target.value)} data-testid="input-report-donor-email" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fund</Label>
+                  <Select value={reportFundId} onValueChange={setReportFundId}>
+                    <SelectTrigger data-testid="select-report-fund">
+                      <SelectValue placeholder="All funds" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Funds</SelectItem>
+                      {funds?.map((fund) => (
+                        <SelectItem key={fund.id} value={fund.id.toString()}>{fund.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button onClick={() => refetchReport()} data-testid="button-run-report">
+                  <Filter className="w-4 h-4 mr-2" /> Run Report
+                </Button>
+                <Button variant="outline" onClick={() => { setReportStartDate(""); setReportEndDate(""); setReportDonorEmail(""); setReportFundId(""); }} data-testid="button-clear-filters">
+                  Clear Filters
+                </Button>
+                {reportData?.donations?.length ? (
+                  <Button variant="outline" onClick={exportCSV} data-testid="button-export-csv">
+                    <Download className="w-4 h-4 mr-2" /> Export CSV
+                  </Button>
+                ) : null}
+              </div>
+            </CardContent>
+          </Card>
+
+          {reportData && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Report Total</CardTitle>
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="value-report-total">{formatCents(reportData.totalAmount)}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Donations Found</CardTitle>
+                  <Heart className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="value-report-count">{reportData.totalCount}</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {reportLoading ? (
+            <p className="text-muted-foreground">Loading report...</p>
+          ) : reportData?.donations?.length ? (
+            <Table data-testid="table-report">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Donor</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Fund</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportData.donations.map((d) => (
+                  <TableRow key={d.id} data-testid={`row-report-${d.id}`}>
+                    <TableCell>{d.donationDate ? formatDate(d.donationDate.toString()) : (d.createdAt ? formatDate(d.createdAt.toString()) : "—")}</TableCell>
+                    <TableCell>
+                      <div>{d.donorName || "Anonymous"}</div>
+                      {d.donorEmail && <div className="text-sm text-muted-foreground">{d.donorEmail}</div>}
+                    </TableCell>
+                    <TableCell className="font-medium">{formatCents(d.amountCents)}</TableCell>
+                    <TableCell>{getFundName(d.fundId)}</TableCell>
+                    <TableCell className="capitalize">{(d.paymentMethod || "stripe").replace("_", " ")}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(d.status)}>{d.status}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-muted-foreground">{d.notes || "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : reportData ? (
+            <p className="text-muted-foreground text-center py-8">No donations found matching your filters.</p>
+          ) : null}
+        </div>
+      )}
+
       <Dialog open={fundDialogOpen} onOpenChange={setFundDialogOpen}>
         <DialogContent data-testid="dialog-fund">
           <DialogHeader>
@@ -3607,6 +3814,72 @@ function DonationsTab() {
             </div>
             <Button type="submit" className="w-full" disabled={createFundMutation.isPending || updateFundMutation.isPending} data-testid="button-submit-fund">
               {editingFund ? "Update" : "Create"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={manualDonationOpen} onOpenChange={setManualDonationOpen}>
+        <DialogContent data-testid="dialog-manual-donation">
+          <DialogHeader>
+            <DialogTitle>Record Donation</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleManualDonationSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Donor Name</Label>
+                <Input placeholder="Anonymous" value={manualForm.donorName} onChange={(e) => setManualForm({ ...manualForm, donorName: e.target.value })} data-testid="input-manual-donor-name" />
+              </div>
+              <div className="space-y-2">
+                <Label>Donor Email</Label>
+                <Input type="email" placeholder="Optional" value={manualForm.donorEmail} onChange={(e) => setManualForm({ ...manualForm, donorEmail: e.target.value })} data-testid="input-manual-donor-email" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Amount ($)</Label>
+                <Input type="number" step="0.01" min="0.01" placeholder="0.00" value={manualForm.amountDollars} onChange={(e) => setManualForm({ ...manualForm, amountDollars: e.target.value })} required data-testid="input-manual-amount" />
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input type="date" value={manualForm.donationDate} onChange={(e) => setManualForm({ ...manualForm, donationDate: e.target.value })} data-testid="input-manual-date" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select value={manualForm.paymentMethod} onValueChange={(v) => setManualForm({ ...manualForm, paymentMethod: v })}>
+                  <SelectTrigger data-testid="select-manual-payment-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Fund</Label>
+                <Select value={manualForm.fundId} onValueChange={(v) => setManualForm({ ...manualForm, fundId: v })}>
+                  <SelectTrigger data-testid="select-manual-fund">
+                    <SelectValue placeholder="No fund" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Fund</SelectItem>
+                    {funds?.filter((f) => f.isActive).map((fund) => (
+                      <SelectItem key={fund.id} value={fund.id.toString()}>{fund.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea placeholder="Optional notes about this donation" value={manualForm.notes} onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })} data-testid="input-manual-notes" />
+            </div>
+            <Button type="submit" className="w-full" disabled={manualDonationMutation.isPending} data-testid="button-submit-manual-donation">
+              {manualDonationMutation.isPending ? "Recording..." : "Record Donation"}
             </Button>
           </form>
         </DialogContent>

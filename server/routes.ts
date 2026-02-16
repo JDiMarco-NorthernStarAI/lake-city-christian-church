@@ -17,6 +17,7 @@ import {
   insertSignupEventSchema, insertSignupSubmissionSchema,
 } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { seedDatabase } from "./seed";
 import { XMLParser } from "fast-xml-parser";
 import v1Router from "./v1-routes";
@@ -909,6 +910,71 @@ export async function registerRoutes(
       res.json(stats);
     } catch (err) {
       res.status(500).json({ message: "Error fetching donation stats" });
+    }
+  });
+
+  app.post("/api/donations/manual", requireFeature("donations"), async (req, res) => {
+    try {
+      const manualSchema = z.object({
+        donorName: z.string().optional().default("Anonymous"),
+        donorEmail: z.string().email().optional().nullable(),
+        amountDollars: z.number().positive("Amount must be greater than 0"),
+        fundId: z.number().int().optional().nullable(),
+        paymentMethod: z.enum(["cash", "check", "other"]).optional().default("cash"),
+        notes: z.string().optional().nullable(),
+        donationDate: z.string().optional().nullable(),
+      });
+      const parsed = manualSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid data" });
+      const { donorName, donorEmail, amountDollars, fundId, paymentMethod, notes, donationDate } = parsed.data;
+      const amountCents = Math.round(amountDollars * 100);
+      const donation = await storage.createDonation({
+        donorName: donorName || "Anonymous",
+        donorEmail: donorEmail || null,
+        amountCents,
+        fundId: fundId || null,
+        frequency: "one_time",
+        status: "completed",
+        paymentMethod: paymentMethod || "cash",
+        notes: notes || null,
+        donationDate: donationDate ? new Date(donationDate) : new Date(),
+      });
+      res.json(donation);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating manual donation" });
+    }
+  });
+
+  app.get("/api/donations/report", requireFeature("donations"), async (req, res) => {
+    try {
+      const { startDate, endDate, donorEmail, fundId } = req.query;
+      let allDonations = await storage.getDonations();
+      if (startDate) {
+        const start = new Date(startDate as string);
+        allDonations = allDonations.filter((d) => {
+          const dDate = d.donationDate || d.createdAt;
+          return dDate && new Date(dDate) >= start;
+        });
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        end.setHours(23, 59, 59, 999);
+        allDonations = allDonations.filter((d) => {
+          const dDate = d.donationDate || d.createdAt;
+          return dDate && new Date(dDate) <= end;
+        });
+      }
+      if (donorEmail) {
+        allDonations = allDonations.filter((d) => d.donorEmail === donorEmail);
+      }
+      if (fundId) {
+        const fid = Number(fundId);
+        allDonations = allDonations.filter((d) => d.fundId === fid);
+      }
+      const totalCents = allDonations.reduce((sum, d) => sum + d.amountCents, 0);
+      res.json({ donations: allDonations, totalAmount: totalCents, totalCount: allDonations.length });
+    } catch (err) {
+      res.status(500).json({ message: "Error generating report" });
     }
   });
 
