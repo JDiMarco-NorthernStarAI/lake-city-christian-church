@@ -2,7 +2,7 @@ import { db } from "./db";
 import { eq, desc, asc, and, isNull, sql } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
-  refreshTokens, eventSignups, children, forms, formFields, formSubmissions,
+  refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -18,6 +18,8 @@ import {
   type Form, type InsertForm,
   type FormField, type InsertFormField,
   type FormSubmission, type InsertFormSubmission,
+  type DonationFund, type InsertDonationFund,
+  type Donation, type InsertDonation,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -112,6 +114,22 @@ export interface IStorage {
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   deleteFormSubmission(id: number): Promise<void>;
   getFormSubmissionCount(formId: number): Promise<number>;
+
+  getDonationFunds(): Promise<DonationFund[]>;
+  getActiveDonationFunds(): Promise<DonationFund[]>;
+  getDonationFund(id: number): Promise<DonationFund | undefined>;
+  getDonationFundBySlug(slug: string): Promise<DonationFund | undefined>;
+  createDonationFund(fund: InsertDonationFund): Promise<DonationFund>;
+  updateDonationFund(id: number, data: Partial<InsertDonationFund>): Promise<DonationFund | undefined>;
+  deleteDonationFund(id: number): Promise<void>;
+
+  getDonations(): Promise<Donation[]>;
+  getDonation(id: number): Promise<Donation | undefined>;
+  getDonationByStripeSessionId(sessionId: string): Promise<Donation | undefined>;
+  getDonationByStripeSubscriptionId(subscriptionId: string): Promise<Donation | undefined>;
+  createDonation(donation: InsertDonation): Promise<Donation>;
+  updateDonation(id: number, data: Partial<InsertDonation>): Promise<Donation | undefined>;
+  getDonationStats(): Promise<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -532,6 +550,81 @@ export class DatabaseStorage implements IStorage {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(formSubmissions)
       .where(eq(formSubmissions.formId, formId));
     return result[0]?.count ?? 0;
+  }
+
+  async getDonationFunds(): Promise<DonationFund[]> {
+    return db.select().from(donationFunds).orderBy(asc(donationFunds.sortOrder));
+  }
+
+  async getActiveDonationFunds(): Promise<DonationFund[]> {
+    return db.select().from(donationFunds).where(eq(donationFunds.isActive, true)).orderBy(asc(donationFunds.sortOrder));
+  }
+
+  async getDonationFund(id: number): Promise<DonationFund | undefined> {
+    const [fund] = await db.select().from(donationFunds).where(eq(donationFunds.id, id));
+    return fund;
+  }
+
+  async getDonationFundBySlug(slug: string): Promise<DonationFund | undefined> {
+    const [fund] = await db.select().from(donationFunds).where(eq(donationFunds.slug, slug));
+    return fund;
+  }
+
+  async createDonationFund(fund: InsertDonationFund): Promise<DonationFund> {
+    const [created] = await db.insert(donationFunds).values(fund).returning();
+    return created;
+  }
+
+  async updateDonationFund(id: number, data: Partial<InsertDonationFund>): Promise<DonationFund | undefined> {
+    const [updated] = await db.update(donationFunds).set(data).where(eq(donationFunds.id, id)).returning();
+    return updated;
+  }
+
+  async deleteDonationFund(id: number): Promise<void> {
+    await db.delete(donationFunds).where(eq(donationFunds.id, id));
+  }
+
+  async getDonations(): Promise<Donation[]> {
+    return db.select().from(donations).orderBy(desc(donations.createdAt));
+  }
+
+  async getDonation(id: number): Promise<Donation | undefined> {
+    const [donation] = await db.select().from(donations).where(eq(donations.id, id));
+    return donation;
+  }
+
+  async getDonationByStripeSessionId(sessionId: string): Promise<Donation | undefined> {
+    const [donation] = await db.select().from(donations).where(eq(donations.stripeSessionId, sessionId));
+    return donation;
+  }
+
+  async getDonationByStripeSubscriptionId(subscriptionId: string): Promise<Donation | undefined> {
+    const [donation] = await db.select().from(donations).where(eq(donations.stripeSubscriptionId, subscriptionId));
+    return donation;
+  }
+
+  async createDonation(donation: InsertDonation): Promise<Donation> {
+    const [created] = await db.insert(donations).values(donation).returning();
+    return created;
+  }
+
+  async updateDonation(id: number, data: Partial<InsertDonation>): Promise<Donation | undefined> {
+    const [updated] = await db.update(donations).set({ ...data, updatedAt: new Date() }).where(eq(donations.id, id)).returning();
+    return updated;
+  }
+
+  async getDonationStats(): Promise<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }> {
+    const allDonations = await db.select().from(donations).where(eq(donations.status, "completed"));
+    const totalAmount = allDonations.reduce((sum, d) => sum + d.amountCents, 0);
+    const totalCount = allDonations.length;
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthlyDonations = allDonations.filter(d => new Date(d.createdAt) >= monthStart);
+    const monthlyAmount = monthlyDonations.reduce((sum, d) => sum + d.amountCents, 0);
+    const monthlyCount = monthlyDonations.length;
+
+    return { totalAmount, totalCount, monthlyAmount, monthlyCount };
   }
 }
 

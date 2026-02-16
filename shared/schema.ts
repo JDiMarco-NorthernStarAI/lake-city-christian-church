@@ -31,6 +31,7 @@ export const AVAILABLE_FEATURES = [
   "messages",
   "connect",
   "forms",
+  "donations",
   "settings",
   "users",
   "roles",
@@ -46,6 +47,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   messages: "Messages",
   connect: "Connect Cards",
   forms: "Form Builder",
+  donations: "Donations",
   settings: "Settings",
   users: "User Management",
   roles: "Role Permissions",
@@ -68,6 +70,9 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export const SIGNUP_STATUSES = ["registered", "waitlist", "cancelled"] as const;
+
+export const DONATION_FREQUENCIES = ["one_time", "weekly", "monthly"] as const;
+export const DONATION_STATUSES = ["pending", "completed", "failed", "refunded"] as const;
 
 export const FORM_STATUSES = ["draft", "published", "archived"] as const;
 
@@ -285,6 +290,32 @@ export const formSubmissions = pgTable("form_submissions", {
   submittedAt: timestamp("submitted_at").notNull().defaultNow(),
 });
 
+export const donationFunds = pgTable("donation_funds", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const donations = pgTable("donations", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  fundId: integer("fund_id"),
+  donorName: text("donor_name"),
+  donorEmail: text("donor_email"),
+  amountCents: integer("amount_cents").notNull(),
+  frequency: text("frequency").notNull().default("one_time"),
+  status: text("status").notNull().default("pending"),
+  stripeSessionId: text("stripe_session_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeCustomerId: text("stripe_customer_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSermonSchema = createInsertSchema(sermons).omit({ id: true });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, updatedAt: true });
@@ -389,6 +420,30 @@ export type InsertFormField = z.infer<typeof insertFormFieldSchema>;
 export type FormField = typeof formFields.$inferSelect;
 export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 export type FormSubmission = typeof formSubmissions.$inferSelect;
+
+export const insertDonationFundSchema = createInsertSchema(donationFunds).omit({ id: true, createdAt: true });
+export const insertDonationSchema = createInsertSchema(donations).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type InsertDonationFund = z.infer<typeof insertDonationFundSchema>;
+export type DonationFund = typeof donationFunds.$inferSelect;
+export type InsertDonation = z.infer<typeof insertDonationSchema>;
+export type Donation = typeof donations.$inferSelect;
+
+export const createDonationFundSchema = z.object({
+  name: z.string().min(1, "Fund name is required"),
+  slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const createCheckoutSchema = z.object({
+  amountCents: z.number().int().positive("Amount must be positive"),
+  frequency: z.enum(DONATION_FREQUENCIES),
+  fundSlug: z.string().optional(),
+  donorName: z.string().optional(),
+  donorEmail: z.string().email().optional(),
+});
 
 export const createFormSchema = z.object({
   title: z.string().min(1, "Title is required"),

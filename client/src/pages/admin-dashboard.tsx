@@ -19,16 +19,16 @@ import {
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
-  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown,
+  Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission } from "@shared/schema";
+import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund } from "@shared/schema";
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES } from "@shared/schema";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "pages" | "settings" | "users" | "roles";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "pages" | "settings" | "users" | "roles";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -40,6 +40,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
   { id: "connect", label: "Connect Cards", icon: FileText, feature: "connect" },
   { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
+  { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "users", label: "Users", icon: UserCog, feature: "users" },
   { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
@@ -140,6 +141,7 @@ export default function AdminDashboard() {
           {activeTab === "messages" && <MessagesTab />}
           {activeTab === "connect" && <ConnectCardsTab />}
           {activeTab === "forms" && <FormsTab />}
+          {activeTab === "donations" && <DonationsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}
@@ -2225,6 +2227,309 @@ function FormSubmissionsView({ formId, onBack }: { formId: number; onBack: () =>
           </Table>
         </div>
       )}
+    </div>
+  );
+}
+
+function DonationsTab() {
+  const { toast } = useToast();
+  const [view, setView] = useState<"history" | "funds">("history");
+  const [fundDialogOpen, setFundDialogOpen] = useState(false);
+  const [editingFund, setEditingFund] = useState<DonationFund | null>(null);
+  const [fundForm, setFundForm] = useState({ name: "", slug: "", description: "", isActive: true });
+
+  const { data: stats } = useQuery<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }>({
+    queryKey: ["/api/donations/stats"],
+  });
+
+  const { data: donations, isLoading: donationsLoading } = useQuery<Donation[]>({
+    queryKey: ["/api/donations"],
+  });
+
+  const { data: funds, isLoading: fundsLoading } = useQuery<DonationFund[]>({
+    queryKey: ["/api/donation-funds"],
+  });
+
+  const createFundMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("POST", "/api/donation-funds", data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/donation-funds"] });
+      toast({ title: "Fund created" });
+      closeFundDialog();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateFundMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/donation-funds/${id}`, data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/donation-funds"] });
+      toast({ title: "Fund updated" });
+      closeFundDialog();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteFundMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/donation-funds/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/donation-funds"] });
+      toast({ title: "Fund deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function openAddFund() {
+    setEditingFund(null);
+    setFundForm({ name: "", slug: "", description: "", isActive: true });
+    setFundDialogOpen(true);
+  }
+
+  function openEditFund(fund: DonationFund) {
+    setEditingFund(fund);
+    setFundForm({ name: fund.name, slug: fund.slug, description: fund.description || "", isActive: fund.isActive });
+    setFundDialogOpen(true);
+  }
+
+  function closeFundDialog() {
+    setFundDialogOpen(false);
+    setEditingFund(null);
+  }
+
+  function handleFundSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const data = { ...fundForm, description: fundForm.description || null };
+    if (editingFund) {
+      updateFundMutation.mutate({ id: editingFund.id, data });
+    } else {
+      createFundMutation.mutate(data);
+    }
+  }
+
+  function handleDeleteFund(id: number) {
+    if (confirm("Are you sure you want to delete this fund?")) {
+      deleteFundMutation.mutate(id);
+    }
+  }
+
+  function getFundName(fundId: number | null) {
+    if (!fundId || !funds) return "—";
+    const fund = funds.find((f) => f.id === fundId);
+    return fund ? fund.name : "Unknown";
+  }
+
+  function formatCents(cents: number) {
+    return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatDate(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+    switch (status) {
+      case "completed": return "default";
+      case "pending": return "secondary";
+      case "refunded": return "destructive";
+      case "failed": return "destructive";
+      default: return "outline";
+    }
+  }
+
+  return (
+    <div data-testid="tab-donations">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-2xl font-bold">Donations</h1>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={view === "history" ? "default" : "outline"}
+            onClick={() => setView("history")}
+            data-testid="button-view-history"
+          >
+            <DollarSign className="w-4 h-4 mr-2" /> History
+          </Button>
+          <Button
+            variant={view === "funds" ? "default" : "outline"}
+            onClick={() => setView("funds")}
+            data-testid="button-view-funds"
+          >
+            <Heart className="w-4 h-4 mr-2" /> Funds
+          </Button>
+        </div>
+      </div>
+
+      {view === "history" && (
+        <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Card data-testid="stat-total-donated">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Donated</CardTitle>
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="value-total-donated">
+                  {stats ? formatCents(stats.totalAmount) : "$0.00"}
+                </div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-total-donations">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Donations</CardTitle>
+                <Heart className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="value-total-donations">
+                  {stats?.totalCount ?? 0}
+                </div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-monthly-amount">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">This Month</CardTitle>
+                <TrendingUp className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="value-monthly-amount">
+                  {stats ? formatCents(stats.monthlyAmount) : "$0.00"}
+                </div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-monthly-count">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Monthly Count</CardTitle>
+                <BarChart3 className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="value-monthly-count">
+                  {stats?.monthlyCount ?? 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {donationsLoading ? (
+            <p className="text-muted-foreground">Loading donations...</p>
+          ) : (
+            <Table data-testid="table-donations">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Donor</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Fund</TableHead>
+                  <TableHead>Frequency</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {donations?.map((donation) => (
+                  <TableRow key={donation.id} data-testid={`row-donation-${donation.id}`}>
+                    <TableCell>{donation.createdAt ? formatDate(donation.createdAt.toString()) : "—"}</TableCell>
+                    <TableCell>
+                      <div>{donation.donorName || "Anonymous"}</div>
+                      {donation.donorEmail && (
+                        <div className="text-sm text-muted-foreground">{donation.donorEmail}</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{formatCents(donation.amountCents)}</TableCell>
+                    <TableCell>{getFundName(donation.fundId)}</TableCell>
+                    <TableCell className="capitalize">{donation.frequency.replace("_", " ")}</TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(donation.status)} data-testid={`badge-status-${donation.id}`}>
+                        {donation.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      )}
+
+      {view === "funds" && (
+        <div>
+          <div className="flex items-center justify-end mb-4">
+            <Button onClick={openAddFund} data-testid="button-add-fund">
+              <Plus className="w-4 h-4 mr-2" /> Add Fund
+            </Button>
+          </div>
+
+          {fundsLoading ? (
+            <p className="text-muted-foreground">Loading funds...</p>
+          ) : (
+            <Table data-testid="table-funds">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {funds?.map((fund) => (
+                  <TableRow key={fund.id} data-testid={`row-fund-${fund.id}`}>
+                    <TableCell className="font-medium">{fund.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{fund.slug}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{fund.description || "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={fund.isActive ? "default" : "secondary"} data-testid={`badge-fund-status-${fund.id}`}>
+                        {fund.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEditFund(fund)} data-testid={`button-edit-fund-${fund.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => handleDeleteFund(fund.id)} data-testid={`button-delete-fund-${fund.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      )}
+
+      <Dialog open={fundDialogOpen} onOpenChange={setFundDialogOpen}>
+        <DialogContent data-testid="dialog-fund">
+          <DialogHeader>
+            <DialogTitle>{editingFund ? "Edit Fund" : "Add Fund"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleFundSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={fundForm.name} onChange={(e) => setFundForm({ ...fundForm, name: e.target.value })} required data-testid="input-fund-name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Slug</Label>
+              <Input value={fundForm.slug} onChange={(e) => setFundForm({ ...fundForm, slug: e.target.value })} required data-testid="input-fund-slug" />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea value={fundForm.description} onChange={(e) => setFundForm({ ...fundForm, description: e.target.value })} data-testid="input-fund-description" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="fund-active"
+                checked={fundForm.isActive}
+                onCheckedChange={(checked) => setFundForm({ ...fundForm, isActive: !!checked })}
+                data-testid="checkbox-fund-active"
+              />
+              <Label htmlFor="fund-active">Active</Label>
+            </div>
+            <Button type="submit" className="w-full" disabled={createFundMutation.isPending || updateFundMutation.isPending} data-testid="button-submit-fund">
+              {editingFund ? "Update" : "Create"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

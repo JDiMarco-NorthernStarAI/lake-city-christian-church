@@ -19,6 +19,7 @@ import ConnectServe from "@/pages/connect-serve";
 import Encounter from "@/pages/encounter";
 import Announcements from "@/pages/announcements";
 import Give from "@/pages/give";
+import GiveSuccess from "@/pages/give-success";
 import PlanVisit from "@/pages/plan-visit";
 import Contact from "@/pages/contact";
 import AdminLogin from "@/pages/admin-login";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/encounter" component={Encounter} />
       <Route path="/announcements" component={Announcements} />
       <Route path="/give" component={Give} />
+      <Route path="/give/success" component={GiveSuccess} />
       <Route path="/plan-visit" component={PlanVisit} />
       <Route path="/contact" component={Contact} />
       <Route path="/forms/:slug" component={PublicForm} />

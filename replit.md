@@ -44,6 +44,7 @@ Preferred communication style: Simple, everyday language.
 - **Tables**: users, sermons, events, team_members, contact_submissions, connect_cards, site_settings, plus session table auto-created by connect-pg-simple
 - **V1 API Tables**: refresh_tokens (JWT refresh token storage with device tracking), event_signups (event registration with waitlist support), children (kids ministry registration)
 - **Form Builder Tables**: forms (configurable forms with slug, status, settings), form_fields (fields with type, order, options), form_submissions (submitted data as JSONB)
+- **Donation Tables**: donation_funds (named giving categories with slug/active status), donations (amount in cents, frequency, Stripe session/payment/subscription IDs, status tracking)
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface with a database-backed implementation using Drizzle
@@ -97,7 +98,7 @@ migrations/           # Drizzle migration output directory
 ### Third-Party Services (referenced in the app)
 - **YouTube** — Sermon videos embedded via YouTube URLs, thumbnails fetched from `img.youtube.com`
 - **Google Fonts** — Typography (Inter, Montserrat, DM Sans, etc.)
-- **Tithe.ly** — External giving/donation platform (linked to, not integrated)
+- **Stripe** — Payment processing for donations (one-time and recurring via Checkout Sessions). Uses STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, and STRIPE_WEBHOOK_SECRET env vars.
 
 ### Key NPM Dependencies
 - `drizzle-orm` + `drizzle-kit` — Database ORM and schema tooling
