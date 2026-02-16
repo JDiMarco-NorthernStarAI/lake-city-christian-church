@@ -21,13 +21,18 @@ const navItems = [
       { label: "What We Believe", href: "/what-we-believe" },
       { label: "Leadership", href: "/leadership" },
       { label: "Ministries", href: "/ministries" },
-      { label: "Encounter", href: "/encounter" },
-      { label: "Announcements", href: "/announcements" },
-      { label: "Contact", href: "/contact" },
     ],
   },
   { label: "Give", href: "/give" },
-  { label: "Plan Your Visit", href: "/plan-visit" },
+  {
+    label: "Plan Your Visit",
+    href: "/plan-visit",
+    children: [
+      { label: "Contact", href: "/contact" },
+      { label: "Announcements", href: "/announcements" },
+      { label: "Encounter", href: "/encounter" },
+    ],
+  },
 ];
 
 export default function Navbar() {
