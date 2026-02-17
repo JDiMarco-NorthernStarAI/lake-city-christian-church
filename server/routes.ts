@@ -613,6 +613,7 @@ export async function registerRoutes(
         uniquePages: Object.keys(pageCounts),
       });
     } catch (err) {
+      console.error("Analytics report error:", err);
       res.status(500).json({ message: "Error generating analytics report" });
     }
   });
