@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
@@ -146,7 +146,14 @@ export default function AdminDashboard() {
           </SidebarContent>
         </Sidebar>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto flex flex-col">
+          <header className="flex items-center gap-2 p-3 border-b md:hidden sticky top-0 z-50 bg-background">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <span className="text-sm font-medium truncate">
+              {navItems.find(item => item.id === activeTab)?.label || "Dashboard"}
+            </span>
+          </header>
+          <div className="flex-1 p-6">
           {activeTab === "dashboard" && <DashboardTab />}
           {activeTab === "analytics" && <AnalyticsTab />}
           {activeTab === "sermons" && <SermonsTab />}
@@ -164,6 +171,7 @@ export default function AdminDashboard() {
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}
           {activeTab === "roles" && <RolesTab isSuperAdmin={user.roles.includes("super_admin")} />}
+          </div>
         </div>
       </div>
     </SidebarProvider>
