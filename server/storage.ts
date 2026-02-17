@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, asc, and, isNull, sql, inArray, ne } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, sql, inArray, ne, gte, lte } from "drizzle-orm";
 import {
   users, sermons, events, teamMembers, contactSubmissions, connectCards, siteSettings, pageViews, rolePermissions,
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
@@ -253,6 +253,9 @@ export interface IStorage {
 
   createLoginActivity(entry: InsertLoginActivity): Promise<LoginActivity>;
   getLoginActivity(limit?: number): Promise<LoginActivity[]>;
+
+  getPageViewsFiltered(filters: { startDate?: string; endDate?: string; path?: string }): Promise<PageView[]>;
+  getLoginActivityFiltered(filters: { startDate?: string; endDate?: string; source?: string }): Promise<LoginActivity[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1183,6 +1186,32 @@ export class DatabaseStorage implements IStorage {
 
   async getLoginActivity(limit = 100): Promise<LoginActivity[]> {
     return db.select().from(loginActivity).orderBy(desc(loginActivity.createdAt)).limit(limit);
+  }
+
+  async getPageViewsFiltered(filters: { startDate?: string; endDate?: string; path?: string }): Promise<PageView[]> {
+    const conditions = [];
+    if (filters.startDate) conditions.push(gte(pageViews.createdAt, new Date(filters.startDate)));
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(lte(pageViews.createdAt, end));
+    }
+    if (filters.path) conditions.push(eq(pageViews.path, filters.path));
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    return db.select().from(pageViews).where(where).orderBy(desc(pageViews.createdAt));
+  }
+
+  async getLoginActivityFiltered(filters: { startDate?: string; endDate?: string; source?: string }): Promise<LoginActivity[]> {
+    const conditions = [];
+    if (filters.startDate) conditions.push(gte(loginActivity.createdAt, new Date(filters.startDate)));
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(lte(loginActivity.createdAt, end));
+    }
+    if (filters.source) conditions.push(eq(loginActivity.source, filters.source));
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    return db.select().from(loginActivity).where(where).orderBy(desc(loginActivity.createdAt));
   }
 }
 

@@ -256,7 +256,57 @@ function DashboardTab() {
   );
 }
 
+const PAGE_NAMES: Record<string, string> = {
+  "/": "Home",
+  "/about": "About",
+  "/about/story": "Our Story",
+  "/about/beliefs": "What We Believe",
+  "/about/leadership": "Leadership",
+  "/ministries": "Ministries",
+  "/ministries/kids": "Kids Ministry",
+  "/ministries/students": "Students",
+  "/ministries/small-groups": "Small Groups",
+  "/ministries/connect-serve": "Connect & Serve",
+  "/encounter": "Watch",
+  "/announcements": "What's Happening",
+  "/give": "Give",
+  "/plan-a-visit": "Plan a Visit",
+  "/contact": "Contact",
+};
+
 function AnalyticsTab() {
+  const [analyticsView, setAnalyticsView] = useState<"overview" | "reports">("overview");
+
+  return (
+    <div data-testid="tab-analytics">
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <h1 className="text-2xl font-bold">Analytics</h1>
+        <div className="flex gap-2">
+          <Button
+            variant={analyticsView === "overview" ? "default" : "outline"}
+            onClick={() => setAnalyticsView("overview")}
+            data-testid="button-analytics-overview"
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            Overview
+          </Button>
+          <Button
+            variant={analyticsView === "reports" ? "default" : "outline"}
+            onClick={() => setAnalyticsView("reports")}
+            data-testid="button-analytics-reports"
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Reports
+          </Button>
+        </div>
+      </div>
+
+      {analyticsView === "overview" ? <AnalyticsOverview /> : <AnalyticsReports />}
+    </div>
+  );
+}
+
+function AnalyticsOverview() {
   const { data: stats, isLoading } = useQuery<{
     totalViews: number;
     uniqueVisitors: number;
@@ -270,28 +320,8 @@ function AnalyticsTab() {
 
   const maxDayCount = Math.max(...stats.recentDays.map(d => d.count), 1);
 
-  const pageNames: Record<string, string> = {
-    "/": "Home",
-    "/about": "About",
-    "/about/story": "Our Story",
-    "/about/beliefs": "What We Believe",
-    "/about/leadership": "Leadership",
-    "/ministries": "Ministries",
-    "/ministries/kids": "Kids Ministry",
-    "/ministries/students": "Students",
-    "/ministries/small-groups": "Small Groups",
-    "/ministries/connect-serve": "Connect & Serve",
-    "/encounter": "Watch",
-    "/announcements": "What's Happening",
-    "/give": "Give",
-    "/plan-a-visit": "Plan a Visit",
-    "/contact": "Contact",
-  };
-
   return (
-    <div data-testid="tab-analytics">
-      <h1 className="text-2xl font-bold mb-6">Analytics</h1>
-
+    <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
@@ -376,7 +406,7 @@ function AnalyticsTab() {
               <TableBody>
                 {stats.topPages.map((page) => (
                   <TableRow key={page.path} data-testid={`row-page-${page.path.replace(/\//g, "-")}`}>
-                    <TableCell className="font-medium">{pageNames[page.path] || page.path}</TableCell>
+                    <TableCell className="font-medium">{PAGE_NAMES[page.path] || page.path}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{page.path}</TableCell>
                     <TableCell className="text-right">{page.count.toLocaleString()}</TableCell>
                   </TableRow>
@@ -388,6 +418,335 @@ function AnalyticsTab() {
       </Card>
 
       <LoginActivitySection />
+    </>
+  );
+}
+
+type ReportData = {
+  totalViews: number;
+  uniqueVisitors: number;
+  topPages: { path: string; count: number }[];
+  dailyBreakdown: { date: string; count: number }[];
+  totalLogins: number;
+  logins: LoginActivity[];
+  uniquePages: string[];
+};
+
+function AnalyticsReports() {
+  const today = new Date().toISOString().split("T")[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState(thirtyDaysAgo);
+  const [endDate, setEndDate] = useState(today);
+  const [selectedPage, setSelectedPage] = useState("all");
+  const [selectedSource, setSelectedSource] = useState("all");
+  const [reportTab, setReportTab] = useState<"pageviews" | "logins">("pageviews");
+
+  const params = new URLSearchParams();
+  if (startDate) params.set("startDate", startDate);
+  if (endDate) params.set("endDate", endDate);
+  if (selectedPage !== "all") params.set("path", selectedPage);
+  if (selectedSource !== "all") params.set("source", selectedSource);
+
+  const { data: report, isLoading } = useQuery<ReportData>({
+    queryKey: ["/api/analytics/report", startDate, endDate, selectedPage, selectedSource],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/report?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch report");
+      return res.json();
+    },
+  });
+
+  const exportCsv = () => {
+    if (!report) return;
+    if (reportTab === "pageviews") {
+      const rows = [["Date", "Page Views"]];
+      for (const day of report.dailyBreakdown) {
+        rows.push([day.date, String(day.count)]);
+      }
+      rows.push([]);
+      rows.push(["Page", "Views"]);
+      for (const page of report.topPages) {
+        rows.push([PAGE_NAMES[page.path] || page.path, String(page.count)]);
+      }
+      rows.push([]);
+      rows.push(["Total Views", String(report.totalViews)]);
+      rows.push(["Unique Visitors", String(report.uniqueVisitors)]);
+      const csv = rows.map(r => r.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `analytics-pageviews-${startDate}-to-${endDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const rows = [["Date/Time", "User", "Email", "Source", "Method"]];
+      for (const login of report.logins) {
+        rows.push([
+          login.createdAt ? new Date(login.createdAt).toLocaleString() : "",
+          login.displayName || login.username || "",
+          login.email || "",
+          login.source,
+          login.loginMethod,
+        ]);
+      }
+      const csv = rows.map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `analytics-logins-${startDate}-to-${endDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const maxBarCount = report?.dailyBreakdown ? Math.max(...report.dailyBreakdown.map(d => d.count), 1) : 1;
+
+  return (
+    <div data-testid="analytics-reports">
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Report Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                data-testid="input-report-start-date"
+              />
+            </div>
+            <div>
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                data-testid="input-report-end-date"
+              />
+            </div>
+            <div>
+              <Label>Page</Label>
+              <Select value={selectedPage} onValueChange={setSelectedPage}>
+                <SelectTrigger data-testid="select-report-page">
+                  <SelectValue placeholder="All Pages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Pages</SelectItem>
+                  {Object.entries(PAGE_NAMES).map(([path, name]) => (
+                    <SelectItem key={path} value={path}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Login Source</Label>
+              <Select value={selectedSource} onValueChange={setSelectedSource}>
+                <SelectTrigger data-testid="select-report-source">
+                  <SelectValue placeholder="All Sources" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="app">Web App</SelectItem>
+                  <SelectItem value="ios">iOS</SelectItem>
+                  <SelectItem value="android">Android</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Generating report...</div>
+      ) : !report ? (
+        <p className="text-muted-foreground">No data available for the selected filters.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Page Views</CardTitle>
+                <Eye className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="report-total-views">{report.totalViews.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Unique Visitors</CardTitle>
+                <Users className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="report-unique-visitors">{report.uniqueVisitors.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pages Visited</CardTitle>
+                <FileText className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="report-pages-count">{report.uniquePages.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Logins</CardTitle>
+                <LogIn className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="report-total-logins">{report.totalLogins.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div className="flex gap-2">
+              <Button
+                variant={reportTab === "pageviews" ? "default" : "outline"}
+                onClick={() => setReportTab("pageviews")}
+                data-testid="button-report-pageviews"
+              >
+                Page Views
+              </Button>
+              <Button
+                variant={reportTab === "logins" ? "default" : "outline"}
+                onClick={() => setReportTab("logins")}
+                data-testid="button-report-logins"
+              >
+                Logins
+              </Button>
+            </div>
+            <Button variant="outline" onClick={exportCsv} data-testid="button-export-report-csv">
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
+
+          {reportTab === "pageviews" ? (
+            <>
+              {report.dailyBreakdown.length > 0 && (
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Daily Page Views</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-end gap-1 h-48" data-testid="report-chart">
+                      {report.dailyBreakdown.map((day) => {
+                        const height = maxBarCount > 0 ? (day.count / maxBarCount) * 100 : 0;
+                        const dateObj = new Date(day.date + "T12:00:00");
+                        const label = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                        return (
+                          <div key={day.date} className="flex-1 flex flex-col items-center justify-end h-full group relative" style={{ minWidth: "4px" }}>
+                            <div
+                              className="w-full rounded-t-sm"
+                              style={{
+                                height: `${Math.max(height, 2)}%`,
+                                background: "linear-gradient(to top, #0033AA, #00D4FF)",
+                                minHeight: day.count > 0 ? "4px" : "2px",
+                              }}
+                            />
+                            <div className="invisible group-hover:visible absolute -top-8 bg-popover border rounded-md px-2 py-1 text-xs whitespace-nowrap z-10">
+                              {label}: {day.count} views
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {report.dailyBreakdown.length > 1 && (
+                      <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                        <span>{new Date(report.dailyBreakdown[0].date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        <span>{new Date(report.dailyBreakdown[report.dailyBreakdown.length - 1].date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Pages Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {report.topPages.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No page view data for this period.</p>
+                  ) : (
+                    <Table data-testid="report-table-pages">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Page</TableHead>
+                          <TableHead>Path</TableHead>
+                          <TableHead className="text-right">Views</TableHead>
+                          <TableHead className="text-right">% of Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {report.topPages.map((page) => (
+                          <TableRow key={page.path}>
+                            <TableCell className="font-medium">{PAGE_NAMES[page.path] || page.path}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{page.path}</TableCell>
+                            <TableCell className="text-right">{page.count.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {report.totalViews > 0 ? ((page.count / report.totalViews) * 100).toFixed(1) : 0}%
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Login Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {report.logins.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No login activity for this period.</p>
+                ) : (
+                  <Table data-testid="report-table-logins">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead>Date/Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {report.logins.map((login) => (
+                        <TableRow key={login.id}>
+                          <TableCell className="font-medium">{login.displayName || login.username}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{login.email || "-"}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              {login.source === "admin" ? "Admin" : login.source === "app" ? "Web App" : login.source}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{login.loginMethod}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {login.createdAt ? new Date(login.createdAt).toLocaleString() : ""}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

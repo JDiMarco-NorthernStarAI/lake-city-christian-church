@@ -574,6 +574,49 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/analytics/report", requireFeature("analytics"), async (req, res) => {
+    try {
+      const { startDate, endDate, path, source } = req.query as Record<string, string | undefined>;
+      const [views, logins] = await Promise.all([
+        storage.getPageViewsFiltered({ startDate, endDate, path }),
+        storage.getLoginActivityFiltered({ startDate, endDate, source }),
+      ]);
+
+      const totalViews = views.length;
+      const uniqueVisitors = new Set(views.map(v => v.ipHash).filter(Boolean)).size;
+
+      const pageCounts: Record<string, number> = {};
+      for (const v of views) {
+        pageCounts[v.path] = (pageCounts[v.path] || 0) + 1;
+      }
+      const topPages = Object.entries(pageCounts)
+        .map(([p, count]) => ({ path: p, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+
+      const dayCounts: Record<string, number> = {};
+      for (const v of views) {
+        const d = new Date(v.createdAt).toISOString().split("T")[0];
+        dayCounts[d] = (dayCounts[d] || 0) + 1;
+      }
+      const dailyBreakdown = Object.entries(dayCounts)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json({
+        totalViews,
+        uniqueVisitors,
+        topPages,
+        dailyBreakdown,
+        totalLogins: logins.length,
+        logins: logins.slice(0, 200),
+        uniquePages: Object.keys(pageCounts),
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Error generating analytics report" });
+    }
+  });
+
   app.get("/api/users", requireFeature("users"), async (_req, res) => {
     const data = await storage.getUsers();
     const safe = data.map(({ password, ...rest }) => rest);
