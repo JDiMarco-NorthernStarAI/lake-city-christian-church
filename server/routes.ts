@@ -177,6 +177,18 @@ export async function registerRoutes(
       req.session.userId = user.id;
       req.session.roles = user.roles;
       const enabledFeatures = await storage.getEnabledFeaturesForRoles(user.roles);
+
+      storage.createLoginActivity({
+        userId: user.id,
+        username: user.username,
+        email: user.email || undefined,
+        displayName: user.name || user.username,
+        loginMethod: "password",
+        source: "admin",
+        ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null,
+        userAgent: req.headers["user-agent"]?.slice(0, 500) || null,
+      }).catch(() => {});
+
       res.json({ id: user.id, username: user.username, roles: user.roles, features: enabledFeatures });
     } catch (err) {
       res.status(500).json({ message: "Server error" });
@@ -549,6 +561,16 @@ export async function registerRoutes(
       res.json(stats);
     } catch (err) {
       res.status(500).json({ message: "Error fetching analytics" });
+    }
+  });
+
+  app.get("/api/analytics/logins", requireFeature("analytics"), async (req, res) => {
+    try {
+      const limit = req.query.limit ? Math.min(Number(req.query.limit), 500) : 100;
+      const logins = await storage.getLoginActivity(limit);
+      res.json(logins);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching login activity" });
     }
   });
 

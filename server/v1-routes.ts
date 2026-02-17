@@ -172,6 +172,7 @@ v1Router.post("/auth/login", async (req, res) => {
     const accessToken = generateAccessToken({ userId: user.id, roles: user.roles });
     const refreshTokenRaw = generateRefreshToken();
     const tokenHash = hashRefreshToken(refreshTokenRaw);
+    const clientIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
 
     await storage.createRefreshToken({
       userId: user.id,
@@ -179,9 +180,20 @@ v1Router.post("/auth/login", async (req, res) => {
       deviceId,
       deviceName,
       deviceType,
-      ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null,
+      ipAddress: clientIp,
       expiresAt: getRefreshTokenExpiry(),
     });
+
+    storage.createLoginActivity({
+      userId: user.id,
+      username: user.username,
+      email: user.email || undefined,
+      displayName: user.name || user.username,
+      loginMethod: "password",
+      source: deviceType === "web" ? "app" : deviceType,
+      ipAddress: clientIp,
+      userAgent: req.headers["user-agent"]?.slice(0, 500) || null,
+    }).catch(() => {});
 
     return apiResponse(res, 200, {
       user: sanitizeUser(user),

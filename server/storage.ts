@@ -5,6 +5,7 @@ import {
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
   pushSubscriptions, notificationLogs, signupEvents, signupSubmissions,
   smsGroups, smsGroupMembers, userTags, smsMessages, smsRecipients, smsOptOuts, smsTemplates, smsSettings, smsIncomingMessages,
+  loginActivity,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -35,6 +36,7 @@ import {
   type SmsTemplate, type InsertSmsTemplate,
   type SmsSettings, type InsertSmsSettings,
   type SmsIncomingMessage, type InsertSmsIncomingMessage,
+  type LoginActivity, type InsertLoginActivity,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -248,6 +250,9 @@ export interface IStorage {
   getDonationsByEmail(email: string): Promise<Donation[]>;
   getAllFormSubmissions(): Promise<FormSubmission[]>;
   getAllSignupSubmissions(): Promise<SignupSubmission[]>;
+
+  createLoginActivity(entry: InsertLoginActivity): Promise<LoginActivity>;
+  getLoginActivity(limit?: number): Promise<LoginActivity[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1169,6 +1174,15 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSignupSubmissions(): Promise<SignupSubmission[]> {
     return db.select().from(signupSubmissions).orderBy(desc(signupSubmissions.createdAt));
+  }
+
+  async createLoginActivity(entry: InsertLoginActivity): Promise<LoginActivity> {
+    const [result] = await db.insert(loginActivity).values(entry).returning();
+    return result;
+  }
+
+  async getLoginActivity(limit = 100): Promise<LoginActivity[]> {
+    return db.select().from(loginActivity).orderBy(desc(loginActivity.createdAt)).limit(limit);
   }
 }
 

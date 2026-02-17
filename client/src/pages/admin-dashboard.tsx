@@ -20,13 +20,13 @@ import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
   Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy, UserPlus,
-  Camera, Loader2, ExternalLink, Download, Search, Filter,
+  Camera, Loader2, ExternalLink, Download, Search, Filter, LogIn, Monitor, Smartphone, Globe,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund, SignupEvent, SignupSubmission } from "@shared/schema";
+import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund, SignupEvent, SignupSubmission, LoginActivity } from "@shared/schema";
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES, SIGNUP_CATEGORIES, SIGNUP_CATEGORY_LABELS, SIGNUP_EVENT_STATUSES, SIGNUP_VISIBILITY, SIGNUP_DISPLAY_TYPES } from "@shared/schema";
 import { clearTokens } from "@/lib/v1Api";
 import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
@@ -357,7 +357,7 @@ function AnalyticsTab() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
           <CardTitle className="text-lg">Top Pages</CardTitle>
         </CardHeader>
@@ -386,7 +386,95 @@ function AnalyticsTab() {
           )}
         </CardContent>
       </Card>
+
+      <LoginActivitySection />
     </div>
+  );
+}
+
+function LoginActivitySection() {
+  const { data: logins, isLoading } = useQuery<LoginActivity[]>({
+    queryKey: ["/api/analytics/logins"],
+  });
+
+  const sourceIcon = (source: string) => {
+    if (source === "admin") return <Monitor className="w-4 h-4 text-muted-foreground" />;
+    if (source === "ios" || source === "android") return <Smartphone className="w-4 h-4 text-muted-foreground" />;
+    return <Globe className="w-4 h-4 text-muted-foreground" />;
+  };
+
+  const sourceLabel = (source: string) => {
+    const labels: Record<string, string> = { admin: "Admin", app: "Web App", ios: "iOS", android: "Android" };
+    return labels[source] || source;
+  };
+
+  const formatTime = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined });
+  };
+
+  return (
+    <Card data-testid="card-login-activity">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <LogIn className="w-5 h-5" />
+          Recent Logins
+        </CardTitle>
+        {logins && <span className="text-sm text-muted-foreground">{logins.length} total</span>}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-muted-foreground text-sm">Loading login activity...</p>
+        ) : !logins || logins.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No login activity yet. Logins will appear here as users sign in.</p>
+        ) : (
+          <Table data-testid="table-login-activity">
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>When</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logins.map((login) => (
+                <TableRow key={login.id} data-testid={`row-login-${login.id}`}>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{login.displayName || login.username}</span>
+                      {login.email && <span className="text-xs text-muted-foreground">{login.email}</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {sourceIcon(login.source)}
+                      <span className="text-sm">{sourceLabel(login.source)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-xs">{login.loginMethod}</Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {formatTime(login.createdAt as string | null)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
