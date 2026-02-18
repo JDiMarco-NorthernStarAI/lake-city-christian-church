@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund, SignupEvent, SignupSubmission, LoginActivity } from "@shared/schema";
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES, SIGNUP_CATEGORIES, SIGNUP_CATEGORY_LABELS, SIGNUP_EVENT_STATUSES, SIGNUP_VISIBILITY, SIGNUP_DISPLAY_TYPES } from "@shared/schema";
 import { clearTokens } from "@/lib/v1Api";
-import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
+import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068577.png";
 import AdminSmsTab from "@/pages/admin-sms";
 import { MessageSquare, Inbox } from "lucide-react";
 
