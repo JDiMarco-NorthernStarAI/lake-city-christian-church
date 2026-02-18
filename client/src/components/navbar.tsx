@@ -11,7 +11,7 @@ import {
 import { Menu, ChevronDown, UserCircle, Shield, LogOut } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import wordsLogoPath from "@assets/Lake_City_Words_Logo_1771425892561.png";
+import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068577.png";
 import { useAuth } from "@/hooks/use-auth";
 import { getAccessToken } from "@/lib/v1Api";
 
@@ -104,6 +104,7 @@ export default function Navbar() {
     children?.some((child) => location === child.href) ?? false;
 
   return (
+    <>
     <nav
       data-testid="navbar"
       className={`fixed top-0 left-0 right-0 z-50 bg-black transition-all duration-300 ${
@@ -371,6 +372,8 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
+    <div className="h-[60px] md:h-[72px]" />
+    </>
   );
 }
 
