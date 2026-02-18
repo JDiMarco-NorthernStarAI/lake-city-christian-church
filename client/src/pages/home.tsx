@@ -131,7 +131,7 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       {/* HERO SECTION */}
-      <section className="relative flex flex-col items-center justify-center min-h-screen bg-black px-4 py-24 overflow-hidden">
+      <section className="relative flex flex-col items-center justify-center min-h-screen bg-black px-4 py-24 overflow-hidden -mt-[60px] md:-mt-[72px] pt-[84px] md:pt-[96px]">
         <motion.img
           src={colorLogoPath}
           alt="Lake City Christian Church Logo"
