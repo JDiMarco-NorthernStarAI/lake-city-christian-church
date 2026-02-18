@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { MapPin, Clock, Mail, Phone } from "lucide-react";
+import { MapPin, Clock, Mail } from "lucide-react";
 import { SiInstagram, SiFacebook, SiYoutube } from "react-icons/si";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -168,20 +168,6 @@ export default function Contact() {
                   </Card>
                 </FadeInSection>
 
-                {/* Phone Card */}
-                <FadeInSection delay={0.5}>
-                  <Card className="hover-elevate">
-                    <CardContent className="pt-6">
-                      <div className="flex gap-4">
-                        <Phone className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />
-                        <div>
-                          <h3 className="font-semibold text-foreground mb-1" data-testid="text-phone-label">Phone</h3>
-                          <p className="text-muted-foreground" data-testid="text-phone-value">{c.phone}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </FadeInSection>
               </div>
 
               {/* Social Links */}
