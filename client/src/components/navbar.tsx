@@ -11,7 +11,7 @@ import {
 import { Menu, ChevronDown, UserCircle, Shield, LogOut } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import wordsLogoPath from "@assets/Words_and_Logo_1770933488639.png";
+import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771425825832.png";
 import { useAuth } from "@/hooks/use-auth";
 import { getAccessToken } from "@/lib/v1Api";
 
