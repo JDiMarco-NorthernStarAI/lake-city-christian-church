@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Baby, ArrowRight, Calendar, Users, Heart } from "lucide-react";
+import { Baby, ArrowRight, Users, Heart } from "lucide-react";
 import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -38,11 +38,6 @@ const ageGroups = [
 ];
 
 const infoItems = [
-  {
-    title: "Family Sunday",
-    icon: Calendar,
-    description: "The First Sunday of Every Month is Family Sunday! This gives families and kids the opportunity to worship together! The Nursery space will remain open.",
-  },
   {
     title: "Serve Team",
     icon: Users,
