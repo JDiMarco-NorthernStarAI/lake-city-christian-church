@@ -36,18 +36,18 @@ export default function WhatWeBelieve() {
     belief_great_commission: "We are called to go and make disciples of all people groups, baptizing them and teaching them to obey everything Jesus commanded.",
   });
 
-  const beliefKeys: { id: string; title: string; contentKey: string }[] = [
-    { id: "god", title: "God", contentKey: "belief_god" },
-    { id: "god-the-father", title: "God the Father", contentKey: "belief_god_the_father" },
-    { id: "jesus-christ", title: "Jesus Christ", contentKey: "belief_jesus_christ" },
-    { id: "holy-spirit", title: "The Holy Spirit", contentKey: "belief_holy_spirit" },
-    { id: "the-bible", title: "The Bible", contentKey: "belief_the_bible" },
-    { id: "humanity-and-sin", title: "Humanity & Sin", contentKey: "belief_humanity_and_sin" },
-    { id: "salvation", title: "Salvation", contentKey: "belief_salvation" },
-    { id: "our-response", title: "Our Response", contentKey: "belief_our_response" },
-    { id: "the-church", title: "The Church", contentKey: "belief_the_church" },
-    { id: "lords-supper", title: "The Lord's Supper", contentKey: "belief_lords_supper" },
-    { id: "great-commission", title: "The Great Commission", contentKey: "belief_great_commission" },
+  const beliefKeys: { id: string; title: string; contentKey: string; references: string }[] = [
+    { id: "god", title: "God", contentKey: "belief_god", references: "Matt 5:16, 45; 6:1, 4, 8, 9; James 1:17; John 1:1; 4:24; 14:9, 16-20; Gen 1:2; 2 Peter 1:21" },
+    { id: "god-the-father", title: "God the Father", contentKey: "belief_god_the_father", references: "Gen 1:1; Acts 17:24-28; Heb 11:3" },
+    { id: "jesus-christ", title: "Jesus Christ", contentKey: "belief_jesus_christ", references: "John 1:14; 1 John 4:9; John 3:16; 2 Peter 3:18; Matthew 21:11; John 1:14; 19:19; Romans 5:15-17; Colossians 2:9; 1 John 1:1; Matthew 1:18; Luke 1:26-38; Luke 23:44; 24:8; John 20:24-29; 1 Corinthians 15:3-8; Luke 22:69; Acts 1:1-9; Colossians 3:1; Matthew 24:36-42; John 14:1-3; Acts 1:10-11; 10:39-42; 1 Peter 4:5" },
+    { id: "holy-spirit", title: "The Holy Spirit", contentKey: "belief_holy_spirit", references: "John 16:5-15; Acts 1:7-8; Romans 8:26-27; 1 Corinthians 3:16; 6:19; 2 Timothy 1:14" },
+    { id: "the-bible", title: "The Bible", contentKey: "belief_the_bible", references: "Mark 12:36; John 14:26; 16:12-15; Acts 1:16; 1 Corinthians 2:12-13; 2 Timothy 3:14-16; 2 Peter 1:20-21; Isaiah 40:8; Matthew 5:18; 24:35; Romans 15:4; Hebrews 4:12" },
+    { id: "humanity-and-sin", title: "Humanity & Sin", contentKey: "belief_humanity_and_sin", references: "Acts 4:12; Romans 3:23" },
+    { id: "salvation", title: "Salvation", contentKey: "belief_salvation", references: "Matthew 26:28; Romans 5:1-11; 6:23; Ephesians 2:8-10; Hebrews 10:19-22; 1 Peter 1:18, 19; 1 John 1:7" },
+    { id: "our-response", title: "Our Response", contentKey: "belief_our_response", references: "Romans 3:23; Titus 3:3-7; Matthew 10:32; Romans 10:9, 10; Luke 24:45-47; Acts 3:19; 17:30; Romans 10:11-13; Philippians 2:11; Acts 2:38; Romans 6:1-4" },
+    { id: "the-church", title: "The Church", contentKey: "belief_the_church", references: "Matthew 16:13-18; Acts 2:14-47" },
+    { id: "lords-supper", title: "The Lord's Supper", contentKey: "belief_lords_supper", references: "Acts 2:42; 20:7; 1 Corinthians 11:24-30" },
+    { id: "great-commission", title: "The Great Commission", contentKey: "belief_great_commission", references: "Matthew 28:18-20" },
   ];
   return (
     <div className="min-h-screen">
@@ -92,7 +92,10 @@ export default function WhatWeBelieve() {
                   {belief.title}
                 </AccordionTrigger>
                 <AccordionContent className="text-base text-muted-foreground leading-relaxed">
-                  {c[belief.contentKey]}
+                  <p>{c[belief.contentKey]}</p>
+                  <p className="mt-3 text-sm italic text-muted-foreground/70" data-testid={`references-${belief.id}`}>
+                    {belief.references}
+                  </p>
                 </AccordionContent>
               </AccordionItem>
             ))}
