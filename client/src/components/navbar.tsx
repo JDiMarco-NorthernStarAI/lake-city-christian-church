@@ -11,7 +11,7 @@ import {
 import { Menu, ChevronDown, UserCircle, Shield, LogOut } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771425825832.png";
+import wordsLogoPath from "@assets/Lake_City_Words_Logo_1771425892561.png";
 import { useAuth } from "@/hooks/use-auth";
 import { getAccessToken } from "@/lib/v1Api";
 
@@ -115,7 +115,7 @@ export default function Navbar() {
           <img
             src={wordsLogoPath}
             alt="Lake City Christian Church"
-            className="h-auto w-[140px] md:w-[180px]"
+            className="h-auto w-[180px] md:w-[220px]"
             data-testid="img-logo"
           />
         </Link>
@@ -268,7 +268,7 @@ export default function Navbar() {
                   <img
                     src={wordsLogoPath}
                     alt="Lake City Christian Church"
-                    className="mb-6 h-auto w-[140px]"
+                    className="mb-6 h-auto w-[180px]"
                   />
                 </Link>
 
