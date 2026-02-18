@@ -92,10 +92,11 @@ declare module "express-session" {
 const ADMIN_TIMEOUT_MS = 30 * 60 * 1000;
 
 function checkAdminTimeout(req: Request, res: Response, next: NextFunction) {
-  if (!req.session.userId) return next();
+  if (!req.session || !req.session.userId) return next();
   const roles = req.session.roles || [];
   const isAdmin = roles.includes("admin") || roles.includes("super_admin");
-  if (isAdmin && req.session.lastActivity) {
+  if (!isAdmin) return next();
+  if (req.session.lastActivity) {
     const elapsed = Date.now() - req.session.lastActivity;
     if (elapsed > ADMIN_TIMEOUT_MS) {
       return req.session.destroy(() => {
@@ -103,9 +104,8 @@ function checkAdminTimeout(req: Request, res: Response, next: NextFunction) {
       });
     }
   }
-  if (isAdmin) {
-    req.session.lastActivity = Date.now();
-  }
+  req.session.lastActivity = Date.now();
+  req.session.touch();
   next();
 }
 
@@ -246,6 +246,7 @@ export async function registerRoutes(
       }
       req.session.userId = user.id;
       req.session.roles = user.roles;
+      req.session.lastActivity = Date.now();
       req.session.save((err) => {
         if (err) {
           return res.status(500).json({ message: "Session error" });
