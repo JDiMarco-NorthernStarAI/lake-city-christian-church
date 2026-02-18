@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { BookOpen, Heart, Users, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import serviceImgPath from "@assets/LC_Service_01_1770933498063.jpg";
+import churchViewPath from "@assets/Church_View_1771425241655.png";
 import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -50,7 +50,7 @@ export default function About() {
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
         <img
-          src={serviceImgPath}
+          src={churchViewPath}
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-30 grayscale"
           aria-hidden="true"

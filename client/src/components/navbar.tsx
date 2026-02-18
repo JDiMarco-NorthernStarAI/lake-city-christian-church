@@ -148,7 +148,7 @@ export default function Navbar() {
                       className="cursor-pointer text-white/70 focus:bg-white/10 focus:text-white"
                       data-testid={`nav-link-${item.href.replace(/\//g, "").replace(/\s+/g, "-") || "home"}`}
                     >
-                      {item.label} Overview
+                      {item.label}
                     </Link>
                   </DropdownMenuItem>
                   {item.children.map((child) => (
@@ -421,7 +421,7 @@ function MobileDropdown({
                   : "text-white/60 hover:text-white"
               }`}
             >
-              {item.label} Overview
+              {item.label}
             </span>
           </Link>
           {item.children.map((child) => (
