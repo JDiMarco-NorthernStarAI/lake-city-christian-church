@@ -85,7 +85,28 @@ declare module "express-session" {
   interface SessionData {
     userId: number;
     roles: string[];
+    lastActivity: number;
   }
+}
+
+const ADMIN_TIMEOUT_MS = 30 * 60 * 1000;
+
+function checkAdminTimeout(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) return next();
+  const roles = req.session.roles || [];
+  const isAdmin = roles.includes("admin") || roles.includes("super_admin");
+  if (isAdmin && req.session.lastActivity) {
+    const elapsed = Date.now() - req.session.lastActivity;
+    if (elapsed > ADMIN_TIMEOUT_MS) {
+      return req.session.destroy(() => {
+        res.status(401).json({ message: "Session expired due to inactivity" });
+      });
+    }
+  }
+  if (isAdmin) {
+    req.session.lastActivity = Date.now();
+  }
+  next();
 }
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -154,6 +175,8 @@ export async function registerRoutes(
     })
   );
 
+  app.use("/api", checkAdminTimeout);
+
   await seedDatabase();
 
   registerObjectStorageRoutes(app);
@@ -176,6 +199,9 @@ export async function registerRoutes(
       }
       req.session.userId = user.id;
       req.session.roles = user.roles;
+      if (user.roles.includes("admin") || user.roles.includes("super_admin")) {
+        req.session.lastActivity = Date.now();
+      }
       const enabledFeatures = await storage.getEnabledFeaturesForRoles(user.roles);
 
       storage.createLoginActivity({
