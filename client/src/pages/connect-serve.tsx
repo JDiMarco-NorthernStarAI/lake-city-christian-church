@@ -48,7 +48,7 @@ export default function ConnectServe() {
     hero_title: "Connect & Serve",
     intro_heading: "We would like to get to know you better!",
     intro_description: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus. Join us as we serve together, grow together, and experience the joy of making a lasting impact while connecting people to a life-changing relationship with Jesus.",
-    volunteer_heading: "Volunteer and Connect",
+    volunteer_heading: "Volunteer",
     volunteer_description: "There is a place for everyone to serve at Lake City. Whether you love greeting people, working with kids, or serving behind the scenes, we would love to have you on the team.",
     volunteer_url: "https://docs.google.com/forms/d/e/1FAIpQLSd4-YBkgZV6FI76SNW7ijofq5TDCdXaaD5fj2-P5iHx4A9EIg/viewform",
   });
