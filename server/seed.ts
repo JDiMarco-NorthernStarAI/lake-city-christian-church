@@ -238,6 +238,37 @@ async function seedDonationFunds() {
   }
 }
 
+async function cleanupData() {
+  try {
+    const team = await storage.getTeamMembers();
+    const seen = new Set<string>();
+    for (const member of team) {
+      const key = member.name.toLowerCase();
+      if (key === "j.d. mcintosh" || seen.has(key)) {
+        await storage.deleteTeamMember(member.id);
+      } else {
+        seen.add(key);
+      }
+    }
+    const trevors = team.filter(m => m.name === "Trevor Littleton" && !seen.has("_trevor_updated"));
+    if (trevors.length > 0) {
+      const trevor = trevors[0];
+      if (trevor.bio && !trevor.bio.includes("eager to see what God has in store for LC3")) {
+        await storage.updateTeamMember(trevor.id, {
+          bio: "Trevor is passionate about scripture, apologetics and loves watching lives change for Jesus. Trevor graduated from CCU with a BS in Preaching Ministry and a Master of Divinity in Pastoral Leadership, a Master of Business Administration in Executive Coaching from Liberty University and has a Doctor of Ministry in Transformational Leadership from Ashland Theological Seminary. Beyond his heart for ministry, Trevor enjoys weightlifting and boxing, writing books, scouting out new restaurants. Trevor is married to his wife Shanna. They both have a deep passion for adoption. Their family is made up of 11 children; four biological, five adopted from Ukraine, including two surrogate daughters. Together they have a heart for community and are eager to see what God has in store for LC3.",
+        });
+      }
+    }
+    const signups = await storage.getSignupEvents();
+    for (const signup of signups) {
+      await storage.deleteSignupEvent(signup.id);
+    }
+    log("Data cleanup completed", "seed");
+  } catch (e) {
+    log(`Data cleanup error: ${e}`, "seed");
+  }
+}
+
 export async function seedDatabase() {
   try {
     const existingAdmin = await storage.getUserByUsername("admin");
@@ -245,8 +276,9 @@ export async function seedDatabase() {
     await seedRolePermissions();
     await seedSmsDefaults();
 
-    await seedFormsAndSignups();
     await seedDonationFunds();
+
+    await cleanupData();
 
     if (existingAdmin) {
       log("Database already seeded", "seed");
@@ -267,14 +299,13 @@ export async function seedDatabase() {
     await storage.createTeamMember({
       name: "Trevor Littleton",
       role: "Lead Pastor",
-      bio: "Trevor is passionate about scripture, apologetics and loves watching lives change for Jesus. Trevor graduated from CCU with a BS in Preaching Ministry and a Master of Divinity in Pastoral Leadership, a Master of Business Administration in Executive Coaching from Liberty University and has a Doctor of Ministry in Transformational Leadership from Ashland Theological Seminary. Beyond his heart for ministry, Trevor enjoys weightlifting and boxing, writing books, scouting out new restaurants, traveling, spending time with his wife Shanna and being a proud Dad.",
+      bio: "Trevor is passionate about scripture, apologetics and loves watching lives change for Jesus. Trevor graduated from CCU with a BS in Preaching Ministry and a Master of Divinity in Pastoral Leadership, a Master of Business Administration in Executive Coaching from Liberty University and has a Doctor of Ministry in Transformational Leadership from Ashland Theological Seminary. Beyond his heart for ministry, Trevor enjoys weightlifting and boxing, writing books, scouting out new restaurants. Trevor is married to his wife Shanna. They both have a deep passion for adoption. Their family is made up of 11 children; four biological, five adopted from Ukraine, including two surrogate daughters. Together they have a heart for community and are eager to see what God has in store for LC3.",
       sortOrder: 0,
       isFeatured: true,
       photoUrl: null,
     });
 
     const teamData = [
-      { name: "J.D. McIntosh", role: "Discipleship Pastor", sortOrder: 1 },
       { name: "Michael Batt", role: "Management Team / Tech", sortOrder: 2 },
       { name: "Melissa Batt", role: "Kids Ministry Director", sortOrder: 3 },
       { name: "Joey Ekers", role: "Student Ministry Director", sortOrder: 4 },
