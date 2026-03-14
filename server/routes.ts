@@ -174,6 +174,22 @@ export async function registerRoutes(
     })
   );
 
+  // If no session exists, fall back to JWT token from Authorization header
+  // This allows the admin dashboard to work with JWT auth stored in localStorage
+  app.use("/api", (req: Request, _res: Response, next: NextFunction) => {
+    if (req.session?.userId) return next();
+    const auth = req.headers.authorization;
+    if (auth?.startsWith("Bearer ")) {
+      const payload = verifyAccessToken(auth.slice(7));
+      if (payload) {
+        req.session.userId = payload.userId;
+        req.session.roles = payload.roles;
+        req.session.lastActivity = Date.now();
+      }
+    }
+    next();
+  });
+
   app.use("/api", checkAdminTimeout);
 
   await seedDatabase();
