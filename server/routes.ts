@@ -6,7 +6,7 @@ import Stripe from "stripe";
 import webpush from "web-push";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { storage } from "./storage";
-import { db } from "./db";
+import { db, getDbConnectionConfig } from "./db";
 import {
   insertSermonSchema, insertEventSchema, insertTeamMemberSchema,
   insertContactSchema, insertConnectCardSchema, siteSettings,
@@ -161,7 +161,8 @@ export async function registerRoutes(
   app.use(
     session({
       store: new PgStore({
-        conString: process.env.DATABASE_URL,
+        ...getDbConnectionConfig(),
+        conString: getDbConnectionConfig().connectionString,
         createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "lake-city-dev-secret",
