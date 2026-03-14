@@ -280,11 +280,31 @@ export async function seedDatabase() {
 
     await cleanupData();
 
-    // Ensure jdimarco account has super_admin access
-    const jdimarco = await storage.getUserByEmail("jdimarco@northernstarai.com");
-    if (jdimarco && !jdimarco.roles?.includes("super_admin")) {
-      await storage.updateUser(jdimarco.id, { roles: ["super_admin", "admin", "member"] });
-      log("Promoted jdimarco@northernstarai.com to super_admin", "seed");
+    // Ensure admin accounts exist and have correct roles
+    const adminAccounts = [
+      { email: "jdimarco@northernstarai.com", name: "Jason DiMarco", roles: ["super_admin", "admin", "member"] },
+      { email: "trevor@lakecitycc.com", name: "Trevor Littleton", roles: ["super_admin", "admin", "member"] },
+      { email: "shanna@lakecitycc.com", name: "Shanna Littleton", roles: ["super_admin", "admin", "member"] },
+    ];
+
+    const defaultPassword = await bcrypt.hash("LakeCity2024", 10);
+    for (const acct of adminAccounts) {
+      const existing = await storage.getUserByEmail(acct.email);
+      if (existing) {
+        if (!existing.roles?.includes("super_admin")) {
+          await storage.updateUser(existing.id, { roles: acct.roles });
+          log(`Promoted ${acct.email} to super_admin`, "seed");
+        }
+      } else {
+        await storage.createUser({
+          username: acct.email,
+          email: acct.email,
+          name: acct.name,
+          password: defaultPassword,
+          roles: acct.roles,
+        });
+        log(`Created admin account: ${acct.email}`, "seed");
+      }
     }
 
     if (existingAdmin) {
@@ -293,15 +313,6 @@ export async function seedDatabase() {
     }
 
     log("Seeding database...", "seed");
-
-    const hashedPassword = await bcrypt.hash("lakecity2024", 10);
-    await storage.createUser({
-      username: "admin",
-      email: "admin@lakecitychristian.church",
-      name: "Admin",
-      password: hashedPassword,
-      roles: ["super_admin", "admin"],
-    });
 
     await storage.createTeamMember({
       name: "Trevor Littleton",

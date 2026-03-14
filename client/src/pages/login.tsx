@@ -34,6 +34,17 @@ export default function Login() {
     setLoading(false);
     if (result.success) {
       toast({ title: "Welcome back!" });
+      // Check if user has admin role from the stored token
+      const token = localStorage.getItem("lc3_access_token");
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          if (payload.roles?.includes("admin") || payload.roles?.includes("super_admin")) {
+            navigate("/admin/dashboard");
+            return;
+          }
+        } catch {}
+      }
       navigate("/account");
     } else {
       toast({ title: "Login failed", description: result.error, variant: "destructive" });

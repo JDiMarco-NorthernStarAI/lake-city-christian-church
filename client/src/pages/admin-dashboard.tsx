@@ -72,7 +72,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      setLocation("/admin");
+      setLocation("/login");
     }
   }, [authLoading, user, setLocation]);
 
