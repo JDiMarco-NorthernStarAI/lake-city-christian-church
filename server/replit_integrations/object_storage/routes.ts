@@ -28,7 +28,7 @@ export function registerObjectStorageRoutes(app: Express): void {
    *
    * Response:
    * {
-   *   "uploadURL": "https://storage.googleapis.com/...",
+   *   "uploadURL": "https://<bucket>.s3.<region>.amazonaws.com/...",
    *   "objectPath": "/objects/uploads/uuid"
    * }
    *

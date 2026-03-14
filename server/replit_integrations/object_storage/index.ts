@@ -1,8 +1,10 @@
 export {
   ObjectStorageService,
   ObjectNotFoundError,
-  objectStorageClient,
+  s3Client,
 } from "./objectStorage";
+
+export type { S3FileRef } from "./objectStorage";
 
 export type {
   ObjectAclPolicy,
@@ -18,4 +20,3 @@ export {
 } from "./objectAcl";
 
 export { registerObjectStorageRoutes } from "./routes";
-
