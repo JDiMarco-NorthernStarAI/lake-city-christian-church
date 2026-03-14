@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+
 # Create the database if it doesn't exist (connect to default 'postgres' db first)
 echo "Ensuring database exists..."
 DB_URL="${DATABASE_URL}"
@@ -25,7 +27,7 @@ node -e "
 " "$ADMIN_URL" "$DB_NAME"
 
 echo "Running database schema sync..."
-NODE_TLS_REJECT_UNAUTHORIZED=0 ./node_modules/.bin/drizzle-kit push --force
+./node_modules/.bin/drizzle-kit push --force
 
 echo "Starting server..."
 node dist/index.cjs
