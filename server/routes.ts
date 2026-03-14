@@ -162,7 +162,6 @@ export async function registerRoutes(
     session({
       store: new PgStore({
         pool,
-        createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "lake-city-dev-secret",
       resave: false,

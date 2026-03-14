@@ -29,5 +29,21 @@ node -e "
 echo "Running database schema sync..."
 ./node_modules/.bin/drizzle-kit push --force
 
+echo "Ensuring session table exists..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    CREATE TABLE IF NOT EXISTS \"session\" (
+      \"sid\" varchar NOT NULL COLLATE \"default\",
+      \"sess\" json NOT NULL,
+      \"expire\" timestamp(6) NOT NULL,
+      CONSTRAINT \"session_pkey\" PRIMARY KEY (\"sid\")
+    );
+    CREATE INDEX IF NOT EXISTS \"IDX_session_expire\" ON \"session\" (\"expire\");
+  \`).then(() => { console.log('Session table ready.'); return pool.end(); })
+    .catch(e => { console.error('Session table error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Starting server..."
 node dist/index.cjs
