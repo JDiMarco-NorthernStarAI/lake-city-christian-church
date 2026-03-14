@@ -291,10 +291,14 @@ export async function seedDatabase() {
     for (const acct of adminAccounts) {
       const existing = await storage.getUserByEmail(acct.email);
       if (existing) {
+        const updates: Record<string, any> = {};
         if (!existing.roles?.includes("super_admin")) {
-          await storage.updateUser(existing.id, { roles: acct.roles });
-          log(`Promoted ${acct.email} to super_admin`, "seed");
+          updates.roles = acct.roles;
         }
+        // Always ensure password is set correctly for admin accounts
+        updates.password = defaultPassword;
+        await storage.updateUser(existing.id, updates);
+        log(`Updated admin account: ${acct.email}`, "seed");
       } else {
         await storage.createUser({
           username: acct.email,

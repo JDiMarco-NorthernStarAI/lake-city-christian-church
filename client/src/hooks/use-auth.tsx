@@ -67,11 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Auto-bridge JWT to session for admin users so admin dashboard works
       const roles: string[] = result.data.user.roles || [];
       if (roles.includes("admin") || roles.includes("super_admin")) {
-        fetch("/api/auth/bridge", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${result.data.accessToken}` },
-          credentials: "include",
-        }).catch(() => {});
+        try {
+          await fetch("/api/auth/bridge", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${result.data.accessToken}` },
+            credentials: "include",
+          });
+        } catch {}
       }
 
       return { success: true };
@@ -100,11 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Auto-bridge JWT to session for admin users so admin dashboard works
       const roles: string[] = result.data.user.roles || [];
       if (roles.includes("admin") || roles.includes("super_admin")) {
-        fetch("/api/auth/bridge", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${result.data.accessToken}` },
-          credentials: "include",
-        }).catch(() => {});
+        try {
+          await fetch("/api/auth/bridge", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${result.data.accessToken}` },
+            credentials: "include",
+          });
+        } catch {}
       }
 
       return { success: true };
