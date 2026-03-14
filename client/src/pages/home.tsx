@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import colorLogoPath from "@assets/color_Logo_1770933488638.png";
 import welcomeImgPath from "@assets/LC_Welcome_Area_01_1770933498064.png";
+import heroBackgroundPath from "@assets/Church_View_bw_1773518914154.png";
 import { useQuery } from "@tanstack/react-query";
 import { usePageContent } from "@/hooks/use-page-content";
 
@@ -132,10 +133,16 @@ export default function Home() {
     <div className="min-h-screen">
       {/* HERO SECTION */}
       <section className="relative flex flex-col items-center justify-center min-h-screen bg-black px-4 py-24 overflow-hidden -mt-[60px] md:-mt-[72px] pt-[84px] md:pt-[96px]">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroBackgroundPath})` }}
+          data-testid="img-hero-background"
+        />
+        <div className="absolute inset-0 bg-black/65" />
         <motion.img
           src={colorLogoPath}
           alt="Lake City Christian Church Logo"
-          className="h-[200px] w-auto mb-8"
+          className="relative z-10 h-[200px] w-auto mb-8"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 2, ease: "easeOut" }}
@@ -143,7 +150,7 @@ export default function Home() {
         />
 
         <motion.h1
-          className="text-4xl md:text-6xl font-bold text-white text-center mb-4"
+          className="relative z-10 text-4xl md:text-6xl font-bold text-white text-center mb-4"
           style={{ fontFamily: "Montserrat, sans-serif" }}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -154,7 +161,7 @@ export default function Home() {
         </motion.h1>
 
         <motion.p
-          className="text-lg md:text-xl text-white/70 text-center max-w-xl mb-10"
+          className="relative z-10 text-lg md:text-xl text-white/70 text-center max-w-xl mb-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 2.5 }}
@@ -164,7 +171,7 @@ export default function Home() {
         </motion.p>
 
         <motion.div
-          className="flex flex-col sm:flex-row items-center gap-4"
+          className="relative z-10 flex flex-col sm:flex-row items-center gap-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 3 }}
