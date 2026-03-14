@@ -1227,28 +1227,45 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/media/upload", requireAdminOrSuperAdmin, async (req, res) => {
+  // Server-side proxy upload to S3 (avoids CORS issues with direct S3 PUT)
+  const multer = (await import("multer")).default;
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+  app.post("/api/media/upload", requireAdminOrSuperAdmin, upload.single("file"), async (req, res) => {
     try {
-      const { filename, folder, contentType } = req.body;
-      if (!filename) return res.status(400).json({ message: "filename is required" });
+      const file = req.file;
+      if (!file) return res.status(400).json({ message: "No file uploaded" });
 
-      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
-      const objStorage = new ObjectStorageService();
-      const uploadURL = await objStorage.getObjectEntityUploadURL();
-      const objectPath = objStorage.normalizeObjectEntityPath(uploadURL);
+      const folder = req.body.folder || "general";
+      const { PutObjectCommand } = await import("@aws-sdk/client-s3");
+      const { s3Client } = await import("./replit_integrations/object_storage/objectStorage");
 
+      const bucketName = process.env.S3_BUCKET_NAME;
+      if (!bucketName) return res.status(500).json({ message: "S3_BUCKET_NAME not configured" });
+
+      const { randomUUID } = await import("crypto");
+      const key = `uploads/${randomUUID()}`;
+
+      await s3Client.send(new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }));
+
+      const objectPath = `/objects/${key}`;
       const mediaItem = await storage.createMedia({
-        filename,
+        filename: file.originalname,
         objectPath,
-        folder: folder || "general",
-        contentType: contentType || null,
+        folder,
+        contentType: file.mimetype,
         uploadedBy: req.session.userId,
       });
 
-      res.json({ uploadURL, objectPath, media: mediaItem });
+      res.json({ objectPath, media: mediaItem });
     } catch (err) {
-      console.error("Media upload URL error:", err);
-      res.status(500).json({ message: "Failed to generate upload URL" });
+      console.error("Media upload error:", err);
+      res.status(500).json({ message: "Failed to upload image" });
     }
   });
 

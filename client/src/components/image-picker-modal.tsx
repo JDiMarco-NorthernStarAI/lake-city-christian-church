@@ -88,30 +88,32 @@ export default function ImagePickerModal({ open, onClose, onSelect, defaultFolde
 
     setUploading(true);
     try {
-      // 1. Get presigned upload URL
-      const res = await apiRequest("POST", "/api/media/upload", {
-        filename: file.name,
-        folder: activeFolder === "all" ? "general" : activeFolder,
-        contentType: file.type,
-      });
-      const { uploadURL, objectPath } = await res.json();
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", activeFolder === "all" ? "general" : activeFolder);
 
-      // 2. Upload to S3
-      await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
+      // Upload through server (server proxies to S3)
+      const token = localStorage.getItem("lc3_access_token");
+      const res = await fetch("/api/media/upload", {
+        method: "POST",
+        body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      // 3. Refresh the gallery
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Upload failed");
+      }
+
+      const { objectPath } = await res.json();
+
       queryClient.invalidateQueries({ queryKey: ["/api/media"] });
       toast({ title: "Image uploaded" });
 
-      // Auto-select the newly uploaded image
       onSelect(objectPath);
       onClose();
-    } catch (err) {
-      toast({ title: "Upload failed", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: err.message || "Upload failed", variant: "destructive" });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

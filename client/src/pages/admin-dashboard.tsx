@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Sermon, Event, TeamMember, ContactSubmission, ConnectCard, SiteSetting, RolePermission, Form, FormField, FormSubmission, Donation, DonationFund, SignupEvent, SignupSubmission, LoginActivity } from "@shared/schema";
 import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_FIELD_TYPES, FORM_FIELD_TYPE_LABELS, FORM_STATUSES, SIGNUP_CATEGORIES, SIGNUP_CATEGORY_LABELS, SIGNUP_EVENT_STATUSES, SIGNUP_VISIBILITY, SIGNUP_DISPLAY_TYPES } from "@shared/schema";
 import { clearTokens, v1Post } from "@/lib/v1Api";
+import { useAuth } from "@/hooks/use-auth";
 import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068577.png";
 import AdminSmsTab from "@/pages/admin-sms";
 import ImagePickerModal from "@/components/image-picker-modal";
@@ -65,6 +66,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { logout: authLogout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
   const { data: user, isLoading: authLoading, error: authError } = useQuery<{
@@ -85,15 +87,13 @@ export default function AdminDashboard() {
 
   async function handleLogout() {
     try {
-      await apiRequest("POST", "/api/auth/logout");
-      await v1Post("/api/v1/auth/logout", {}).catch(() => {});
-      clearTokens();
+      await authLogout();
       queryClient.clear();
-      setLocation("/");
+      setLocation("/login");
     } catch {
       clearTokens();
       queryClient.clear();
-      setLocation("/");
+      setLocation("/login");
     }
   }
 
