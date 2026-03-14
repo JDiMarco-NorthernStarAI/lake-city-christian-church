@@ -280,6 +280,13 @@ export async function seedDatabase() {
 
     await cleanupData();
 
+    // Ensure jdimarco account has super_admin access
+    const jdimarco = await storage.getUserByEmail("jdimarco@northernstarai.com");
+    if (jdimarco && !jdimarco.roles?.includes("super_admin")) {
+      await storage.updateUser(jdimarco.id, { roles: ["super_admin", "admin", "member"] });
+      log("Promoted jdimarco@northernstarai.com to super_admin", "seed");
+    }
+
     if (existingAdmin) {
       log("Database already seeded", "seed");
       return;
