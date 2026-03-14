@@ -890,6 +890,30 @@ export const loginActivity = pgTable("login_activity", {
 export type LoginActivity = typeof loginActivity.$inferSelect;
 export type InsertLoginActivity = typeof loginActivity.$inferInsert;
 
+// ==================== MEDIA LIBRARY ====================
+export const MEDIA_FOLDERS = ["events", "team", "sermons", "pages", "general"] as const;
+export const MEDIA_FOLDER_LABELS: Record<string, string> = {
+  events: "Events",
+  team: "Team",
+  sermons: "Sermons",
+  pages: "Pages",
+  general: "General",
+};
+
+export const media = pgTable("media", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  objectPath: text("object_path").notNull(),
+  folder: text("folder").notNull().default("general"),
+  contentType: text("content_type"),
+  size: integer("size"),
+  uploadedBy: integer("uploaded_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Media = typeof media.$inferSelect;
+export type InsertMedia = typeof media.$inferInsert;
+
 export const createSignupEventSchema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),

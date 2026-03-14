@@ -31,7 +31,14 @@ import { AVAILABLE_ROLES, ROLE_LABELS, AVAILABLE_FEATURES, FEATURE_LABELS, FORM_
 import { clearTokens, v1Post } from "@/lib/v1Api";
 import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068577.png";
 import AdminSmsTab from "@/pages/admin-sms";
-import { MessageSquare, Inbox } from "lucide-react";
+import ImagePickerModal from "@/components/image-picker-modal";
+import { MessageSquare, Inbox, ImageIcon } from "lucide-react";
+
+function getImageSrc(path: string | null | undefined) {
+  if (!path) return undefined;
+  if (path.startsWith("http")) return path;
+  return `/objects${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "pages" | "settings" | "users" | "roles" | "submissions";
 
@@ -1002,6 +1009,7 @@ function EventsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
   const [form, setForm] = useState({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true });
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => { await apiRequest("POST", "/api/events", data); },
@@ -1090,7 +1098,7 @@ function EventsTab() {
               <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
                 <TableCell>
                   {event.imageUrl ? (
-                    <img src={event.imageUrl} alt="" className="w-12 h-9 object-cover rounded-sm" />
+                    <img src={getImageSrc(event.imageUrl)} alt="" className="w-12 h-9 object-cover rounded-sm" />
                   ) : (
                     <span className="text-muted-foreground text-xs">None</span>
                   )}
@@ -1142,11 +1150,26 @@ function EventsTab() {
               <Textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required data-testid="input-event-body" />
             </div>
             <div className="space-y-2">
-              <Label>Image URL</Label>
-              <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://example.com/image.jpg" data-testid="input-event-image" />
+              <Label>Image</Label>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" className="gap-2" onClick={() => setImagePickerOpen(true)}>
+                  <ImageIcon className="w-4 h-4" /> {form.imageUrl ? "Change Image" : "Choose Image"}
+                </Button>
+                {form.imageUrl && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ ...form, imageUrl: "" })}>
+                    Remove
+                  </Button>
+                )}
+              </div>
               {form.imageUrl && (
-                <img src={form.imageUrl} alt="Preview" className="w-full h-32 object-cover rounded-md mt-2" />
+                <img src={getImageSrc(form.imageUrl)} alt="Preview" className="w-full h-32 object-cover rounded-md mt-2" />
               )}
+              <ImagePickerModal
+                open={imagePickerOpen}
+                onClose={() => setImagePickerOpen(false)}
+                onSelect={(path) => setForm({ ...form, imageUrl: path })}
+                defaultFolder="events"
+              />
             </div>
             <div className="flex items-center gap-2">
               <Checkbox
@@ -4584,6 +4607,7 @@ function SignupsTab() {
     successMessage: "",
     redirectUrl: "",
   });
+  const [signupImagePickerOpen, setSignupImagePickerOpen] = useState(false);
 
   function generateSlug(title: string) {
     return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -4814,8 +4838,26 @@ function SignupsTab() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Image URL</Label>
-                  <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} data-testid="input-signup-image-url" />
+                  <Label>Image</Label>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" className="gap-2" onClick={() => setSignupImagePickerOpen(true)}>
+                      <ImageIcon className="w-4 h-4" /> {form.imageUrl ? "Change Image" : "Choose Image"}
+                    </Button>
+                    {form.imageUrl && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setForm({ ...form, imageUrl: "" })}>
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {form.imageUrl && (
+                    <img src={getImageSrc(form.imageUrl)} alt="Preview" className="w-full h-24 object-cover rounded-md mt-1" />
+                  )}
+                  <ImagePickerModal
+                    open={signupImagePickerOpen}
+                    onClose={() => setSignupImagePickerOpen(false)}
+                    onSelect={(path) => setForm({ ...form, imageUrl: path })}
+                    defaultFolder="events"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Thumbnail URL</Label>

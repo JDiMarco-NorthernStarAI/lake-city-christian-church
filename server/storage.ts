@@ -5,7 +5,7 @@ import {
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
   pushSubscriptions, notificationLogs, signupEvents, signupSubmissions,
   smsGroups, smsGroupMembers, userTags, smsMessages, smsRecipients, smsOptOuts, smsTemplates, smsSettings, smsIncomingMessages,
-  loginActivity,
+  loginActivity, media,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -37,6 +37,7 @@ import {
   type SmsSettings, type InsertSmsSettings,
   type SmsIncomingMessage, type InsertSmsIncomingMessage,
   type LoginActivity, type InsertLoginActivity,
+  type Media, type InsertMedia,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -1212,6 +1213,28 @@ export class DatabaseStorage implements IStorage {
     if (filters.source) conditions.push(eq(loginActivity.source, filters.source));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     return db.select().from(loginActivity).where(where).orderBy(desc(loginActivity.createdAt));
+  }
+
+  // ==================== MEDIA ====================
+  async createMedia(data: InsertMedia): Promise<Media> {
+    const [item] = await db.insert(media).values(data).returning();
+    return item;
+  }
+
+  async getMedia(folder?: string): Promise<Media[]> {
+    if (folder) {
+      return db.select().from(media).where(eq(media.folder, folder)).orderBy(desc(media.createdAt));
+    }
+    return db.select().from(media).orderBy(desc(media.createdAt));
+  }
+
+  async getMediaById(id: number): Promise<Media | undefined> {
+    const [item] = await db.select().from(media).where(eq(media.id, id));
+    return item;
+  }
+
+  async deleteMedia(id: number): Promise<void> {
+    await db.delete(media).where(eq(media.id, id));
   }
 }
 

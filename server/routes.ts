@@ -1216,6 +1216,64 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== MEDIA LIBRARY ====================
+  app.get("/api/media", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const folder = req.query.folder as string | undefined;
+      const items = await storage.getMedia(folder);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch media" });
+    }
+  });
+
+  app.post("/api/media/upload", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const { filename, folder, contentType } = req.body;
+      if (!filename) return res.status(400).json({ message: "filename is required" });
+
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objStorage = new ObjectStorageService();
+      const uploadURL = await objStorage.getObjectEntityUploadURL();
+      const objectPath = objStorage.normalizeObjectEntityPath(uploadURL);
+
+      const mediaItem = await storage.createMedia({
+        filename,
+        objectPath,
+        folder: folder || "general",
+        contentType: contentType || null,
+        uploadedBy: req.session.userId,
+      });
+
+      res.json({ uploadURL, objectPath, media: mediaItem });
+    } catch (err) {
+      console.error("Media upload URL error:", err);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  app.delete("/api/media/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const item = await storage.getMediaById(id);
+      if (!item) return res.status(404).json({ message: "Not found" });
+
+      // Delete from S3
+      try {
+        const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+        const { s3Client } = await import("./replit_integrations/object_storage");
+        const bucket = process.env.S3_BUCKET_NAME || "lc3-storage";
+        const key = item.objectPath.replace(/^\/objects\//, "");
+        await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+      } catch {}
+
+      await storage.deleteMedia(id);
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete media" });
+    }
+  });
+
   // ==================== STRIPE WEBHOOK ====================
   app.post("/api/stripe/webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"];
