@@ -6,7 +6,7 @@ import Stripe from "stripe";
 import webpush from "web-push";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { storage } from "./storage";
-import { db, getDbConnectionConfig } from "./db";
+import { db, pool, getDbConnectionConfig } from "./db";
 import {
   insertSermonSchema, insertEventSchema, insertTeamMemberSchema,
   insertContactSchema, insertConnectCardSchema, siteSettings,
@@ -161,7 +161,7 @@ export async function registerRoutes(
   app.use(
     session({
       store: new PgStore({
-        conObject: getDbConnectionConfig(),
+        pool,
         createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "lake-city-dev-secret",
@@ -254,6 +254,7 @@ export async function registerRoutes(
       req.session.lastActivity = Date.now();
       req.session.save((err) => {
         if (err) {
+          console.error("Bridge session save error:", err);
           return res.status(500).json({ message: "Session error" });
         }
         const enabledFeatures = storage.getEnabledFeaturesForRoles(user.roles);

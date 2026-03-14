@@ -20,7 +20,7 @@ if (useSSL) {
   poolConfig.ssl = { rejectUnauthorized: false };
 }
 
-const pool = new Pool(poolConfig);
+export const pool = new Pool(poolConfig);
 
 export const db = drizzle(pool, { schema });
 
