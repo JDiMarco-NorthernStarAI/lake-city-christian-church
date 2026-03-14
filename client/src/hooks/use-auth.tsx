@@ -120,6 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await v1Post("/api/v1/auth/logout", {});
     } catch {}
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {}
     clearTokens();
     setUser(null);
   }, []);
