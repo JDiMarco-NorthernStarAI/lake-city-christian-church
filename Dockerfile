@@ -13,10 +13,10 @@ FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && npm install drizzle-kit
 
 COPY --from=builder /app/dist ./dist
-COPY drizzle.config.ts ./
+COPY drizzle.config.ts tsconfig.json ./
 COPY shared ./shared
 COPY scripts/start.sh ./scripts/start.sh
 RUN chmod +x scripts/start.sh
