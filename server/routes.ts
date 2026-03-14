@@ -161,8 +161,7 @@ export async function registerRoutes(
   app.use(
     session({
       store: new PgStore({
-        ...getDbConnectionConfig(),
-        conString: getDbConnectionConfig().connectionString,
+        conObject: getDbConnectionConfig(),
         createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "lake-city-dev-secret",
