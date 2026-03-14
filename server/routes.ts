@@ -179,6 +179,11 @@ export async function registerRoutes(
 
   await seedDatabase();
 
+  // Health check endpoint (used by ALB target group)
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   registerObjectStorageRoutes(app);
 
   app.use("/api/v1", v1Router);
