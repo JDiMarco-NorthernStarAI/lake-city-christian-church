@@ -1246,12 +1246,23 @@ export async function registerRoutes(
       const { randomUUID } = await import("crypto");
       const key = `uploads/${randomUUID()}`;
 
-      await s3Client.send(new PutObjectCommand({
+      console.log(`S3 upload: bucket=${bucketName}, key=${key}, size=${file.buffer.length}, type=${file.mimetype}`);
+      const putResult = await s3Client.send(new PutObjectCommand({
         Bucket: bucketName,
         Key: key,
         Body: file.buffer,
         ContentType: file.mimetype,
       }));
+      console.log(`S3 upload result: ETag=${putResult.ETag}, status=${putResult.$metadata.httpStatusCode}`);
+
+      // Verify the upload immediately
+      const { HeadObjectCommand } = await import("@aws-sdk/client-s3");
+      try {
+        const headResult = await s3Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
+        console.log(`S3 verify: exists=true, size=${headResult.ContentLength}`);
+      } catch (verifyErr: any) {
+        console.error(`S3 verify FAILED: ${verifyErr.name} ${verifyErr.message}`);
+      }
 
       const objectPath = `/objects/${key}`;
       const mediaItem = await storage.createMedia({

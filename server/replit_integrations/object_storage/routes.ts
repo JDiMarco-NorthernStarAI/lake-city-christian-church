@@ -91,6 +91,7 @@ export function registerObjectStorageRoutes(app: Express): void {
       }
 
       // Stream the object directly from S3
+      console.log(`S3 GET: bucket=${bucket}, key=${key}, path=${req.path}`);
       const command = new GetObjectCommand({ Bucket: bucket, Key: key });
       const response = await s3Client.send(command);
 
