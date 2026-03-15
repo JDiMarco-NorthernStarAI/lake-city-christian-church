@@ -1,5 +1,7 @@
 import type { Express } from "express";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, s3Client } from "./objectStorage";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
  * Register object storage routes for file uploads.
@@ -77,13 +79,23 @@ export function registerObjectStorageRoutes(app: Express): void {
    */
   app.get(/^\/objects\/(.+)$/, async (req, res) => {
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      await objectStorageService.downloadObject(objectFile, res);
-    } catch (error) {
-      console.error("Error serving object:", error);
-      if (error instanceof ObjectNotFoundError) {
+      // Strip "/objects/" prefix to get the S3 key
+      const key = req.path.slice("/objects/".length);
+      if (!key) {
         return res.status(404).json({ error: "Object not found" });
       }
+
+      const bucket = process.env.S3_BUCKET_NAME;
+      if (!bucket) {
+        return res.status(500).json({ error: "S3 not configured" });
+      }
+
+      // Generate a presigned GET URL and redirect the browser to it
+      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+      const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      res.redirect(presignedUrl);
+    } catch (error) {
+      console.error("Error serving object:", error);
       return res.status(500).json({ error: "Failed to serve object" });
     }
   });
