@@ -29,6 +29,25 @@ node -e "
 echo "Running database schema sync..."
 ./node_modules/.bin/drizzle-kit push --force
 
+echo "Ensuring media table exists..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    CREATE TABLE IF NOT EXISTS \"media\" (
+      \"id\" serial PRIMARY KEY,
+      \"filename\" text NOT NULL,
+      \"object_path\" text NOT NULL,
+      \"folder\" text NOT NULL DEFAULT 'general',
+      \"content_type\" text,
+      \"size\" integer,
+      \"uploaded_by\" integer,
+      \"created_at\" timestamp NOT NULL DEFAULT now()
+    );
+  \`).then(() => { console.log('Media table ready.'); return pool.end(); })
+    .catch(e => { console.error('Media table error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Ensuring session table exists..."
 node -e "
   const { Pool } = require('pg');
