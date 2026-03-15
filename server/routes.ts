@@ -1251,11 +1251,9 @@ export async function registerRoutes(
         Key: key,
         Body: file.buffer,
         ContentType: file.mimetype,
-        ACL: "public-read",
       }));
 
-      const region = process.env.AWS_REGION || "us-east-2";
-      const objectPath = `https://${bucketName}.s3.${region}.amazonaws.com/${key}`;
+      const objectPath = `/objects/${key}`;
       const mediaItem = await storage.createMedia({
         filename: file.originalname,
         objectPath,

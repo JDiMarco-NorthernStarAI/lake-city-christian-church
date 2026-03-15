@@ -90,12 +90,33 @@ export function registerObjectStorageRoutes(app: Express): void {
         return res.status(500).json({ error: "S3 not configured" });
       }
 
-      // Generate a presigned GET URL and redirect the browser to it
+      // Stream the object directly from S3
       const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-      const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      res.redirect(presignedUrl);
-    } catch (error) {
-      console.error("Error serving object:", error);
+      const response = await s3Client.send(command);
+
+      if (response.ContentType) {
+        res.set("Content-Type", response.ContentType);
+      }
+      if (response.ContentLength !== undefined) {
+        res.set("Content-Length", String(response.ContentLength));
+      }
+      res.set("Cache-Control", "public, max-age=3600");
+
+      const { Readable } = await import("stream");
+      const body = response.Body;
+      if (body instanceof Readable) {
+        body.pipe(res);
+      } else if (body) {
+        const readable = Readable.from(body as any);
+        readable.pipe(res);
+      } else {
+        res.status(500).json({ error: "Empty response from S3" });
+      }
+    } catch (error: any) {
+      console.error("Error serving object:", error?.name, error?.message, error?.$metadata?.httpStatusCode);
+      if (error?.name === "NoSuchKey" || error?.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({ error: "Object not found" });
+      }
       return res.status(500).json({ error: "Failed to serve object" });
     }
   });
