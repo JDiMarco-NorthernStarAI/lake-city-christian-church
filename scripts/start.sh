@@ -64,5 +64,14 @@ node -e "
     .catch(e => { console.error('Session table error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Fixing media paths with double /objects/ prefix..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`UPDATE media SET object_path = REPLACE(object_path, '/objects/', '/') WHERE object_path LIKE '/objects/%'\`)
+    .then(r => { console.log('Fixed ' + r.rowCount + ' media paths.'); return pool.end(); })
+    .catch(e => { console.error('Media path fix error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Starting server..."
 node dist/index.cjs

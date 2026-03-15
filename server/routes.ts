@@ -1264,7 +1264,7 @@ export async function registerRoutes(
         console.error(`S3 verify FAILED: ${verifyErr.name} ${verifyErr.message}`);
       }
 
-      const objectPath = `/objects/${key}`;
+      const objectPath = `/${key}`;
       const mediaItem = await storage.createMedia({
         filename: file.originalname,
         objectPath,
