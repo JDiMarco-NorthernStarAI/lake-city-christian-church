@@ -5,7 +5,7 @@ import {
   refreshTokens, eventSignups, children, forms, formFields, formSubmissions, donationFunds, donations,
   pushSubscriptions, notificationLogs, signupEvents, signupSubmissions,
   smsGroups, smsGroupMembers, userTags, smsMessages, smsRecipients, smsOptOuts, smsTemplates, smsSettings, smsIncomingMessages,
-  loginActivity, media,
+  loginActivity, media, mediaFolders,
   type User, type InsertUser,
   type Sermon, type InsertSermon,
   type Event, type InsertEvent,
@@ -38,6 +38,7 @@ import {
   type SmsIncomingMessage, type InsertSmsIncomingMessage,
   type LoginActivity, type InsertLoginActivity,
   type Media, type InsertMedia,
+  type MediaFolder, type InsertMediaFolder,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -1235,6 +1236,62 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMedia(id: number): Promise<void> {
     await db.delete(media).where(eq(media.id, id));
+  }
+
+  async updateMedia(id: number, data: Partial<{ filename: string; folder: string }>): Promise<Media | undefined> {
+    const [item] = await db.update(media).set(data).where(eq(media.id, id)).returning();
+    return item;
+  }
+
+  async bulkDeleteMedia(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.delete(media).where(inArray(media.id, ids));
+  }
+
+  async getMediaStorageStats(): Promise<{ totalBytes: number; fileCount: number }> {
+    const [result] = await db.select({
+      totalBytes: sql<number>`COALESCE(SUM(${media.size}), 0)`,
+      fileCount: sql<number>`COUNT(*)`,
+    }).from(media);
+    return { totalBytes: Number(result.totalBytes), fileCount: Number(result.fileCount) };
+  }
+
+  async createMediaFolder(data: InsertMediaFolder): Promise<MediaFolder> {
+    const [item] = await db.insert(mediaFolders).values(data).returning();
+    return item;
+  }
+
+  async getMediaFolders(): Promise<MediaFolder[]> {
+    return db.select().from(mediaFolders).orderBy(asc(mediaFolders.path));
+  }
+
+  async getMediaFolder(id: number): Promise<MediaFolder | undefined> {
+    const [item] = await db.select().from(mediaFolders).where(eq(mediaFolders.id, id));
+    return item;
+  }
+
+  async updateMediaFolder(id: number, newPath: string): Promise<MediaFolder | undefined> {
+    const folder = await this.getMediaFolder(id);
+    if (!folder) return undefined;
+    const oldPath = folder.path;
+    // Update all media items in this folder and subfolders
+    await db.execute(sql`UPDATE media SET folder = ${newPath} || SUBSTRING(folder FROM ${oldPath.length + 1}) WHERE folder = ${oldPath} OR folder LIKE ${oldPath + '/%'}`);
+    const [updated] = await db.update(mediaFolders).set({ path: newPath }).where(eq(mediaFolders.id, id)).returning();
+    // Also update any subfolder paths
+    await db.execute(sql`UPDATE media_folders SET path = ${newPath} || SUBSTRING(path FROM ${oldPath.length + 1}) WHERE path LIKE ${oldPath + '/%'}`);
+    return updated;
+  }
+
+  async deleteMediaFolder(id: number, action: "move_to_general" | "delete_contents"): Promise<void> {
+    const folder = await this.getMediaFolder(id);
+    if (!folder) return;
+    if (action === "move_to_general") {
+      await db.execute(sql`UPDATE media SET folder = 'general' WHERE folder = ${folder.path} OR folder LIKE ${folder.path + '/%'}`);
+    } else {
+      await db.execute(sql`DELETE FROM media WHERE folder = ${folder.path} OR folder LIKE ${folder.path + '/%'}`);
+    }
+    // Delete subfolders too
+    await db.execute(sql`DELETE FROM media_folders WHERE path = ${folder.path} OR path LIKE ${folder.path + '/%'}`);
   }
 }
 

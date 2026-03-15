@@ -32,6 +32,7 @@ import { clearTokens, v1Post } from "@/lib/v1Api";
 import { useAuth } from "@/hooks/use-auth";
 import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068577.png";
 import AdminSmsTab from "@/pages/admin-sms";
+import AdminMediaTab from "@/pages/admin-media";
 import ImagePickerModal from "@/components/image-picker-modal";
 import { MessageSquare, Inbox, ImageIcon } from "lucide-react";
 
@@ -41,7 +42,7 @@ function getImageSrc(path: string | null | undefined) {
   return `/objects${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "pages" | "settings" | "users" | "roles" | "submissions";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "media" | "pages" | "settings" | "users" | "roles" | "submissions";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -50,6 +51,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
   { id: "events", label: "Events", icon: Calendar, feature: "events" },
   { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
+  { id: "media", label: "Media Library", icon: ImageIcon, feature: "media" },
   { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
   { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
   { id: "pages", label: "Page Content", icon: FileEdit, feature: "pages" },
@@ -176,6 +178,7 @@ export default function AdminDashboard() {
           {activeTab === "donations" && <DonationsTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "sms" && <AdminSmsTab />}
+          {activeTab === "media" && <AdminMediaTab />}
           {activeTab === "signups" && <SignupsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}

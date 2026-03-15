@@ -1,21 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Upload, Trash2, Loader2, Image as ImageIcon, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const FOLDERS = [
-  { id: "events", label: "Events" },
-  { id: "team", label: "Team" },
-  { id: "sermons", label: "Sermons" },
-  { id: "pages", label: "Pages" },
-  { id: "general", label: "General" },
-];
+import type { MediaFolder } from "@shared/schema";
 
 interface MediaItem {
   id: number;
@@ -40,6 +30,14 @@ function getImageSrc(path: string) {
   return `/objects${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+const DEFAULT_FOLDERS = [
+  { id: "events", label: "Events" },
+  { id: "team", label: "Team" },
+  { id: "sermons", label: "Sermons" },
+  { id: "pages", label: "Pages" },
+  { id: "general", label: "General" },
+];
+
 export default function ImagePickerModal({ open, onClose, onSelect, defaultFolder = "general" }: ImagePickerModalProps) {
   const { toast } = useToast();
   const [activeFolder, setActiveFolder] = useState(defaultFolder);
@@ -53,6 +51,26 @@ export default function ImagePickerModal({ open, onClose, onSelect, defaultFolde
       setSelectedId(null);
     }
   }, [open, defaultFolder]);
+
+  // Fetch dynamic folders
+  const { data: dynamicFolders = [] } = useQuery<MediaFolder[]>({
+    queryKey: ["/api/media/folders"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: open,
+  });
+
+  // Merge default + dynamic folders, deduplicate
+  const allFolderTabs = (() => {
+    const seen = new Set(DEFAULT_FOLDERS.map(f => f.id));
+    const merged = [...DEFAULT_FOLDERS];
+    for (const df of dynamicFolders) {
+      if (!seen.has(df.path)) {
+        seen.add(df.path);
+        merged.push({ id: df.path, label: df.path.split("/").pop() || df.path });
+      }
+    }
+    return merged;
+  })();
 
   const { data: mediaItems = [], isLoading } = useQuery<MediaItem[]>({
     queryKey: ["/api/media", `?folder=${activeFolder}`],
@@ -92,7 +110,6 @@ export default function ImagePickerModal({ open, onClose, onSelect, defaultFolde
       formData.append("file", file);
       formData.append("folder", activeFolder === "all" ? "general" : activeFolder);
 
-      // Upload through server (server proxies to S3)
       const token = localStorage.getItem("lc3_access_token");
       const res = await fetch("/api/media/upload", {
         method: "POST",
@@ -160,16 +177,25 @@ export default function ImagePickerModal({ open, onClose, onSelect, defaultFolde
           )}
         </div>
 
-        <Tabs value={activeFolder} onValueChange={setActiveFolder}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            {FOLDERS.map((f) => (
-              <TabsTrigger key={f.id} value={f.id}>{f.label}</TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex gap-1 flex-wrap mb-2">
+          <button
+            onClick={() => setActiveFolder("all")}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${activeFolder === "all" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
+          >
+            All
+          </button>
+          {allFolderTabs.map(f => (
+            <button
+              key={f.id}
+              onClick={() => setActiveFolder(f.id)}
+              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${activeFolder === f.id ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
 
-        <div className="flex-1 overflow-y-auto mt-4 min-h-[300px]">
+        <div className="flex-1 overflow-y-auto mt-2 min-h-[300px]">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

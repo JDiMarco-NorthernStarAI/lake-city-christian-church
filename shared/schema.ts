@@ -35,6 +35,7 @@ export const AVAILABLE_FEATURES = [
   "notifications",
   "sms",
   "signups",
+  "media",
   "settings",
   "users",
   "roles",
@@ -56,6 +57,7 @@ export const FEATURE_LABELS: Record<string, string> = {
   signups: "Sign Ups",
   settings: "Settings",
   users: "User Management",
+  media: "Media Library",
   roles: "Role Permissions",
 };
 
@@ -913,6 +915,16 @@ export const media = pgTable("media", {
 
 export type Media = typeof media.$inferSelect;
 export type InsertMedia = typeof media.$inferInsert;
+
+export const mediaFolders = pgTable("media_folders", {
+  id: serial("id").primaryKey(),
+  path: text("path").notNull().unique(),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type MediaFolder = typeof mediaFolders.$inferSelect;
+export type InsertMediaFolder = typeof mediaFolders.$inferInsert;
 
 export const createSignupEventSchema = z.object({
   title: z.string().min(1, "Title is required"),

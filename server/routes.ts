@@ -1302,6 +1302,125 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== MEDIA FOLDERS & MANAGEMENT ====================
+
+  app.put("/api/media/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { filename, folder } = req.body;
+      const updates: any = {};
+      if (filename) updates.filename = filename;
+      if (folder) updates.folder = folder;
+      const item = await storage.updateMedia(id, updates);
+      if (!item) return res.status(404).json({ message: "Not found" });
+      res.json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update media" });
+    }
+  });
+
+  app.post("/api/media/bulk-delete", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids array required" });
+      // Delete from S3 first
+      try {
+        const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+        const { s3Client } = await import("./replit_integrations/object_storage");
+        const bucket = process.env.S3_BUCKET_NAME || "lc3-storage";
+        for (const id of ids) {
+          const item = await storage.getMediaById(id);
+          if (item) {
+            const key = item.objectPath.replace(/^\//, "");
+            await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
+          }
+        }
+      } catch {}
+      await storage.bulkDeleteMedia(ids);
+      res.json({ message: `Deleted ${ids.length} items` });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to bulk delete media" });
+    }
+  });
+
+  app.get("/api/media/storage-stats", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const stats = await storage.getMediaStorageStats();
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get storage stats" });
+    }
+  });
+
+  app.get("/api/media/folders", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const folders = await storage.getMediaFolders();
+      res.json(folders);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get folders" });
+    }
+  });
+
+  app.post("/api/media/folders", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const { path: folderPath } = req.body;
+      if (!folderPath || typeof folderPath !== "string") return res.status(400).json({ message: "path is required" });
+      const cleanPath = folderPath.replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
+      if (!cleanPath) return res.status(400).json({ message: "Invalid folder path" });
+      const folder = await storage.createMediaFolder({ path: cleanPath, createdBy: req.session.userId });
+      res.json(folder);
+    } catch (err: any) {
+      if (err?.constraint || err?.code === "23505") {
+        return res.status(409).json({ message: "Folder already exists" });
+      }
+      res.status(500).json({ message: "Failed to create folder" });
+    }
+  });
+
+  app.put("/api/media/folders/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { path: newPath } = req.body;
+      if (!newPath || typeof newPath !== "string") return res.status(400).json({ message: "path is required" });
+      const cleanPath = newPath.replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
+      const folder = await storage.updateMediaFolder(id, cleanPath);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      res.json(folder);
+    } catch (err: any) {
+      if (err?.constraint || err?.code === "23505") {
+        return res.status(409).json({ message: "A folder with that name already exists" });
+      }
+      res.status(500).json({ message: "Failed to rename folder" });
+    }
+  });
+
+  app.delete("/api/media/folders/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const action = (req.query.action as string) === "delete_contents" ? "delete_contents" : "move_to_general";
+      // If deleting contents, also delete from S3
+      if (action === "delete_contents") {
+        const folder = await storage.getMediaFolder(id);
+        if (folder) {
+          const items = await storage.getMedia(folder.path);
+          try {
+            const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+            const { s3Client } = await import("./replit_integrations/object_storage");
+            const bucket = process.env.S3_BUCKET_NAME || "lc3-storage";
+            for (const item of items) {
+              const key = item.objectPath.replace(/^\//, "");
+              await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
+            }
+          } catch {}
+        }
+      }
+      await storage.deleteMediaFolder(id, action);
+      res.json({ message: "Folder deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete folder" });
+    }
+  });
+
   // ==================== STRIPE WEBHOOK ====================
   app.post("/api/stripe/webhook", async (req, res) => {
     const sig = req.headers["stripe-signature"];

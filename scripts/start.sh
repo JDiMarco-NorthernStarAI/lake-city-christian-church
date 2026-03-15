@@ -48,6 +48,23 @@ node -e "
     .catch(e => { console.error('Media table error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Ensuring media_folders table exists..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    CREATE TABLE IF NOT EXISTS \"media_folders\" (
+      \"id\" serial PRIMARY KEY,
+      \"path\" text NOT NULL UNIQUE,
+      \"created_by\" integer,
+      \"created_at\" timestamp NOT NULL DEFAULT now()
+    );
+    INSERT INTO media_folders (path) VALUES ('events'), ('team'), ('sermons'), ('pages'), ('general')
+    ON CONFLICT (path) DO NOTHING;
+  \`).then(() => { console.log('Media folders table ready.'); return pool.end(); })
+    .catch(e => { console.error('Media folders table error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Ensuring session table exists..."
 node -e "
   const { Pool } = require('pg');
