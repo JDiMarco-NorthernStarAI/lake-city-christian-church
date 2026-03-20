@@ -2101,5 +2101,39 @@ export async function registerRoutes(
     }
   });
 
+  // ======== User City Group Assignments ========
+
+  // Admin: get all user-group assignments (for filtering)
+  app.get("/api/user-city-groups", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const assignments = await storage.getAllUserCityGroups();
+      res.json(assignments);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching user group assignments" });
+    }
+  });
+
+  // Admin: get groups for a specific user
+  app.get("/api/users/:userId/city-groups", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const groups = await storage.getUserCityGroups(Number(req.params.userId));
+      res.json(groups);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching user groups" });
+    }
+  });
+
+  // Admin: set groups for a user
+  app.put("/api/users/:userId/city-groups", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const { groupIds, otherGroupName } = req.body;
+      await storage.setUserGroups(Number(req.params.userId), groupIds || [], otherGroupName);
+      const updated = await storage.getUserCityGroups(Number(req.params.userId));
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating user groups" });
+    }
+  });
+
   return httpServer;
 }

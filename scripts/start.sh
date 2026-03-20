@@ -109,6 +109,23 @@ node -e "
     .catch(e => { console.error('City groups table error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Ensuring user_city_groups table exists..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    CREATE TABLE IF NOT EXISTS \"user_city_groups\" (
+      \"id\" serial PRIMARY KEY,
+      \"user_id\" integer NOT NULL,
+      \"city_group_id\" integer NOT NULL,
+      \"other_group_name\" text,
+      \"created_at\" timestamp NOT NULL DEFAULT now(),
+      UNIQUE(\"user_id\", \"city_group_id\")
+    );
+  \`).then(() => { console.log('User city groups table ready.'); return pool.end(); })
+    .catch(e => { console.error('User city groups table error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Fixing media paths with double /objects/ prefix..."
 node -e "
   const { Pool } = require('pg');

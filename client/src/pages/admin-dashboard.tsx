@@ -2078,21 +2078,84 @@ type AdminUser = {
   profilePhotoUrl: string | null;
 };
 
+interface UserCityGroupAssignment {
+  id: number;
+  userId: number;
+  cityGroupId: number;
+  otherGroupName: string | null;
+}
+
 function UsersTab({ currentUser }: { currentUser: { id: number; username: string; roles: string[] } }) {
   const { toast } = useToast();
   const { data: users, isLoading } = useQuery<AdminUser[]>({
     queryKey: ["/api/users"],
   });
+  const { data: allCityGroups = [] } = useQuery<CityGroup[]>({
+    queryKey: ["/api/city-groups"],
+    queryFn: async () => { const res = await apiRequest("GET", "/api/city-groups"); return res.json(); },
+  });
+  const { data: allUserGroups = [] } = useQuery<UserCityGroupAssignment[]>({
+    queryKey: ["/api/user-city-groups"],
+    queryFn: async () => { const res = await apiRequest("GET", "/api/user-city-groups"); return res.json(); },
+  });
+  const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterGroup, setFilterGroup] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<AdminUser | null>(null);
   const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [editingGroups, setEditingGroups] = useState(false);
+  const [editGroupUserId, setEditGroupUserId] = useState<number | null>(null);
+  const [editGroupIds, setEditGroupIds] = useState<number[]>([]);
+  const [editOtherGroup, setEditOtherGroup] = useState("");
   const [form, setForm] = useState({
     username: "", password: "", email: "", name: "", phone: "",
     address: "", city: "", state: "", zip: "",
     gender: "", dateOfBirth: "", maritalStatus: "",
     emergencyContactName: "", emergencyContactPhone: "",
     roles: ["member"] as string[],
+  });
+
+  const setGroupsMutation = useMutation({
+    mutationFn: async ({ userId, groupIds, otherGroupName }: { userId: number; groupIds: number[]; otherGroupName?: string }) => {
+      await apiRequest("PUT", `/api/users/${userId}/city-groups`, { groupIds, otherGroupName });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-city-groups"] });
+      setEditingGroups(false);
+      setEditGroupUserId(null);
+      toast({ title: "Groups updated" });
+    },
+    onError: () => toast({ title: "Error updating groups", variant: "destructive" }),
+  });
+
+  function openEditGroups(userId: number) {
+    const userGroups = allUserGroups.filter(ug => ug.userId === userId);
+    setEditGroupUserId(userId);
+    setEditGroupIds(userGroups.filter(ug => ug.cityGroupId !== 0).map(ug => ug.cityGroupId));
+    setEditOtherGroup(userGroups.find(ug => ug.cityGroupId === 0)?.otherGroupName || "");
+    setEditingGroups(true);
+  }
+
+  function getUserGroupNames(userId: number): string[] {
+    const userGroups = allUserGroups.filter(ug => ug.userId === userId);
+    return userGroups.map(ug => {
+      if (ug.cityGroupId === 0) return ug.otherGroupName || "Other";
+      return allCityGroups.find(g => g.id === ug.cityGroupId)?.name || `Group #${ug.cityGroupId}`;
+    });
+  }
+
+  const filteredUsers = users?.filter(u => {
+    if (filterRole !== "all" && !u.roles.includes(filterRole)) return false;
+    if (filterGroup !== "all") {
+      const groupId = parseInt(filterGroup);
+      if (groupId === 0) {
+        if (!allUserGroups.some(ug => ug.userId === u.id && ug.cityGroupId === 0)) return false;
+      } else {
+        if (!allUserGroups.some(ug => ug.userId === u.id && ug.cityGroupId === groupId)) return false;
+      }
+    }
+    return true;
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -2277,6 +2340,39 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
         </Button>
       </div>
 
+      <div className="flex gap-4 mb-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap">Filter by Role:</Label>
+          <Select value={filterRole} onValueChange={setFilterRole}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {AVAILABLE_ROLES.map(r => (
+                <SelectItem key={r} value={r}>{ROLE_LABELS[r] || r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap">Filter by Group:</Label>
+          <Select value={filterGroup} onValueChange={setFilterGroup}>
+            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Groups</SelectItem>
+              {allCityGroups.map(g => (
+                <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+              ))}
+              <SelectItem value="0">Other</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(filterRole !== "all" || filterGroup !== "all") && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterRole("all"); setFilterGroup("all"); }}>
+            Clear Filters
+          </Button>
+        )}
+      </div>
+
       {isLoading ? (
         <p className="text-muted-foreground" data-testid="loading-users">Loading...</p>
       ) : (
@@ -2287,11 +2383,12 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Roles</TableHead>
+              <TableHead>Groups</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users?.map((u) => (
+            {filteredUsers?.map((u) => (
               <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -2305,8 +2402,8 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                     </div>
                   </div>
                 </TableCell>
-                <TableCell data-testid={`text-user-email-${u.id}`}>{u.email || "—"}</TableCell>
-                <TableCell data-testid={`text-user-phone-${u.id}`}>{u.phone || "—"}</TableCell>
+                <TableCell data-testid={`text-user-email-${u.id}`}>{u.email || "\u2014"}</TableCell>
+                <TableCell data-testid={`text-user-phone-${u.id}`}>{u.phone || "\u2014"}</TableCell>
                 <TableCell>
                   <div className="flex gap-1 flex-wrap">
                     {u.roles.map((r) => (
@@ -2317,12 +2414,25 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                   </div>
                 </TableCell>
                 <TableCell>
+                  {(() => {
+                    const gNames = getUserGroupNames(u.id);
+                    return gNames.length > 0 ? (
+                      <div className="flex gap-1 flex-wrap">
+                        {gNames.map((n, i) => <Badge key={i} variant="outline" className="text-xs">{n}</Badge>)}
+                      </div>
+                    ) : <span className="text-muted-foreground text-xs">\u2014</span>;
+                  })()}
+                </TableCell>
+                <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => openView(u)} data-testid={`button-view-user-${u.id}`}>
+                    <Button size="icon" variant="ghost" onClick={() => openView(u)} data-testid={`button-view-user-${u.id}`} title="View">
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`}>
+                    <Button size="icon" variant="ghost" onClick={() => openEdit(u)} data-testid={`button-edit-user-${u.id}`} title="Edit">
                       <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => openEditGroups(u.id)} title="Edit Groups">
+                      <UsersRound className="w-4 h-4" />
                     </Button>
                     {u.id !== currentUser.id && (
                       <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this user?")) deleteMutation.mutate(u.id); }} data-testid={`button-delete-user-${u.id}`}>
@@ -2397,9 +2507,70 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                     ))}
                   </div>
                 </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">City Groups</span>
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    {(() => {
+                      const gNames = getUserGroupNames(viewingUser.id);
+                      return gNames.length > 0
+                        ? gNames.map((n, i) => <Badge key={i} variant="outline" className="text-xs">{n}</Badge>)
+                        : <span className="text-sm">{"\u2014"}</span>;
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Groups Dialog */}
+      <Dialog open={editingGroups} onOpenChange={open => { if (!open) { setEditingGroups(false); setEditGroupUserId(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit City Groups{editGroupUserId && users ? ` - ${users.find(u => u.id === editGroupUserId)?.name || ""}` : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {allCityGroups.map(g => (
+              <div
+                key={g.id}
+                className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                  editGroupIds.includes(g.id) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                }`}
+                onClick={(e) => { e.preventDefault(); setEditGroupIds(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id]); }}
+              >
+                <Checkbox
+                  checked={editGroupIds.includes(g.id)}
+                  onCheckedChange={() => setEditGroupIds(prev => prev.includes(g.id) ? prev.filter(id => id !== g.id) : [...prev, g.id])}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="text-sm font-medium">{g.name}</span>
+              </div>
+            ))}
+            <div className="space-y-2">
+              <Label>Other Group</Label>
+              <Input
+                placeholder="Other group name (leave blank if none)"
+                value={editOtherGroup}
+                onChange={e => setEditOtherGroup(e.target.value)}
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (editGroupUserId) {
+                  setGroupsMutation.mutate({
+                    userId: editGroupUserId,
+                    groupIds: editGroupIds,
+                    otherGroupName: editOtherGroup.trim() || undefined,
+                  });
+                }
+              }}
+              disabled={setGroupsMutation.isPending}
+            >
+              Save Groups
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

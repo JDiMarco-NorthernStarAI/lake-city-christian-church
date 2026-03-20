@@ -105,6 +105,31 @@ v1Router.post("/auth/register", async (req, res) => {
       smsOptedOutAt: smsConsented ? null : new Date(),
     });
 
+    // Assign city groups if selected during registration
+    if (parsed.data.cityGroupIds && parsed.data.cityGroupIds.length > 0) {
+      await storage.setUserGroups(user.id, parsed.data.cityGroupIds, parsed.data.otherGroup || undefined);
+    } else if (parsed.data.otherGroup) {
+      await storage.setUserGroups(user.id, [], parsed.data.otherGroup);
+    }
+
+    // Auto-link any existing city group signup form submissions by email
+    try {
+      const existingSignups = await storage.getCityGroupSignups();
+      const matchingSignups = existingSignups.filter(s => s.email.toLowerCase() === parsed.data.email.toLowerCase());
+      for (const signup of matchingSignups) {
+        if (signup.groupIds && signup.groupIds.length > 0) {
+          const currentGroups = await storage.getUserCityGroups(user.id);
+          const currentIds = currentGroups.map(g => g.cityGroupId);
+          const newIds = signup.groupIds.filter(id => !currentIds.includes(id));
+          for (const gid of newIds) {
+            await storage.addUserToGroup({ userId: user.id, cityGroupId: gid });
+          }
+        }
+      }
+    } catch (linkErr) {
+      console.error("Error auto-linking city group signups:", linkErr);
+    }
+
     const deviceId = req.body.deviceId || "web-" + Date.now();
     const deviceName = req.body.deviceName || req.headers["user-agent"]?.slice(0, 100) || "Unknown";
     const deviceType = req.body.deviceType || "web";

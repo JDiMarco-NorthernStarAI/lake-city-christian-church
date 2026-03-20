@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,9 @@ export default function Register() {
   const { register } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
+  const [otherGroup, setOtherGroup] = useState("");
+  const [showOther, setShowOther] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -32,6 +36,15 @@ export default function Register() {
     state: "",
     zip: "",
     smsConsent: false,
+  });
+
+  const { data: cityGroups = [] } = useQuery<{ id: number; name: string; meetingDay: string | null; meetingTime: string | null }[]>({
+    queryKey: ["/api/city-groups/active"],
+    queryFn: async () => {
+      const res = await fetch("/api/city-groups/active");
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
   function update(field: string, value: string) {
@@ -63,6 +76,8 @@ export default function Register() {
       state: form.state || undefined,
       zip: form.zip || undefined,
       smsConsent: form.smsConsent,
+      cityGroupIds: selectedGroups.length > 0 ? selectedGroups : undefined,
+      otherGroup: showOther && otherGroup.trim() ? otherGroup.trim() : undefined,
     });
     setLoading(false);
     if (result.success) {
@@ -212,6 +227,59 @@ export default function Register() {
                   />
                 </div>
               </div>
+              {cityGroups.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-white/80">Are you part of a City Group?</Label>
+                  <div className="space-y-2">
+                    {cityGroups.map(group => (
+                      <div
+                        key={group.id}
+                        className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                          selectedGroups.includes(group.id) ? "border-blue-500 bg-blue-500/10" : "border-white/10 hover:border-white/20"
+                        }`}
+                        onClick={(e) => { e.preventDefault(); setSelectedGroups(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id]); }}
+                      >
+                        <Checkbox
+                          checked={selectedGroups.includes(group.id)}
+                          onCheckedChange={() => setSelectedGroups(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
+                          onClick={(e) => e.stopPropagation()}
+                          className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                        />
+                        <div>
+                          <span className="text-white/90 text-sm font-medium">{group.name}</span>
+                          {(group.meetingDay || group.meetingTime) && (
+                            <span className="text-white/50 text-xs ml-2">
+                              {[group.meetingDay, group.meetingTime].filter(Boolean).join(" @ ")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                        showOther ? "border-blue-500 bg-blue-500/10" : "border-white/10 hover:border-white/20"
+                      }`}
+                      onClick={(e) => { e.preventDefault(); setShowOther(!showOther); }}
+                    >
+                      <Checkbox
+                        checked={showOther}
+                        onCheckedChange={() => setShowOther(!showOther)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                      />
+                      <span className="text-white/90 text-sm font-medium">Other</span>
+                    </div>
+                    {showOther && (
+                      <Input
+                        placeholder="Group name"
+                        value={otherGroup}
+                        onChange={(e) => setOtherGroup(e.target.value)}
+                        className="bg-zinc-800 border-white/10 text-white placeholder:text-white/30"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="sms-consent"

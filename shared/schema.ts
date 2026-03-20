@@ -381,6 +381,8 @@ export const registerUserSchema = z.object({
   zip: z.string().optional(),
   dateOfBirth: z.string().optional(),
   smsConsent: z.boolean().optional(),
+  cityGroupIds: z.array(z.number().int()).optional(),
+  otherGroup: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -955,6 +957,19 @@ export type CityGroup = typeof cityGroups.$inferSelect;
 export type InsertCityGroup = z.infer<typeof insertCityGroupSchema>;
 export type CityGroupSignup = typeof cityGroupSignups.$inferSelect;
 export type InsertCityGroupSignup = z.infer<typeof insertCityGroupSignupSchema>;
+
+export const userCityGroups = pgTable("user_city_groups", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  cityGroupId: integer("city_group_id").notNull(),
+  otherGroupName: text("other_group_name"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  unique().on(table.userId, table.cityGroupId),
+]);
+
+export type UserCityGroup = typeof userCityGroups.$inferSelect;
+export type InsertUserCityGroup = typeof userCityGroups.$inferInsert;
 
 export const createCityGroupSchema = z.object({
   name: z.string().min(1, "Group name is required"),

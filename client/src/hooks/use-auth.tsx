@@ -24,6 +24,8 @@ interface RegisterData {
   zip?: string;
   dateOfBirth?: string;
   smsConsent?: boolean;
+  cityGroupIds?: number[];
+  otherGroup?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

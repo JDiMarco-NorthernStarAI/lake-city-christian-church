@@ -39,9 +39,10 @@ import {
   type LoginActivity, type InsertLoginActivity,
   type Media, type InsertMedia,
   type MediaFolder, type InsertMediaFolder,
-  cityGroups, cityGroupSignups,
+  cityGroups, cityGroupSignups, userCityGroups,
   type CityGroup, type InsertCityGroup,
   type CityGroupSignup, type InsertCityGroupSignup,
+  type UserCityGroup, type InsertUserCityGroup,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -275,6 +276,14 @@ export interface IStorage {
   getCityGroupSignup(id: number): Promise<CityGroupSignup | undefined>;
   createCityGroupSignup(signup: InsertCityGroupSignup): Promise<CityGroupSignup>;
   deleteCityGroupSignup(id: number): Promise<void>;
+
+  // User City Group Assignments
+  getUserCityGroups(userId: number): Promise<UserCityGroup[]>;
+  getUsersByGroup(cityGroupId: number): Promise<UserCityGroup[]>;
+  getAllUserCityGroups(): Promise<UserCityGroup[]>;
+  addUserToGroup(data: InsertUserCityGroup): Promise<UserCityGroup>;
+  removeUserFromGroup(userId: number, cityGroupId: number): Promise<void>;
+  setUserGroups(userId: number, groupIds: number[], otherGroupName?: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1358,6 +1367,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCityGroupSignup(id: number): Promise<void> {
     await db.delete(cityGroupSignups).where(eq(cityGroupSignups.id, id));
+  }
+
+  // ======== User City Group Assignments ========
+
+  async getUserCityGroups(userId: number): Promise<UserCityGroup[]> {
+    return db.select().from(userCityGroups).where(eq(userCityGroups.userId, userId));
+  }
+
+  async getUsersByGroup(cityGroupId: number): Promise<UserCityGroup[]> {
+    return db.select().from(userCityGroups).where(eq(userCityGroups.cityGroupId, cityGroupId));
+  }
+
+  async getAllUserCityGroups(): Promise<UserCityGroup[]> {
+    return db.select().from(userCityGroups);
+  }
+
+  async addUserToGroup(data: InsertUserCityGroup): Promise<UserCityGroup> {
+    const [created] = await db.insert(userCityGroups).values(data).onConflictDoNothing().returning();
+    if (!created) {
+      const [existing] = await db.select().from(userCityGroups)
+        .where(and(eq(userCityGroups.userId, data.userId!), eq(userCityGroups.cityGroupId, data.cityGroupId!)));
+      return existing;
+    }
+    return created;
+  }
+
+  async removeUserFromGroup(userId: number, cityGroupId: number): Promise<void> {
+    await db.delete(userCityGroups).where(
+      and(eq(userCityGroups.userId, userId), eq(userCityGroups.cityGroupId, cityGroupId))
+    );
+  }
+
+  async setUserGroups(userId: number, groupIds: number[], otherGroupName?: string): Promise<void> {
+    await db.delete(userCityGroups).where(eq(userCityGroups.userId, userId));
+    if (groupIds.length > 0) {
+      const values = groupIds.map(gid => ({
+        userId,
+        cityGroupId: gid,
+        otherGroupName: undefined as string | undefined,
+      }));
+      await db.insert(userCityGroups).values(values).onConflictDoNothing();
+    }
+    if (otherGroupName) {
+      await db.insert(userCityGroups).values({
+        userId,
+        cityGroupId: 0,
+        otherGroupName,
+      }).onConflictDoNothing();
+    }
   }
 }
 
