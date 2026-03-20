@@ -2014,25 +2014,23 @@ export async function registerRoutes(
       // Resolve group names for email
       const allGroups = await storage.getActiveCityGroups();
       const selectedGroups = allGroups.filter(g => parsed.data.groupIds.includes(g.id));
-      const groupNames = selectedGroups.map(g => g.name).join(", ");
+      const groupNames = selectedGroups.map(g => g.name);
 
-      // Send notification email to church
+      // Send branded notification email
       const { sendEmail } = await import("./email-service");
-      const { baseLayout: _ignore, ...templates } = await import("./email-templates");
-      const notifyHtml = `
-        <h2 style="color:#ffffff;margin:0 0 16px;">New Small Group Signup</h2>
-        <p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Name:</strong> ${parsed.data.name}</p>
-        <p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Email:</strong> ${parsed.data.email}</p>
-        ${parsed.data.phone ? `<p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Phone:</strong> ${parsed.data.phone}</p>` : ""}
-        <p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Groups:</strong> ${groupNames}</p>
-        <p style="color:rgba(255,255,255,0.6);margin:16px 0 0;font-size:13px;">Submitted on ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
-      `;
+      const { smallGroupSignupNotification } = await import("./email-templates");
+      const emailData = smallGroupSignupNotification(
+        parsed.data.name,
+        parsed.data.email,
+        parsed.data.phone,
+        groupNames,
+        new Date(),
+      );
 
-      sendEmail({
-        to: "info@lakecitycc.com",
-        subject: `New Small Group Signup: ${parsed.data.name}`,
-        html: notifyHtml,
-      }).catch(() => {});
+      // Send to Trevor directly (info@ group forwards back to sender, gets suppressed by Gmail)
+      sendEmail({ to: "trevor@lakecitycc.com", ...emailData }).catch(() => {});
+      // Also send to info@ in case other recipients are added later
+      sendEmail({ to: "info@lakecitycc.com", ...emailData }).catch(() => {});
 
       res.status(201).json(signup);
     } catch (err) {

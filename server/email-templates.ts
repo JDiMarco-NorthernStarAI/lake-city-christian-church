@@ -1,6 +1,6 @@
 const CHURCH_NAME = "Lake City Christian Church";
 const CHURCH_URL = process.env.APP_URL || "https://lakecitychristian.church";
-const CHURCH_ADDRESS = "7519 Engle Rd, Middleburg Heights, OH 44130";
+const CHURCH_ADDRESS = "6717 Fry Road, Middleburg Heights, OH";
 
 function baseLayout(title: string, content: string): string {
   return `<!DOCTYPE html>
@@ -170,6 +170,31 @@ export function donationReceiptEmail(
       `)}
       ${paragraph("This email serves as your donation receipt. Please keep it for your records.")}
       ${button("View Giving", `${CHURCH_URL}/give`)}
+    `),
+  };
+}
+
+export function smallGroupSignupNotification(
+  submitterName: string,
+  submitterEmail: string,
+  submitterPhone: string | undefined,
+  groupNames: string[],
+  submittedAt: Date,
+): { subject: string; html: string } {
+  return {
+    subject: `New City Group Signup: ${submitterName} - ${CHURCH_NAME}`,
+    html: baseLayout("New City Group Signup", `
+      ${heading("New City Group Interest")}
+      ${paragraph(`Someone has expressed interest in joining a City Group. Please follow up with them to get connected!`)}
+      ${detailsTable(`
+        ${detailRow("Name", submitterName)}
+        ${detailRow("Email", `<a href="mailto:${submitterEmail}" style="color:#00D4FF;">${submitterEmail}</a>`)}
+        ${submitterPhone ? detailRow("Phone", `<a href="tel:${submitterPhone}" style="color:#00D4FF;">${submitterPhone}</a>`) : ""}
+        ${detailRow("Group(s)", groupNames.join(", "))}
+        ${detailRow("Submitted", submittedAt.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }))}
+      `)}
+      ${button("View All Signups", `${CHURCH_URL}/admin/dashboard`)}
+      ${paragraph("You can manage City Groups and view all signups in the admin dashboard under the Small Groups tab.")}
     `),
   };
 }
