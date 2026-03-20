@@ -214,11 +214,12 @@ export default function JoinSmallGroup() {
                           className={`flex items-start gap-3 p-4 rounded-md border cursor-pointer transition-colors ${
                             selectedGroups.includes(group.id) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
                           }`}
-                          onClick={() => toggleGroup(group.id)}
+                          onClick={(e) => { e.preventDefault(); toggleGroup(group.id); }}
                         >
                           <Checkbox
                             checked={selectedGroups.includes(group.id)}
                             onCheckedChange={() => toggleGroup(group.id)}
+                            onClick={(e) => e.stopPropagation()}
                             className="mt-0.5"
                           />
                           <div className="flex-1">

@@ -273,15 +273,34 @@ async function cleanupData() {
       });
       log("Added Paul & Leslie Aguilar to team", "seed");
     }
-    // Seed city groups if none exist
+    // Seed or update city groups
     const existingGroups = await storage.getCityGroups();
+    // Update existing groups that are missing descriptions
+    for (const g of existingGroups) {
+      if (!g.description) {
+        const descriptions: Record<string, string> = {
+          "Anchored": "Young Families. This City Group is designed for young families who want to grow deeper in their faith while doing life together. They love to have fun and keep things relaxed. This group is lively, welcoming, and focused on learning, growing, and building meaningful relationships together. Kids are always welcome to join us (though no childcare is provided).",
+          "Young Adults": "This group shares their lives with one another, offers encouragement and wisdom for each other to navigate this unique point in their lives. They walk through scriptures, breaking it down together, so that they can grow in their understanding of the Lord and His Word.",
+          "Deep Diver Crew": "Anyone (no childcare). This city group's focus is going deeper into God's Word, developing a deeper love for God and for one another, and building meaningful fellowship through sharing, caring, and encouraging each other. We also seek to go deeper in using our gifts & passions to serve God and advance His Kingdom.",
+          "F4 (Faith, Friends, Fellowship, Fun)": "Adult Couples. This City Group is for adult couples looking for a place to grow as a couple, connect deeply, and walk through life alongside others\u2014you're invited to join. A relaxed, welcoming environment focused on meaningful conversation, prayer, and real connection.",
+          "CIA (Christians In Action)": "This City Group is an adult-only group focused on studying and discussing God's Word while building strong relationships with one another. We gather to grow in faith, enjoy food and fellowship, and encourage each other as brothers and sisters in Christ.",
+        };
+        if (descriptions[g.name]) {
+          const updates: Record<string, any> = { description: descriptions[g.name] };
+          if (g.name === "F4 (Faith, Friends, Fellowship, Fun)" || g.name === "CIA (Christians In Action)") {
+            updates.meetingDay = "Wednesday (every other)";
+          }
+          await storage.updateCityGroup(g.id, updates);
+        }
+      }
+    }
     if (existingGroups.length === 0) {
       const cityGroupData = [
-        { name: "Anchored", description: "Young Families", meetingDay: "Sunday (every other)", meetingTime: "4:30 PM", sortOrder: 0 },
-        { name: "Young Adults", description: null, meetingDay: "Monday", meetingTime: "7:30 PM", sortOrder: 1 },
-        { name: "Deep Diver Crew", description: null, meetingDay: "Wednesday", meetingTime: "10:30 AM", sortOrder: 2 },
-        { name: "F4 (Faith, Friends, Fellowship, Fun)", description: null, meetingDay: "Wednesday", meetingTime: "6:30 PM", sortOrder: 3 },
-        { name: "CIA (Christians In Action)", description: null, meetingDay: "Wednesday", meetingTime: "6:30 PM", sortOrder: 4 },
+        { name: "Anchored", description: "Young Families. This City Group is designed for young families who want to grow deeper in their faith while doing life together. They love to have fun and keep things relaxed. This group is lively, welcoming, and focused on learning, growing, and building meaningful relationships together. Kids are always welcome to join us (though no childcare is provided).", meetingDay: "Sunday (every other)", meetingTime: "4:30 PM", sortOrder: 0 },
+        { name: "Young Adults", description: "This group shares their lives with one another, offers encouragement and wisdom for each other to navigate this unique point in their lives. They walk through scriptures, breaking it down together, so that they can grow in their understanding of the Lord and His Word.", meetingDay: "Monday", meetingTime: "7:30 PM", sortOrder: 1 },
+        { name: "Deep Diver Crew", description: "Anyone (no childcare). This city group's focus is going deeper into God's Word, developing a deeper love for God and for one another, and building meaningful fellowship through sharing, caring, and encouraging each other. We also seek to go deeper in using our gifts & passions to serve God and advance His Kingdom.", meetingDay: "Wednesday", meetingTime: "10:30 AM", sortOrder: 2 },
+        { name: "F4 (Faith, Friends, Fellowship, Fun)", description: "Adult Couples. This City Group is for adult couples looking for a place to grow as a couple, connect deeply, and walk through life alongside others\u2014you're invited to join. A relaxed, welcoming environment focused on meaningful conversation, prayer, and real connection.", meetingDay: "Wednesday (every other)", meetingTime: "6:30 PM", sortOrder: 3 },
+        { name: "CIA (Christians In Action)", description: "This City Group is an adult-only group focused on studying and discussing God's Word while building strong relationships with one another. We gather to grow in faith, enjoy food and fellowship, and encourage each other as brothers and sisters in Christ.", meetingDay: "Wednesday (every other)", meetingTime: "6:30 PM", sortOrder: 4 },
       ];
       for (const group of cityGroupData) {
         await storage.createCityGroup({ ...group, isActive: true });
