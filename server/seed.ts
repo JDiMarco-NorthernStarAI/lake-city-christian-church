@@ -259,6 +259,30 @@ async function cleanupData() {
         });
       }
     }
+    // Deduplicate events
+    const events = await storage.getEvents();
+    const seenEvents = new Set<string>();
+    for (const evt of events) {
+      const key = `${evt.title}|||${evt.date}`.toLowerCase();
+      if (seenEvents.has(key)) {
+        await storage.deleteEvent(evt.id);
+      } else {
+        seenEvents.add(key);
+      }
+    }
+
+    // Deduplicate sermons
+    const sermons = await storage.getSermons();
+    const seenSermons = new Set<string>();
+    for (const s of sermons) {
+      const key = `${s.title}|||${s.date}`.toLowerCase();
+      if (seenSermons.has(key)) {
+        await storage.deleteSermon(s.id);
+      } else {
+        seenSermons.add(key);
+      }
+    }
+
     // Ensure Paul & Leslie Aguilar exist
     const teamAfterCleanup = await storage.getTeamMembers();
     const hasAguilar = teamAfterCleanup.some(m => m.name.toLowerCase().includes("aguilar"));
