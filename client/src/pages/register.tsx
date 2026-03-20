@@ -305,7 +305,7 @@ export default function Register() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Account"}
               </Button>
             </form>
-            <SocialAuthButtons mode="register" onSuccess={() => navigate("/account")} />
+            <SocialAuthButtons mode="register" onSuccess={() => navigate("/account?complete=1")} />
             <div className="mt-6 text-center">
               <p className="text-white/50 text-sm">
                 Already have an account?{" "}

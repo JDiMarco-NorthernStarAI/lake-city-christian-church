@@ -49,6 +49,7 @@ export default function Account() {
   const { user, isLoading, isAuthenticated, logout, refreshUser } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
+  const needsCompletion = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("complete") === "1";
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -71,6 +72,12 @@ export default function Account() {
   const [donationsList, setDonationsList] = useState<any[]>([]);
   const [formSubs, setFormSubs] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (needsCompletion && user) {
+      setEditing(true);
+    }
+  }, [needsCompletion, user]);
 
   useEffect(() => {
     if (user) {
@@ -277,6 +284,13 @@ export default function Account() {
         </div>
 
         {activeTab === "profile" && (
+          <>
+          {needsCompletion && (
+            <div className="mb-4 p-4 rounded-md border border-blue-500/30 bg-blue-500/10">
+              <p className="text-white font-medium">Welcome to LC3! Please complete your profile below.</p>
+              <p className="text-white/60 text-sm mt-1">Add your phone number and address so we can stay connected with you.</p>
+            </div>
+          )}
           <Card className="bg-zinc-900 border-white/10">
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-white text-lg" style={{ fontFamily: "Montserrat, sans-serif" }}>
@@ -567,6 +581,7 @@ export default function Account() {
               </div>
             </CardContent>
           </Card>
+          </>
         )}
 
         {activeTab === "signups" && (

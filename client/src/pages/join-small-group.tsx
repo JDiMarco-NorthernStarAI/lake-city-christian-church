@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle } from "lucide-react";
@@ -211,17 +210,23 @@ export default function JoinSmallGroup() {
                       {groups.map(group => (
                         <div
                           key={group.id}
+                          role="button"
+                          tabIndex={0}
                           className={`flex items-start gap-3 p-4 rounded-md border cursor-pointer transition-colors ${
                             selectedGroups.includes(group.id) ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"
                           }`}
-                          onClick={(e) => { e.preventDefault(); toggleGroup(group.id); }}
+                          onClick={() => toggleGroup(group.id)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleGroup(group.id); } }}
                         >
-                          <Checkbox
-                            checked={selectedGroups.includes(group.id)}
-                            onCheckedChange={() => toggleGroup(group.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-0.5"
-                          />
+                          <div className={`mt-1 h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                            selectedGroups.includes(group.id) ? "bg-blue-500 border-blue-500" : "border-gray-400"
+                          }`}>
+                            {selectedGroups.includes(group.id) && (
+                              <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
                           <div className="flex-1">
                             <p className="font-medium text-foreground">{group.name}</p>
                             {(group.meetingDay || group.meetingTime) && (
