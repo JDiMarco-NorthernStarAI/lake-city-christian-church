@@ -27,13 +27,13 @@ const ministries = [
   },
   {
     title: "Club 419 \u2014 Student Ministry",
-    description: "Equipping students to follow Jesus and extend the good news.",
+    description: "Equipping Middle and High School Students to Follow Jesus.",
     icon: GraduationCap,
     href: "/student-ministry",
   },
   {
-    title: "City Small Groups",
-    description: "Small group gatherings for community and a closer relationship with Jesus.",
+    title: "Small Groups",
+    description: "City Small Groups are for growing stronger in community.",
     icon: Users,
     href: "/small-groups",
   },

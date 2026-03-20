@@ -21,7 +21,7 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 
 const expectations = [
   "Groups meet for 6-8 week sessions.",
-  "Gatherings are held in homes or at various locations locally in the Middleburg Heights & Strongsville area.",
+  "Gatherings are held in homes or at various locations locally.",
   "Groups share in a time of devotion, reflection, teaching and discipling, share meals and participate in local outreach activities \u2014 Together.",
 ];
 
@@ -102,7 +102,7 @@ export default function SmallGroups() {
           <p className="text-muted-foreground text-lg mb-8">
             {c.cta_description}
           </p>
-          <Link href="/contact">
+          <Link href="/join-small-group">
             <Button
               size="lg"
               className="text-white border-transparent"

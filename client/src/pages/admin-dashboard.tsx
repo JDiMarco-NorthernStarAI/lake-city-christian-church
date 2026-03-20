@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
   Plus, Pencil, Trash2, BarChart3, Eye, TrendingUp, FileEdit, Save, ChevronRight,
   Shield, UserCog, ClipboardList, ArrowUp, ArrowDown, Heart, DollarSign, Bell, Send, Link2, Copy, UserPlus,
-  Camera, Loader2, ExternalLink, Download, Search, Filter, LogIn, Monitor, Smartphone, Globe,
+  Camera, Loader2, ExternalLink, Download, Search, Filter, LogIn, Monitor, Smartphone, Globe, UsersRound,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -42,7 +42,7 @@ function getImageSrc(path: string | null | undefined) {
   return `/objects${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "media" | "pages" | "settings" | "users" | "roles" | "submissions";
+type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "media" | "pages" | "settings" | "users" | "roles" | "submissions" | "small_groups";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
@@ -59,6 +59,7 @@ const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
   { id: "sermons", label: "Sermons", icon: Play, feature: "sermons" },
   { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
   { id: "signups", label: "Sign Ups", icon: UserPlus, feature: "signups" },
+  { id: "small_groups", label: "Small Groups", icon: UsersRound, feature: "signups" },
   { id: "sms", label: "SMS Messaging", icon: MessageSquare, feature: "sms" },
   { id: "submissions", label: "Submissions", icon: Inbox, feature: "forms" },
   { id: "team", label: "Team", icon: Users, feature: "team" },
@@ -180,6 +181,7 @@ export default function AdminDashboard() {
           {activeTab === "sms" && <AdminSmsTab />}
           {activeTab === "media" && <AdminMediaTab />}
           {activeTab === "signups" && <SignupsTab />}
+          {activeTab === "small_groups" && <SmallGroupsTab />}
           {activeTab === "pages" && <PagesTab />}
           {activeTab === "settings" && <SettingsTab />}
           {activeTab === "users" && <UsersTab currentUser={user} />}
@@ -1790,7 +1792,7 @@ const pageConfigs: PageConfig[] = [
       { key: "hero_title", label: "Hero Title", type: "input", placeholder: "Contact Us" },
       { key: "address", label: "Address", type: "input", placeholder: "6717 Fry Road, Middleburg Heights, OH" },
       { key: "service_time", label: "Service Time", type: "input", placeholder: "Sunday @ 10:00 AM" },
-      { key: "email", label: "Email", type: "input", placeholder: "info@lakecitycc.org" },
+      { key: "email", label: "Email", type: "input", placeholder: "info@lakecitycc.com" },
       { key: "phone", label: "Phone", type: "input", placeholder: "(216) 555-0123" },
     ],
   },
@@ -5025,6 +5027,296 @@ function SignupsTab() {
           </TableBody>
         </Table>
       )}
+    </div>
+  );
+}
+
+// ======== SMALL GROUPS TAB ========
+
+interface CityGroup {
+  id: number;
+  name: string;
+  description: string | null;
+  meetingDay: string | null;
+  meetingTime: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+interface CityGroupSignup {
+  id: number;
+  name: string;
+  email: string;
+  phone: string | null;
+  groupIds: number[];
+  createdAt: string;
+}
+
+function SmallGroupsTab() {
+  const { toast } = useToast();
+  const [view, setView] = useState<"groups" | "signups">("groups");
+  const [editingGroup, setEditingGroup] = useState<CityGroup | null>(null);
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [groupForm, setGroupForm] = useState({ name: "", description: "", meetingDay: "", meetingTime: "", isActive: true, sortOrder: 0 });
+
+  const { data: groups = [], isLoading: groupsLoading } = useQuery<CityGroup[]>({
+    queryKey: ["/api/city-groups"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/city-groups");
+      return res.json();
+    },
+  });
+
+  const { data: signups = [], isLoading: signupsLoading } = useQuery<CityGroupSignup[]>({
+    queryKey: ["/api/city-groups/signups"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/city-groups/signups");
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof groupForm) => {
+      const res = await apiRequest("POST", "/api/city-groups", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-groups"] });
+      setShowAddGroup(false);
+      setGroupForm({ name: "", description: "", meetingDay: "", meetingTime: "", isActive: true, sortOrder: 0 });
+      toast({ title: "Group created" });
+    },
+    onError: () => toast({ title: "Error creating group", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<typeof groupForm> }) => {
+      const res = await apiRequest("PATCH", `/api/city-groups/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-groups"] });
+      setEditingGroup(null);
+      toast({ title: "Group updated" });
+    },
+    onError: () => toast({ title: "Error updating group", variant: "destructive" }),
+  });
+
+  const deleteGroupMut = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/city-groups/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-groups"] });
+      toast({ title: "Group deleted" });
+    },
+    onError: () => toast({ title: "Error deleting group", variant: "destructive" }),
+  });
+
+  const deleteSignupMut = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/city-groups/signups/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/city-groups/signups"] });
+      toast({ title: "Signup deleted" });
+    },
+    onError: () => toast({ title: "Error deleting signup", variant: "destructive" }),
+  });
+
+  function getGroupName(id: number) {
+    return groups.find(g => g.id === id)?.name || `Group #${id}`;
+  }
+
+  function openEdit(group: CityGroup) {
+    setEditingGroup(group);
+    setGroupForm({
+      name: group.name,
+      description: group.description || "",
+      meetingDay: group.meetingDay || "",
+      meetingTime: group.meetingTime || "",
+      isActive: group.isActive,
+      sortOrder: group.sortOrder,
+    });
+  }
+
+  function openAdd() {
+    setShowAddGroup(true);
+    setGroupForm({ name: "", description: "", meetingDay: "", meetingTime: "", isActive: true, sortOrder: groups.length });
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button variant={view === "groups" ? "default" : "outline"} onClick={() => setView("groups")}>
+            Manage Groups
+          </Button>
+          <Button variant={view === "signups" ? "default" : "outline"} onClick={() => setView("signups")}>
+            Signups ({signups.length})
+          </Button>
+        </div>
+        {view === "groups" && (
+          <Button onClick={openAdd}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Group
+          </Button>
+        )}
+      </div>
+
+      {view === "groups" && (
+        <>
+          {groupsLoading ? (
+            <p className="text-muted-foreground">Loading...</p>
+          ) : groups.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No small groups yet. Click &quot;Add Group&quot; to create one.
+              </CardContent>
+            </Card>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Day / Time</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Order</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groups.map(group => (
+                  <TableRow key={group.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{group.name}</p>
+                        {group.description && <p className="text-sm text-muted-foreground">{group.description}</p>}
+                      </div>
+                    </TableCell>
+                    <TableCell>{[group.meetingDay, group.meetingTime].filter(Boolean).join(" @ ") || "\u2014"}</TableCell>
+                    <TableCell>
+                      <Badge variant={group.isActive ? "default" : "secondary"}>
+                        {group.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{group.sortOrder}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(group)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => { if (confirm("Delete this group?")) deleteGroupMut.mutate(group.id); }}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </>
+      )}
+
+      {view === "signups" && (
+        <>
+          {signupsLoading ? (
+            <p className="text-muted-foreground">Loading...</p>
+          ) : signups.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No signups yet.
+              </CardContent>
+            </Card>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Groups Interested In</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {signups.map(signup => (
+                  <TableRow key={signup.id}>
+                    <TableCell className="font-medium">{signup.name}</TableCell>
+                    <TableCell>{signup.email}</TableCell>
+                    <TableCell>{signup.phone || "\u2014"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {signup.groupIds.map(id => (
+                          <Badge key={id} variant="outline">{getGroupName(id)}</Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>{new Date(signup.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => { if (confirm("Delete this signup?")) deleteSignupMut.mutate(signup.id); }}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </>
+      )}
+
+      <Dialog open={showAddGroup || !!editingGroup} onOpenChange={open => { if (!open) { setShowAddGroup(false); setEditingGroup(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingGroup ? "Edit Group" : "Add Group"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Group Name</Label>
+              <Input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Young Adults" className="mt-1" />
+            </div>
+            <div>
+              <Label>Description <span className="text-muted-foreground">(optional)</span></Label>
+              <Textarea value={groupForm.description} onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" className="mt-1" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Meeting Day</Label>
+                <Input value={groupForm.meetingDay} onChange={e => setGroupForm(f => ({ ...f, meetingDay: e.target.value }))} placeholder="e.g. Monday" className="mt-1" />
+              </div>
+              <div>
+                <Label>Meeting Time</Label>
+                <Input value={groupForm.meetingTime} onChange={e => setGroupForm(f => ({ ...f, meetingTime: e.target.value }))} placeholder="e.g. 7:30 PM" className="mt-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Sort Order</Label>
+                <Input type="number" value={groupForm.sortOrder} onChange={e => setGroupForm(f => ({ ...f, sortOrder: parseInt(e.target.value) || 0 }))} className="mt-1" />
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={groupForm.isActive} onCheckedChange={checked => setGroupForm(f => ({ ...f, isActive: checked }))} />
+                <Label>Active</Label>
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                if (!groupForm.name.trim()) return toast({ title: "Name is required", variant: "destructive" });
+                if (editingGroup) {
+                  updateMutation.mutate({ id: editingGroup.id, data: groupForm });
+                } else {
+                  createMutation.mutate(groupForm);
+                }
+              }}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {editingGroup ? "Save Changes" : "Create Group"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

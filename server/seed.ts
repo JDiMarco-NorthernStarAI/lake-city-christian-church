@@ -152,7 +152,7 @@ async function seedFormsAndSignups() {
         waitlistEnabled: true,
         cost: "Free",
         contactName: "Pastor Sarah",
-        contactEmail: "kids@lakecitycc.org",
+        contactEmail: "kids@lakecitycc.com",
         postSubmissionSettings: { displayType: "thank_you", successMessage: "Thank you for registering your child for VBS 2026! You will receive a confirmation email shortly." },
         createdBy: 1,
       } as any);
@@ -171,7 +171,7 @@ async function seedFormsAndSignups() {
         waitlistEnabled: true,
         cost: "$75 per person",
         contactName: "Pastor Mike",
-        contactEmail: "info@lakecitycc.org",
+        contactEmail: "info@lakecitycc.com",
         postSubmissionSettings: { displayType: "summary_all", successMessage: "You're signed up for the Spring Retreat!" },
         createdBy: 1,
       } as any);
@@ -187,7 +187,7 @@ async function seedFormsAndSignups() {
         location: "Lake City Christian Church",
         waitlistEnabled: false,
         contactName: "Volunteer Coordinator",
-        contactEmail: "volunteer@lakecitycc.org",
+        contactEmail: "volunteer@lakecitycc.com",
         postSubmissionSettings: { displayType: "thank_you", successMessage: "Thank you for volunteering! Our coordinator will reach out to confirm your placement." },
         createdBy: 1,
       } as any);
@@ -206,7 +206,7 @@ async function seedFormsAndSignups() {
         waitlistEnabled: false,
         cost: "Free",
         contactName: "Pastor John",
-        contactEmail: "john@lakecitycc.org",
+        contactEmail: "john@lakecitycc.com",
         postSubmissionSettings: { displayType: "thank_you" },
         createdBy: 1,
       } as any);
@@ -253,11 +253,40 @@ async function cleanupData() {
     const trevors = team.filter(m => m.name === "Trevor Littleton" && !seen.has("_trevor_updated"));
     if (trevors.length > 0) {
       const trevor = trevors[0];
-      if (trevor.bio && !trevor.bio.includes("eager to see what God has in store for LC3")) {
+      if (trevor.bio && !trevor.bio.includes("ragdoll cat Ariel")) {
         await storage.updateTeamMember(trevor.id, {
-          bio: "Trevor is passionate about scripture, apologetics and loves watching lives change for Jesus. Trevor graduated from CCU with a BS in Preaching Ministry and a Master of Divinity in Pastoral Leadership, a Master of Business Administration in Executive Coaching from Liberty University and has a Doctor of Ministry in Transformational Leadership from Ashland Theological Seminary. Beyond his heart for ministry, Trevor enjoys weightlifting and boxing, writing books, scouting out new restaurants. Trevor is married to his wife Shanna. They both have a deep passion for adoption. Their family is made up of 11 children; four biological, five adopted from Ukraine, including two surrogate daughters. Together they have a heart for community and are eager to see what God has in store for LC3.",
+          bio: "Trevor was born and raised in New Philadelphia, Ohio and is a major fan of its local pizza shops. A lifelong Ohio native, Trevor married his wife, Shanna, in 2008. Parents to nine children (yes, you read that correctly), the Littletons are avid adoption and orphan care supporters. A Masters Heavyweight boxer and wrestling coach, Trevor graduated with his Bachelor's and MDiv from Cincinnati Christian University Graduate and has a Doctor of Ministry from Ashland Theological Seminary in Transformational Leadership. He also has an MBA from Liberty University in Executive Coaching. Professionally, Trevor is obsessed with leadership coaching in both Church Planting and Turnaround Church situations. In addition to Lake City, Trevor is the Executive Director for Kainos Leadership Network, a church planting organization and is set to release his two latest books, \"The Roadhouse Leader\" and \"The Roadhouse Church\" in early 2027. Personally, Trevor is obsessed with boxing, annoying his children with 80's hair ballads, and his ragdoll cat Ariel.",
         });
       }
+    }
+    // Ensure Paul & Leslie Aguilar exist
+    const teamAfterCleanup = await storage.getTeamMembers();
+    const hasAguilar = teamAfterCleanup.some(m => m.name.toLowerCase().includes("aguilar"));
+    if (!hasAguilar) {
+      await storage.createTeamMember({
+        name: "Paul & Leslie Aguilar",
+        role: "Serve Ministry Team Leaders",
+        bio: null,
+        photoUrl: null,
+        isFeatured: false,
+        sortOrder: 7,
+      });
+      log("Added Paul & Leslie Aguilar to team", "seed");
+    }
+    // Seed city groups if none exist
+    const existingGroups = await storage.getCityGroups();
+    if (existingGroups.length === 0) {
+      const cityGroupData = [
+        { name: "Anchored", description: "Young Families", meetingDay: "Sunday (every other)", meetingTime: "4:30 PM", sortOrder: 0 },
+        { name: "Young Adults", description: null, meetingDay: "Monday", meetingTime: "7:30 PM", sortOrder: 1 },
+        { name: "Deep Diver Crew", description: null, meetingDay: "Wednesday", meetingTime: "10:30 AM", sortOrder: 2 },
+        { name: "F4 (Faith, Friends, Fellowship, Fun)", description: null, meetingDay: "Wednesday", meetingTime: "6:30 PM", sortOrder: 3 },
+        { name: "CIA (Christians In Action)", description: null, meetingDay: "Wednesday", meetingTime: "6:30 PM", sortOrder: 4 },
+      ];
+      for (const group of cityGroupData) {
+        await storage.createCityGroup({ ...group, isActive: true });
+      }
+      log("Seeded city groups", "seed");
     }
     const signups = await storage.getSignupEvents();
     for (const signup of signups) {
@@ -321,7 +350,7 @@ export async function seedDatabase() {
     await storage.createTeamMember({
       name: "Trevor Littleton",
       role: "Lead Pastor",
-      bio: "Trevor is passionate about scripture, apologetics and loves watching lives change for Jesus. Trevor graduated from CCU with a BS in Preaching Ministry and a Master of Divinity in Pastoral Leadership, a Master of Business Administration in Executive Coaching from Liberty University and has a Doctor of Ministry in Transformational Leadership from Ashland Theological Seminary. Beyond his heart for ministry, Trevor enjoys weightlifting and boxing, writing books, scouting out new restaurants. Trevor is married to his wife Shanna. They both have a deep passion for adoption. Their family is made up of 11 children; four biological, five adopted from Ukraine, including two surrogate daughters. Together they have a heart for community and are eager to see what God has in store for LC3.",
+      bio: "Trevor was born and raised in New Philadelphia, Ohio and is a major fan of its local pizza shops. A lifelong Ohio native, Trevor married his wife, Shanna, in 2008. Parents to nine children (yes, you read that correctly), the Littletons are avid adoption and orphan care supporters. A Masters Heavyweight boxer and wrestling coach, Trevor graduated with his Bachelor's and MDiv from Cincinnati Christian University Graduate and has a Doctor of Ministry from Ashland Theological Seminary in Transformational Leadership. He also has an MBA from Liberty University in Executive Coaching. Professionally, Trevor is obsessed with leadership coaching in both Church Planting and Turnaround Church situations. In addition to Lake City, Trevor is the Executive Director for Kainos Leadership Network, a church planting organization and is set to release his two latest books, \"The Roadhouse Leader\" and \"The Roadhouse Church\" in early 2027. Personally, Trevor is obsessed with boxing, annoying his children with 80's hair ballads, and his ragdoll cat Ariel.",
       sortOrder: 0,
       isFeatured: true,
       photoUrl: null,
@@ -333,6 +362,7 @@ export async function seedDatabase() {
       { name: "Joey Ekers", role: "Student Ministry Director", sortOrder: 4 },
       { name: "Shanna Littleton", role: "Communications / Ministry Assistant", sortOrder: 5 },
       { name: "Tim & Jen Orlosky", role: "Small Group Coordinators", sortOrder: 6 },
+      { name: "Paul & Leslie Aguilar", role: "Serve Ministry Team Leaders", sortOrder: 7 },
     ];
 
     for (const member of teamData) {

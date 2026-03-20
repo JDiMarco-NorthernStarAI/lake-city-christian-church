@@ -1985,5 +1985,121 @@ export async function registerRoutes(
     }
   });
 
+  // ======== City Groups (Small Groups) ========
+
+  // Public: get active groups for the signup form
+  app.get("/api/city-groups/active", async (_req, res) => {
+    try {
+      const groups = await storage.getActiveCityGroups();
+      res.json(groups);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching groups" });
+    }
+  });
+
+  // Public: submit signup form
+  app.post("/api/city-groups/signup", async (req, res) => {
+    try {
+      const { cityGroupSignupFormSchema } = await import("@shared/schema");
+      const parsed = cityGroupSignupFormSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid form data" });
+
+      const signup = await storage.createCityGroupSignup({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        phone: parsed.data.phone || null,
+        groupIds: parsed.data.groupIds,
+      });
+
+      // Resolve group names for email
+      const allGroups = await storage.getActiveCityGroups();
+      const selectedGroups = allGroups.filter(g => parsed.data.groupIds.includes(g.id));
+      const groupNames = selectedGroups.map(g => g.name).join(", ");
+
+      // Send notification email to church
+      const { sendEmail } = await import("./email-service");
+      const { baseLayout: _ignore, ...templates } = await import("./email-templates");
+      const notifyHtml = `
+        <h2 style="color:#ffffff;margin:0 0 16px;">New Small Group Signup</h2>
+        <p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Name:</strong> ${parsed.data.name}</p>
+        <p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Email:</strong> ${parsed.data.email}</p>
+        ${parsed.data.phone ? `<p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Phone:</strong> ${parsed.data.phone}</p>` : ""}
+        <p style="color:rgba(255,255,255,0.8);margin:0 0 8px;"><strong>Groups:</strong> ${groupNames}</p>
+        <p style="color:rgba(255,255,255,0.6);margin:16px 0 0;font-size:13px;">Submitted on ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+      `;
+
+      sendEmail({
+        to: "info@lakecitycc.com",
+        subject: `New Small Group Signup: ${parsed.data.name}`,
+        html: notifyHtml,
+      }).catch(() => {});
+
+      res.status(201).json(signup);
+    } catch (err) {
+      console.error("City group signup error:", err);
+      res.status(500).json({ message: "Error submitting signup" });
+    }
+  });
+
+  // Admin: CRUD for city groups
+  app.get("/api/city-groups", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const groups = await storage.getCityGroups();
+      res.json(groups);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching groups" });
+    }
+  });
+
+  app.post("/api/city-groups", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const { createCityGroupSchema } = await import("@shared/schema");
+      const parsed = createCityGroupSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid data" });
+      const group = await storage.createCityGroup(parsed.data as any);
+      res.status(201).json(group);
+    } catch (err) {
+      res.status(500).json({ message: "Error creating group" });
+    }
+  });
+
+  app.patch("/api/city-groups/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateCityGroup(Number(req.params.id), req.body);
+      if (!updated) return res.status(404).json({ message: "Group not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Error updating group" });
+    }
+  });
+
+  app.delete("/api/city-groups/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      await storage.deleteCityGroup(Number(req.params.id));
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting group" });
+    }
+  });
+
+  // Admin: view signups
+  app.get("/api/city-groups/signups", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const signups = await storage.getCityGroupSignups();
+      res.json(signups);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching signups" });
+    }
+  });
+
+  app.delete("/api/city-groups/signups/:id", requireAdminOrSuperAdmin, async (req, res) => {
+    try {
+      await storage.deleteCityGroupSignup(Number(req.params.id));
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Error deleting signup" });
+    }
+  });
+
   return httpServer;
 }

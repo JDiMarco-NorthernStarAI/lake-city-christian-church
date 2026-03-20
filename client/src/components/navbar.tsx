@@ -108,7 +108,7 @@ export default function Navbar() {
     <nav
       data-testid="navbar"
       className={`fixed top-0 left-0 right-0 z-50 bg-black transition-all duration-300 ${
-        scrolled ? "border-b border-white/10 bg-black/95" : "bg-black/90"
+        scrolled ? "border-b border-white/10" : ""
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 lg:px-6">

@@ -81,6 +81,34 @@ node -e "
     .catch(e => { console.error('Session table error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Ensuring city_groups tables exist..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    CREATE TABLE IF NOT EXISTS \"city_groups\" (
+      \"id\" serial PRIMARY KEY,
+      \"name\" text NOT NULL,
+      \"description\" text,
+      \"meeting_day\" text,
+      \"meeting_time\" text,
+      \"is_active\" boolean NOT NULL DEFAULT true,
+      \"sort_order\" integer NOT NULL DEFAULT 0,
+      \"created_at\" timestamp NOT NULL DEFAULT now(),
+      \"updated_at\" timestamp NOT NULL DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS \"city_group_signups\" (
+      \"id\" serial PRIMARY KEY,
+      \"name\" text NOT NULL,
+      \"email\" text NOT NULL,
+      \"phone\" text,
+      \"group_ids\" integer[] NOT NULL,
+      \"created_at\" timestamp NOT NULL DEFAULT now()
+    );
+  \`).then(() => { console.log('City groups tables ready.'); return pool.end(); })
+    .catch(e => { console.error('City groups table error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Fixing media paths with double /objects/ prefix..."
 node -e "
   const { Pool } = require('pg');

@@ -92,6 +92,22 @@ export default function Footer() {
               <div>
                 <p
                   className="text-white/70 text-sm"
+                  data-testid="footer-text-phone"
+                >
+                  <a href="tel:+12163954761" className="hover:text-white transition-colors">(216) 395-4761</a>
+                </p>
+              </div>
+              <div>
+                <p
+                  className="text-white/70 text-sm"
+                  data-testid="footer-text-email"
+                >
+                  <a href="mailto:info@lakecitycc.com" className="hover:text-white transition-colors">info@lakecitycc.com</a>
+                </p>
+              </div>
+              <div>
+                <p
+                  className="text-white/70 text-sm"
                   data-testid="footer-text-service-time"
                 >
                   Service Time: Sunday @ 10:00 AM

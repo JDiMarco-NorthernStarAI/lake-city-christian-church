@@ -172,6 +172,7 @@ export default function PlanVisit() {
               6717 Fry Road
             </p>
             <p className="text-muted-foreground text-sm">Middleburg Heights, OH</p>
+            <a href="tel:+12163954761" className="text-muted-foreground text-sm hover:text-foreground transition-colors mt-1">(216) 395-4761</a>
             <a
               href="https://www.google.com/maps/search/?api=1&query=6717+Fry+Road+Middleburg+Heights+OH"
               target="_blank"

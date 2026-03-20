@@ -22,8 +22,11 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
 export default function OurStory() {
   const c = usePageContent("our-story", {
     hero_title: "Our Story",
-    story_p1: "Two and a half decades of church leadership opened his eyes to the need for biblical ministry in today's world. After twenty-five years of leading churches large and small, Trevor transitioned into the role of Executive Director for the Kainos Leadership Network (formerly NOAH), a church planting organization in northeastern Ohio, and answered God's call to plant a highly intentional disciple-making church.",
-    story_p2: "After months of research, Godly counsel, prayer, fasting, and many late nights, the Littletons acknowledged a call to plant a church. Together with a launch team of mature Christians from various congregations in Northeastern Ohio, members of Kainos Leadership Network and Nexus Church Planting, Lake City Christian Church was born.",
+    story_p1: "Lake City Christian Church is a church plant in Middleburg Heights, Ohio. A lifetime Ohio native, Trevor Littleton and his wife Shanna felt the call to plant a church in northeastern Ohio. After nearly fifteen years of excuses, the Littletons began the church planting journey and moved their family of eleven to Strongsville in December 2023.",
+    story_p2: "Looking for a place to hold Launch Team meetings, Lead Pastor Trevor Littleton and Discipleship Pastor Joe Hoagland met JD McIntosh and the members of the Southwest Christian Church. JD informed the two men that SWCC was in its twilight years and offered the new church plant its building and property. Moved by this gracious gesture, the Lake City launch team asked the members of SWCC to join the team, and the bold faith journey of Lake City Christian Church was underway.",
+    story_p3: "LC3 began hosting launch team meetings in March 2024 with two \"pop up\" Sunday services on Palm Sunday and Easter. The months ahead bore witness to much growth for the Lake City Launch Team. Growing from eight people, to twelve, to fourteen, and to more than thirty; Lake City Christian Church was developing into the deep community of biblical disciples it aspired to become in the early days of 2023. However, the infant church experienced tragedy in May 2024 when Discipleship Pastor Joe Hoagland passed away suddenly in his sleep.",
+    story_p4: "Broken hearted, the church continued. Joe was passionate about relational discipleship and the bold faith ministry of Lake City, a legacy to which he helped build. The Launch Team, a family of mature disciples rallied around one another and continued the ministry through the summer of 2024 hosting Launch Team gatherings, community events, and service projects in eager anticipation of the first Sunday service.",
+    story_p5: "Lake City Christian Church officially launched on October 6, 2024. More than one hundred people meet every Sunday to worship and connect people to a life changing relationship with Jesus. In 2025, Lake City celebrated 32 baptisms, countless testimonies, and a thriving example of biblical discipleship in action. We are excited about what God is doing in this church and cannot wait to share our best years ahead with you!",
     kln_heading: "Kainos Leadership Network",
     kln_description: "KLN Exists to Plant and Equip Disciple Making Churches",
     memorial_heading: "In Memory of Executive Pastor Joe Hoagland",
@@ -61,6 +64,15 @@ export default function OurStory() {
           </p>
           <p className="text-lg leading-relaxed text-foreground mb-8">
             {c.story_p2}
+          </p>
+          <p className="text-lg leading-relaxed text-foreground mb-8">
+            {c.story_p3}
+          </p>
+          <p className="text-lg leading-relaxed text-foreground mb-8">
+            {c.story_p4}
+          </p>
+          <p className="text-lg leading-relaxed text-foreground">
+            {c.story_p5}
           </p>
         </FadeInSection>
       </section>

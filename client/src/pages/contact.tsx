@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { MapPin, Clock, Mail } from "lucide-react";
+import { MapPin, Clock, Mail, Phone } from "lucide-react";
 import { SiInstagram, SiFacebook, SiYoutube } from "react-icons/si";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -43,8 +43,8 @@ export default function Contact() {
     hero_title: "Contact Us",
     address: "6717 Fry Road\nMiddleburg Heights, OH",
     service_time: "Sunday @ 10:00 AM",
-    email: "info@lakecitycc.org",
-    phone: "(216) 555-0123",
+    email: "info@lakecitycc.com",
+    phone: "(216) 395-4761",
   });
 
   const form = useForm<ContactFormValues>({
@@ -153,8 +153,25 @@ export default function Contact() {
                   </Card>
                 </FadeInSection>
 
-                {/* Email Card */}
+                {/* Phone Card */}
                 <FadeInSection delay={0.4}>
+                  <Card className="hover-elevate">
+                    <CardContent className="pt-6">
+                      <div className="flex gap-4">
+                        <Phone className="h-6 w-6 text-blue-500 flex-shrink-0 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-foreground mb-1" data-testid="text-phone-label">Phone</h3>
+                          <p className="text-muted-foreground" data-testid="text-phone-value">
+                            <a href="tel:+12163954761" className="hover:text-blue-500 transition-colors">{c.phone}</a>
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </FadeInSection>
+
+                {/* Email Card */}
+                <FadeInSection delay={0.5}>
                   <Card className="hover-elevate">
                     <CardContent className="pt-6">
                       <div className="flex gap-4">

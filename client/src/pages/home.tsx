@@ -205,6 +205,8 @@ export default function Home() {
           </span>
           <span className="mx-2">|</span>
           <span>{c.service_location}</span>
+          <span className="mx-2">|</span>
+          <a href="tel:+12163954761" className="hover:text-blue-600 transition-colors">(216) 395-4761</a>
         </p>
       </section>
 

@@ -926,6 +926,52 @@ export const mediaFolders = pgTable("media_folders", {
 export type MediaFolder = typeof mediaFolders.$inferSelect;
 export type InsertMediaFolder = typeof mediaFolders.$inferInsert;
 
+// ======== SMALL GROUPS ========
+export const cityGroups = pgTable("city_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  meetingDay: text("meeting_day"),
+  meetingTime: text("meeting_time"),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const cityGroupSignups = pgTable("city_group_signups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  groupIds: integer("group_ids").array().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCityGroupSchema = createInsertSchema(cityGroups).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCityGroupSignupSchema = createInsertSchema(cityGroupSignups).omit({ id: true, createdAt: true });
+
+export type CityGroup = typeof cityGroups.$inferSelect;
+export type InsertCityGroup = z.infer<typeof insertCityGroupSchema>;
+export type CityGroupSignup = typeof cityGroupSignups.$inferSelect;
+export type InsertCityGroupSignup = z.infer<typeof insertCityGroupSignupSchema>;
+
+export const createCityGroupSchema = z.object({
+  name: z.string().min(1, "Group name is required"),
+  description: z.string().optional(),
+  meetingDay: z.string().optional(),
+  meetingTime: z.string().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const cityGroupSignupFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  phone: z.string().optional(),
+  groupIds: z.array(z.number().int()).min(1, "Please select at least one group"),
+});
+
 export const createSignupEventSchema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),

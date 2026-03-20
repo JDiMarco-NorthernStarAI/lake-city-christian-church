@@ -17,6 +17,7 @@ import Ministries from "@/pages/ministries";
 import KidsMinistry from "@/pages/kids-ministry";
 import StudentMinistry from "@/pages/student-ministry";
 import SmallGroups from "@/pages/small-groups";
+import JoinSmallGroup from "@/pages/join-small-group";
 import ConnectServe from "@/pages/connect-serve";
 import Encounter from "@/pages/encounter";
 import Announcements from "@/pages/announcements";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/kids-ministry" component={KidsMinistry} />
       <Route path="/student-ministry" component={StudentMinistry} />
       <Route path="/small-groups" component={SmallGroups} />
+      <Route path="/join-small-group" component={JoinSmallGroup} />
       <Route path="/connect-serve" component={ConnectServe} />
       <Route path="/encounter" component={Encounter} />
       <Route path="/announcements" component={Announcements} />

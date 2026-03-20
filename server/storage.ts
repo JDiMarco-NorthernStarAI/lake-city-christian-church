@@ -39,6 +39,9 @@ import {
   type LoginActivity, type InsertLoginActivity,
   type Media, type InsertMedia,
   type MediaFolder, type InsertMediaFolder,
+  cityGroups, cityGroupSignups,
+  type CityGroup, type InsertCityGroup,
+  type CityGroupSignup, type InsertCityGroupSignup,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -258,6 +261,20 @@ export interface IStorage {
 
   getPageViewsFiltered(filters: { startDate?: string; endDate?: string; path?: string }): Promise<PageView[]>;
   getLoginActivityFiltered(filters: { startDate?: string; endDate?: string; source?: string }): Promise<LoginActivity[]>;
+
+  // City Groups (Small Groups)
+  getCityGroups(): Promise<CityGroup[]>;
+  getActiveCityGroups(): Promise<CityGroup[]>;
+  getCityGroup(id: number): Promise<CityGroup | undefined>;
+  createCityGroup(group: InsertCityGroup): Promise<CityGroup>;
+  updateCityGroup(id: number, data: Partial<InsertCityGroup>): Promise<CityGroup | undefined>;
+  deleteCityGroup(id: number): Promise<void>;
+
+  // City Group Signups
+  getCityGroupSignups(): Promise<CityGroupSignup[]>;
+  getCityGroupSignup(id: number): Promise<CityGroupSignup | undefined>;
+  createCityGroupSignup(signup: InsertCityGroupSignup): Promise<CityGroupSignup>;
+  deleteCityGroupSignup(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1292,6 +1309,55 @@ export class DatabaseStorage implements IStorage {
     }
     // Delete subfolders too
     await db.execute(sql`DELETE FROM media_folders WHERE path = ${folder.path} OR path LIKE ${folder.path + '/%'}`);
+  }
+
+  // ======== City Groups (Small Groups) ========
+
+  async getCityGroups(): Promise<CityGroup[]> {
+    return db.select().from(cityGroups).orderBy(asc(cityGroups.sortOrder));
+  }
+
+  async getActiveCityGroups(): Promise<CityGroup[]> {
+    return db.select().from(cityGroups).where(eq(cityGroups.isActive, true)).orderBy(asc(cityGroups.sortOrder));
+  }
+
+  async getCityGroup(id: number): Promise<CityGroup | undefined> {
+    const [group] = await db.select().from(cityGroups).where(eq(cityGroups.id, id));
+    return group;
+  }
+
+  async createCityGroup(group: InsertCityGroup): Promise<CityGroup> {
+    const [created] = await db.insert(cityGroups).values(group).returning();
+    return created;
+  }
+
+  async updateCityGroup(id: number, data: Partial<InsertCityGroup>): Promise<CityGroup | undefined> {
+    const [updated] = await db.update(cityGroups).set({ ...data, updatedAt: new Date() }).where(eq(cityGroups.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCityGroup(id: number): Promise<void> {
+    await db.delete(cityGroups).where(eq(cityGroups.id, id));
+  }
+
+  // ======== City Group Signups ========
+
+  async getCityGroupSignups(): Promise<CityGroupSignup[]> {
+    return db.select().from(cityGroupSignups).orderBy(desc(cityGroupSignups.createdAt));
+  }
+
+  async getCityGroupSignup(id: number): Promise<CityGroupSignup | undefined> {
+    const [signup] = await db.select().from(cityGroupSignups).where(eq(cityGroupSignups.id, id));
+    return signup;
+  }
+
+  async createCityGroupSignup(signup: InsertCityGroupSignup): Promise<CityGroupSignup> {
+    const [created] = await db.insert(cityGroupSignups).values(signup).returning();
+    return created;
+  }
+
+  async deleteCityGroupSignup(id: number): Promise<void> {
+    await db.delete(cityGroupSignups).where(eq(cityGroupSignups.id, id));
   }
 }
 

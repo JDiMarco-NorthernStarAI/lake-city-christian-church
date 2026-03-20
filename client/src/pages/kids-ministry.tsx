@@ -39,7 +39,7 @@ const ageGroups = [
 
 const infoItems = [
   {
-    title: "Serve Team",
+    title: "KidMin Leaders",
     icon: Users,
     description: "Volunteers are trained to ensure your child is safe and well cared for during service.",
   },
