@@ -6,6 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { Event } from "@shared/schema";
 import { usePageContent } from "@/hooks/use-page-content";
 
+function getImageSrc(path: string | null | undefined) {
+  if (!path) return undefined;
+  if (path.startsWith("http")) return path;
+  if (path.startsWith("/objects/")) return path;
+  return `/objects${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
     <motion.div
@@ -90,7 +97,7 @@ export default function Announcements() {
                       {event.imageUrl ? (
                         <div className="w-full aspect-[4/3] overflow-hidden rounded-t-md">
                           <img
-                            src={event.imageUrl}
+                            src={getImageSrc(event.imageUrl)}
                             alt={event.title}
                             className="w-full h-full object-cover"
                             data-testid={`img-event-${event.id}`}

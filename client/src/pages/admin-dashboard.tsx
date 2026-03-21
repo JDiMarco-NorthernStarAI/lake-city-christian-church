@@ -39,6 +39,7 @@ import { MessageSquare, Inbox, ImageIcon } from "lucide-react";
 function getImageSrc(path: string | null | undefined) {
   if (!path) return undefined;
   if (path.startsWith("http")) return path;
+  if (path.startsWith("/objects/")) return path;
   return `/objects${path.startsWith("/") ? path : `/${path}`}`;
 }
 
