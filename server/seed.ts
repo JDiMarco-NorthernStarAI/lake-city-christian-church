@@ -350,7 +350,7 @@ async function cleanupData() {
         { formId: fid, label: "First and Last Name", fieldType: "text", required: true, sortOrder: 0 },
         { formId: fid, label: "Phone Number", fieldType: "phone", required: true, sortOrder: 1 },
         { formId: fid, label: "Email", fieldType: "email", required: true, sortOrder: 2 },
-        { formId: fid, label: "Address", fieldType: "text", required: true, placeholder: "Street, City, State, ZIP", sortOrder: 3 },
+        { formId: fid, label: "Address", fieldType: "address", required: true, sortOrder: 3 },
         { formId: fid, label: "Some ministry areas may require a background check. Please accept or decline.", fieldType: "radio", required: true, options: JSON.stringify(["Yes - I give permission for a background check.", "No - I am not comfortable with a background check.", "Other"]), sortOrder: 4 },
         { formId: fid, label: "Lake City Kids", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Lake City Kids (Nursery)", "Lake City Kids Pre-school", "Lake City Kids K-5th"]), sortOrder: 5 },
         { formId: fid, label: "Club 419 Student Ministry", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Middle School Students", "High School Students", "Assisting with C419 Gatherings"]), sortOrder: 6 },

@@ -1626,7 +1626,11 @@ export async function registerRoutes(
             for (const field of fields) {
               const val = data[field.id];
               if (val !== undefined && val !== null && val !== "") {
-                details[field.label] = Array.isArray(val) ? val.join(", ") : String(val);
+                if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
+                  details[field.label] = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
+                } else {
+                  details[field.label] = Array.isArray(val) ? val.join(", ") : String(val);
+                }
               }
             }
             const emailData = adminNotificationEmail(`New Submission: ${form.title}`, `A new submission was received for "${form.title}".`, details);

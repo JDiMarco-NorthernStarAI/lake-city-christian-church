@@ -114,6 +114,7 @@ export const FORM_FIELD_TYPES = [
   "radio",
   "checkbox",
   "checkbox_group",
+  "address",
 ] as const;
 
 export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
@@ -127,6 +128,7 @@ export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
   radio: "Radio Buttons",
   checkbox: "Checkbox (Yes/No)",
   checkbox_group: "Limited Items Signup",
+  address: "Address (with autocomplete)",
 };
 
 export const users = pgTable("users", {

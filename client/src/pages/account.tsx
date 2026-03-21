@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePageContent } from "@/hooks/use-page-content";
 import { v1Fetch, v1Put } from "@/lib/v1Api";
 import { Loader2, User, ClipboardList, DollarSign, FileText, LogOut, Check, X, Clock, Camera } from "lucide-react";
+import AddressAutocomplete from "@/components/address-autocomplete";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { v1Post } from "@/lib/v1Api";
 
@@ -453,66 +454,34 @@ export default function Account() {
 
               <div className="mt-6 pt-4 border-t border-white/10">
                 <h3 className="text-white/80 text-sm font-medium mb-4" style={{ fontFamily: "Montserrat, sans-serif" }}>Address</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label className="text-white/60 text-xs">Street Address</Label>
-                    {editing ? (
-                      <Input
-                        value={profileForm.address}
-                        onChange={(e) => setProfileForm((f) => ({ ...f, address: e.target.value }))}
-                        className="bg-zinc-800 border-white/10 text-white"
-                        data-testid="input-profile-address"
-                        autoComplete="street-address"
-                      />
-                    ) : (
+                {editing ? (
+                  <AddressAutocomplete
+                    value={{ address: profileForm.address, city: profileForm.city, state: profileForm.state, zip: profileForm.zip }}
+                    onChange={({ address, city, state, zip }) => setProfileForm(f => ({ ...f, address, city, state, zip }))}
+                    inputClassName="bg-zinc-800 border-white/10 text-white"
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label className="text-white/60 text-xs">Street Address</Label>
                       <p className="text-white text-sm" data-testid="text-profile-address">{user?.address || "—"}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-white/60 text-xs">City</Label>
-                    {editing ? (
-                      <Input
-                        value={profileForm.city}
-                        onChange={(e) => setProfileForm((f) => ({ ...f, city: e.target.value }))}
-                        className="bg-zinc-800 border-white/10 text-white"
-                        data-testid="input-profile-city"
-                        autoComplete="address-level2"
-                      />
-                    ) : (
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white/60 text-xs">City</Label>
                       <p className="text-white text-sm" data-testid="text-profile-city">{user?.city || "—"}</p>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-white/60 text-xs">State</Label>
-                      {editing ? (
-                        <Input
-                          value={profileForm.state}
-                          onChange={(e) => setProfileForm((f) => ({ ...f, state: e.target.value }))}
-                          className="bg-zinc-800 border-white/10 text-white"
-                          data-testid="input-profile-state"
-                          autoComplete="address-level1"
-                        />
-                      ) : (
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white/60 text-xs">State</Label>
                         <p className="text-white text-sm" data-testid="text-profile-state">{user?.state || "—"}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-white/60 text-xs">ZIP</Label>
-                      {editing ? (
-                        <Input
-                          value={profileForm.zip}
-                          onChange={(e) => setProfileForm((f) => ({ ...f, zip: e.target.value }))}
-                          className="bg-zinc-800 border-white/10 text-white"
-                          data-testid="input-profile-zip"
-                          autoComplete="postal-code"
-                        />
-                      ) : (
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white/60 text-xs">ZIP</Label>
                         <p className="text-white text-sm" data-testid="text-profile-zip">{user?.zip || "—"}</p>
-                      )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="mt-6 pt-4 border-t border-white/10">

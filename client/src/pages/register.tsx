@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import SocialAuthButtons from "@/components/social-auth-buttons";
+import AddressAutocomplete from "@/components/address-autocomplete";
 import { usePageContent } from "@/hooks/use-page-content";
 
 export default function Register() {
@@ -178,54 +179,12 @@ export default function Register() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="address" className="text-white/80">Address</Label>
-                <Input
-                  id="address"
-                  placeholder="123 Main St"
-                  value={form.address}
-                  onChange={(e) => update("address", e.target.value)}
-                  className="bg-zinc-800 border-white/10 text-white placeholder:text-white/30"
-                  data-testid="input-register-address"
-                  autoComplete="street-address"
+                <Label className="text-white/80">Address</Label>
+                <AddressAutocomplete
+                  value={{ address: form.address, city: form.city, state: form.state, zip: form.zip }}
+                  onChange={({ address, city, state, zip }) => setForm(prev => ({ ...prev, address, city, state, zip }))}
+                  inputClassName="bg-zinc-800 border-white/10 text-white placeholder:text-white/30"
                 />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city" className="text-white/80">City</Label>
-                  <Input
-                    id="city"
-                    placeholder="City"
-                    value={form.city}
-                    onChange={(e) => update("city", e.target.value)}
-                    className="bg-zinc-800 border-white/10 text-white placeholder:text-white/30"
-                    data-testid="input-register-city"
-                    autoComplete="address-level2"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state" className="text-white/80">State</Label>
-                  <Input
-                    id="state"
-                    placeholder="OH"
-                    value={form.state}
-                    onChange={(e) => update("state", e.target.value)}
-                    className="bg-zinc-800 border-white/10 text-white placeholder:text-white/30"
-                    data-testid="input-register-state"
-                    autoComplete="address-level1"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="zip" className="text-white/80">ZIP</Label>
-                  <Input
-                    id="zip"
-                    placeholder="44130"
-                    value={form.zip}
-                    onChange={(e) => update("zip", e.target.value)}
-                    className="bg-zinc-800 border-white/10 text-white placeholder:text-white/30"
-                    data-testid="input-register-zip"
-                    autoComplete="postal-code"
-                  />
-                </div>
               </div>
               {cityGroups.length > 0 && (
                 <div className="space-y-3">

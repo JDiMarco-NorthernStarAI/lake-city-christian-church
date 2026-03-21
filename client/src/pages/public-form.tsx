@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle, Loader2 } from "lucide-react";
+import AddressAutocomplete from "@/components/address-autocomplete";
 import type { FormField } from "@shared/schema";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -335,6 +336,18 @@ export default function PublicForm() {
               );
             })}
           </div>
+        );
+      case "address":
+        return (
+          <AddressAutocomplete
+            value={(() => {
+              const v = formValues[field.id];
+              if (typeof v === "object" && v !== null) return v as { address: string; city: string; state: string; zip: string };
+              return { address: "", city: "", state: "", zip: "" };
+            })()}
+            onChange={(components) => handleFieldChange(field.id, components)}
+            required={field.required}
+          />
         );
       default:
         return (

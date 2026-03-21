@@ -1396,6 +1396,7 @@ v1Router.get("/auth/config", (_req, res) => {
   apiResponse(res, 200, {
     googleClientId: process.env.GOOGLE_CLIENT_ID || null,
     appleClientId: process.env.APPLE_CLIENT_ID || null,
+    googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY || null,
   });
 });
 
