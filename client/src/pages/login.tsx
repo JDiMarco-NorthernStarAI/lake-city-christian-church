@@ -30,7 +30,7 @@ export default function Login() {
     if (user.roles?.includes("admin") || user.roles?.includes("super_admin")) {
       navigate("/admin/dashboard");
     } else {
-      navigate("/account");
+      navigate("/");
     }
   }, [user, authLoading, navigate]);
 
@@ -56,7 +56,7 @@ export default function Login() {
           }
         } catch {}
       }
-      navigate("/account");
+      navigate("/");
     } else {
       toast({ title: "Login failed", description: result.error, variant: "destructive" });
     }
@@ -131,7 +131,7 @@ export default function Login() {
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign In"}
               </Button>
             </form>
-            <SocialAuthButtons mode="login" onSuccess={() => navigate("/account")} />
+            <SocialAuthButtons mode="login" onSuccess={() => navigate("/")} />
             <div className="mt-6 text-center">
               <p className="text-white/50 text-sm">
                 Don't have an account?{" "}

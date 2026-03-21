@@ -83,7 +83,7 @@ export default function Register() {
     setLoading(false);
     if (result.success) {
       toast({ title: "Account created! Welcome to LC3." });
-      navigate("/account");
+      navigate("/");
     } else {
       toast({ title: "Registration failed", description: result.error, variant: "destructive" });
     }
