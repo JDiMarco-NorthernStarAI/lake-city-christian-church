@@ -158,6 +158,17 @@ node -e "
     .catch(e => { console.error('pco_donations table error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Ensuring events sort columns exist..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS sort_order integer;
+    ALTER TABLE events ADD COLUMN IF NOT EXISTS pinned text;
+  \`).then(() => { console.log('Events sort columns ready.'); return pool.end(); })
+    .catch(e => { console.error('Events sort columns error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Fixing media paths with double /objects/ prefix..."
 node -e "
   const { Pool } = require('pg');

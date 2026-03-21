@@ -402,11 +402,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEvents(): Promise<Event[]> {
-    return db.select().from(events).orderBy(desc(events.date));
+    const all = await db.select().from(events);
+    return this.sortEvents(all);
   }
 
   async getActiveEvents(): Promise<Event[]> {
-    return db.select().from(events).where(and(eq(events.isActive, true), isNull(events.deletedAt))).orderBy(desc(events.date));
+    const all = await db.select().from(events).where(and(eq(events.isActive, true), isNull(events.deletedAt)));
+    return this.sortEvents(all);
+  }
+
+  private sortEvents(eventList: Event[]): Event[] {
+    const pinnedTop = eventList.filter(e => e.pinned === 'top').sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const pinnedBottom = eventList.filter(e => e.pinned === 'bottom').sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const normal = eventList.filter(e => !e.pinned);
+    // Sort normal events by eventDate ascending (soonest first), then by sortOrder
+    normal.sort((a, b) => {
+      if (a.sortOrder !== null && b.sortOrder !== null && a.sortOrder !== undefined && b.sortOrder !== undefined) {
+        return a.sortOrder - b.sortOrder;
+      }
+      const dateA = a.eventDate ? new Date(a.eventDate).getTime() : Infinity;
+      const dateB = b.eventDate ? new Date(b.eventDate).getTime() : Infinity;
+      return dateA - dateB;
+    });
+    return [...pinnedTop, ...normal, ...pinnedBottom];
   }
 
   async getEvent(id: number): Promise<Event | undefined> {

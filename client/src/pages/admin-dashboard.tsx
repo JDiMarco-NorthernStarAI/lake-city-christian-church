@@ -1015,8 +1015,14 @@ function EventsTab() {
   const { data: events, isLoading } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Event | null>(null);
-  const [form, setForm] = useState({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true });
+  const [form, setForm] = useState({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true, eventDate: "", pinned: "" });
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
+
+  const reorderMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/events/${id}`, data); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/events"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => { await apiRequest("POST", "/api/events", data); },
@@ -1049,13 +1055,13 @@ function EventsTab() {
 
   function openAdd() {
     setEditing(null);
-    setForm({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true });
+    setForm({ title: "", subtitle: "", date: "", body: "", imageUrl: "", isUpcoming: true, eventDate: "", pinned: "" });
     setDialogOpen(true);
   }
 
   function openEdit(event: Event) {
     setEditing(event);
-    setForm({ title: event.title, subtitle: event.subtitle || "", date: event.date, body: event.body, imageUrl: event.imageUrl || "", isUpcoming: event.isUpcoming });
+    setForm({ title: event.title, subtitle: event.subtitle || "", date: event.date, body: event.body, imageUrl: event.imageUrl || "", isUpcoming: event.isUpcoming, eventDate: event.eventDate ? new Date(event.eventDate).toISOString().slice(0, 16) : "", pinned: (event as any).pinned || "" });
     setDialogOpen(true);
   }
 
@@ -1070,6 +1076,8 @@ function EventsTab() {
       ...form,
       subtitle: form.subtitle || null,
       imageUrl: form.imageUrl || null,
+      eventDate: form.eventDate ? new Date(form.eventDate).toISOString() : null,
+      pinned: form.pinned || null,
     };
     if (editing) {
       updateMutation.mutate({ id: editing.id, data: payload });
@@ -1093,16 +1101,45 @@ function EventsTab() {
         <Table data-testid="table-events">
           <TableHeader>
             <TableRow>
+              <TableHead>Order</TableHead>
               <TableHead>Image</TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead>Event Date</TableHead>
               <TableHead>Upcoming</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {events?.map((event) => (
+            {events?.map((event, idx) => (
               <TableRow key={event.id} data-testid={`row-event-${event.id}`}>
+                <TableCell>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <Button size="icon" variant="ghost" className="h-6 w-6" disabled={idx === 0}
+                      onClick={() => {
+                        if (!events || idx === 0) return;
+                        const prevEvent = events[idx - 1];
+                        const myOrder = (event as any).sortOrder ?? idx;
+                        const prevOrder = (prevEvent as any).sortOrder ?? (idx - 1);
+                        reorderMutation.mutate({ id: event.id, data: { sortOrder: prevOrder } });
+                        reorderMutation.mutate({ id: prevEvent.id, data: { sortOrder: myOrder } });
+                      }}>
+                      <ArrowUp className="w-3 h-3" />
+                    </Button>
+                    <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" disabled={idx === (events?.length ?? 0) - 1}
+                      onClick={() => {
+                        if (!events || idx === events.length - 1) return;
+                        const nextEvent = events[idx + 1];
+                        const myOrder = (event as any).sortOrder ?? idx;
+                        const nextOrder = (nextEvent as any).sortOrder ?? (idx + 1);
+                        reorderMutation.mutate({ id: event.id, data: { sortOrder: nextOrder } });
+                        reorderMutation.mutate({ id: nextEvent.id, data: { sortOrder: myOrder } });
+                      }}>
+                      <ArrowDown className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </TableCell>
                 <TableCell>
                   {event.imageUrl ? (
                     <img src={getImageSrc(event.imageUrl)} alt="" className="w-12 h-9 object-cover rounded-sm" />
@@ -1114,9 +1151,11 @@ function EventsTab() {
                   <div>
                     <span className="font-medium">{event.title}</span>
                     {event.subtitle && <span className="block text-xs text-muted-foreground">{event.subtitle}</span>}
+                    {(event as any).pinned && <Badge variant="outline" className="text-[10px] mt-0.5">{(event as any).pinned === "top" ? "📌 Pinned Top" : "📌 Pinned Bottom"}</Badge>}
                   </div>
                 </TableCell>
                 <TableCell className="text-xs">{event.date}</TableCell>
+                <TableCell className="text-xs">{event.eventDate ? new Date(event.eventDate).toLocaleDateString() : "—"}</TableCell>
                 <TableCell>{event.isUpcoming ? "Yes" : "No"}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
@@ -1149,8 +1188,13 @@ function EventsTab() {
               <Input value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="e.g. Middle & High School Students" data-testid="input-event-subtitle" />
             </div>
             <div className="space-y-2">
-              <Label>Date / Time</Label>
+              <Label>Display Date / Time</Label>
               <Input value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} placeholder="e.g. SATURDAY MARCH 7TH @ 8:30AM" required data-testid="input-event-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Event Date (for sorting)</Label>
+              <Input type="datetime-local" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} data-testid="input-event-date-sort" />
+              <p className="text-xs text-muted-foreground">Events are sorted by this date (soonest first). Leave blank to sort manually.</p>
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -1186,6 +1230,17 @@ function EventsTab() {
                 data-testid="checkbox-event-upcoming"
               />
               <Label htmlFor="isUpcoming">Upcoming</Label>
+            </div>
+            <div className="space-y-2">
+              <Label>Pin Position</Label>
+              <Select value={form.pinned || "none"} onValueChange={(v) => setForm({ ...form, pinned: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Pin (sort by date)</SelectItem>
+                  <SelectItem value="top">Pin to Top</SelectItem>
+                  <SelectItem value="bottom">Pin to Bottom</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-event">
               {editing ? "Update" : "Create"}

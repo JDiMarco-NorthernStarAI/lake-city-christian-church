@@ -212,6 +212,8 @@ export const events = pgTable("events", {
   maxSignups: integer("max_signups"),
   signupDeadline: timestamp("signup_deadline"),
   createdBy: integer("created_by"),
+  sortOrder: integer("sort_order"),
+  pinned: text("pinned"),
   sendReminders: boolean("send_reminders").default(true),
   reminderHoursBefore: integer("reminder_hours_before").default(24),
   isActive: boolean("is_active").notNull().default(true),
