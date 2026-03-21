@@ -259,15 +259,107 @@ async function cleanupData() {
         });
       }
     }
-    // Deduplicate events
+    // Remove old seed events and deduplicate
     const events = await storage.getEvents();
+    const oldSeedTitles = ["Family Sunday", "Small Group Session Kickoff", "Club 419 Wednesday Night"];
     const seenEvents = new Set<string>();
     for (const evt of events) {
       const key = `${evt.title}|||${evt.date}`.toLowerCase();
-      if (seenEvents.has(key)) {
+      if (oldSeedTitles.includes(evt.title) || seenEvents.has(key)) {
         await storage.deleteEvent(evt.id);
       } else {
         seenEvents.add(key);
+      }
+    }
+
+    // Ensure current events exist
+    const currentEvents = await storage.getEvents();
+    const eventTitles = new Set(currentEvents.map(e => e.title));
+    const newEvents = [
+      {
+        title: "Club 419",
+        subtitle: "Middle & High School Students",
+        date: "WEDNESDAYS @ 6:30-8:00PM",
+        body: "Weekly on Wednesday's! Students meet from 6:30-8:00PM. See you then!",
+        isUpcoming: true,
+        imageUrl: "/event-images/club-419.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Men's Ministry",
+        subtitle: "All Men Welcome",
+        date: "SATURDAY MARCH 7TH @ 8:30AM",
+        body: "Men's Ministry gathers the 1st Saturday of the month. Breakfast is provided.",
+        isUpcoming: true,
+        imageUrl: "/event-images/mens-ministry.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Women's Ministry",
+        subtitle: "Ladies of All Ages Welcome",
+        date: "SATURDAY MARCH 21ST @ 10:00-11:00AM",
+        body: "Join us for a time of prayer, devotional topic and a light snack! Bring a friend!",
+        isUpcoming: true,
+        imageUrl: "/event-images/womens-ministry.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Serve Ministry",
+        subtitle: "Ongoing Local Impact",
+        date: "ONGOING",
+        body: "Make a local impact! K-4th Grade individually prepackaged snacks needed: Pretzels, Crackers, Veggie Straws, Rice Crispy Treats, Gummy Fruit Snacks, Muffin Minis, Raisins/Chips, Bottled Water (any size). Items must be nut free.\n\nContacts: Paul & Leslie Aguiar\nMrpaulaguiar@gmail.com\nLeslieAgs69@gmail.com",
+        isUpcoming: true,
+        imageUrl: "/event-images/local-impact-snacks.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Club 419 - Sponsor a Meal",
+        subtitle: "Student Ministry Opportunity",
+        date: "SELECT AN AVAILABLE DATE",
+        body: "You're helping create an opportunity for kids to come around the table and create a space for conversation and mentorship! You can easily select an open date and let us know what you're bringing! Select Student Ministry in the drop down tab for more info.",
+        isUpcoming: true,
+        imageUrl: "/event-images/club-419-sponsor.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Good Friday Service",
+        subtitle: "Easter Weekend",
+        date: "FRIDAY APRIL 3RD @ 6:00PM",
+        body: "Message, Worship, Communion & Fellowship",
+        isUpcoming: true,
+        imageUrl: "/event-images/easter-banner.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Egg Hunt Saturday",
+        subtitle: "Easter Weekend",
+        date: "SATURDAY APRIL 4TH @ 1:00PM",
+        body: "Toddlers - Age 12. Hotdogs & drinks provided.",
+        isUpcoming: true,
+        imageUrl: "/event-images/easter-banner.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+      {
+        title: "Easter Sunday",
+        subtitle: "Easter Weekend",
+        date: "SUNDAY APRIL 5TH @ 10:00AM",
+        body: "Worship Service. Join us as we celebrate the resurrection of Jesus Christ!",
+        isUpcoming: true,
+        imageUrl: "/event-images/easter-banner.png",
+        location: "Lake City Christian Church",
+        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
+      },
+    ];
+    for (const evt of newEvents) {
+      if (!eventTitles.has(evt.title)) {
+        await storage.createEvent(evt);
       }
     }
 
@@ -510,32 +602,7 @@ export async function seedDatabase() {
       description: "Why community matters and how to build genuine connections.",
     });
 
-    await storage.createEvent({
-      title: "Family Sunday",
-      subtitle: "Lake City Christian Church",
-      date: "SUNDAY MARCH 2ND @ 10:00AM",
-      body: "The first Sunday of every month is Family Sunday! Families and kids worship together. The nursery space will remain open.",
-      isUpcoming: true,
-      imageUrl: null,
-    });
-
-    await storage.createEvent({
-      title: "Club 419 Wednesday Night",
-      subtitle: "Middle & High School Students",
-      date: "WEDNESDAY FEB 19TH @ 6:30-8:00PM",
-      body: "Students meet every Wednesday from 6:30 PM - 8:00 PM. Join us for food, fellowship, and faith.",
-      isUpcoming: true,
-      imageUrl: null,
-    });
-
-    await storage.createEvent({
-      title: "Small Group Session Kickoff",
-      subtitle: "All Adults Welcome",
-      date: "SATURDAY FEB 15TH @ 6:00PM",
-      body: "New 6-week small group session begins! Groups meet in homes around the Middleburg Heights and Strongsville area.",
-      isUpcoming: true,
-      imageUrl: null,
-    });
+    // Events are now managed via admin dashboard — no seed events needed
 
     const defaultSettings = [
       { key: "church_name", value: "Lake City Christian Church" },

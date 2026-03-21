@@ -10,6 +10,7 @@ function getImageSrc(path: string | null | undefined) {
   if (!path) return undefined;
   if (path.startsWith("http")) return path;
   if (path.startsWith("/objects/")) return path;
+  if (path.startsWith("/event-images/")) return path;
   return `/objects${path.startsWith("/") ? path : `/${path}`}`;
 }
 
