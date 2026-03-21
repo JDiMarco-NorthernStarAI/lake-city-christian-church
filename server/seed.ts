@@ -425,18 +425,75 @@ async function cleanupData() {
       }
       log("Seeded city groups", "seed");
     }
-    // Update student-info form notificationEmail if it exists without one
+    // Seed student-info form if it doesn't exist, or update notificationEmail
     const existingStudentForm = await storage.getFormBySlug("student-info");
     if (existingStudentForm && !(existingStudentForm as any).notificationEmail) {
       await storage.updateForm(existingStudentForm.id, { notificationEmail: "419@lakecitycc.com" } as any);
       log("Updated student-info form notificationEmail", "seed");
     }
+    if (!existingStudentForm) {
+      const studentForm = await storage.createForm({
+        title: "Club 419 Student Information",
+        description: "Student Ministry Director: Joey Ekers. Please fill out this form if your student is attending a Club 419 Wednesday gathering.",
+        slug: "student-info",
+        status: "published",
+        submitButtonText: "Submit",
+        successMessage: "Thank you for submitting your student information! We look forward to seeing them at Club 419.",
+        requireAuth: false,
+        allowMultiple: true,
+        createdBy: 1,
+        notificationEmail: "419@lakecitycc.com",
+      });
+      const studentFields = [
+        { formId: studentForm.id, label: "Student First & Last Name", fieldType: "text" as const, required: true, placeholder: "Enter student full name", sortOrder: 0 },
+        { formId: studentForm.id, label: "Student Cell Phone", fieldType: "phone" as const, required: false, placeholder: "Enter phone number", sortOrder: 1 },
+        { formId: studentForm.id, label: "Student Address", fieldType: "address" as const, required: false, placeholder: "Enter student address", sortOrder: 2 },
+        { formId: studentForm.id, label: "Student Date of Birth", fieldType: "date" as const, required: true, placeholder: "MM/DD/YYYY", sortOrder: 3 },
+        { formId: studentForm.id, label: "Parent/Guardian First and Last Name", fieldType: "text" as const, required: true, placeholder: "Enter parent/guardian full name", sortOrder: 4 },
+        { formId: studentForm.id, label: "2nd Parent/Guardian First and Last Name", fieldType: "text" as const, required: false, placeholder: "Enter second parent/guardian full name", sortOrder: 5 },
+        { formId: studentForm.id, label: "Emergency Contact: Name and Number", fieldType: "text" as const, required: true, placeholder: "Enter name and phone number", sortOrder: 6 },
+        { formId: studentForm.id, label: "2nd Emergency Contact: Name and Number", fieldType: "text" as const, required: true, placeholder: "Enter name and phone number", sortOrder: 7 },
+        { formId: studentForm.id, label: "Any Medical Concerns or Limitations?", fieldType: "textarea" as const, required: false, placeholder: "List any medical concerns or limitations", sortOrder: 8 },
+        { formId: studentForm.id, label: "Allergies", fieldType: "checkbox_group" as const, required: true, options: ["Nuts", "Seasonal", "Medication", "None", "Other"], sortOrder: 9 },
+        { formId: studentForm.id, label: "Does the student have a drivers license?", fieldType: "radio" as const, required: true, options: ["Yes", "No", "Learners Permit: must be accompanied by an adult"], sortOrder: 10 },
+        { formId: studentForm.id, label: "Questions or Concerns?", fieldType: "textarea" as const, required: false, placeholder: "Any questions or concerns you would like to share", sortOrder: 11 },
+      ];
+      for (const field of studentFields) {
+        await storage.createFormField(field as any);
+      }
+      log("Seeded student-info form", "seed");
+    }
 
-    // Update club419 form notificationEmail if it exists without one
+    // Seed club419-meal-sponsor form if it doesn't exist, or update notificationEmail
     const existingClub419Form = await storage.getFormBySlug("club419-meal-sponsor");
     if (existingClub419Form && !(existingClub419Form as any).notificationEmail) {
       await storage.updateForm(existingClub419Form.id, { notificationEmail: "419@lakecitycc.com" } as any);
       log("Updated club419 form notificationEmail", "seed");
+    }
+    if (!existingClub419Form) {
+      const sponsorForm = await storage.createForm({
+        title: "Club 419 Meal Sponsors",
+        description: "Lake City Student Ministry Director: Joey Ekers",
+        slug: "club419-meal-sponsor",
+        status: "published",
+        submitButtonText: "Submit",
+        successMessage: "Thank you for sponsoring a meal for Club 419! The students truly appreciate your generosity.",
+        requireAuth: false,
+        allowMultiple: true,
+        createdBy: 1,
+        notificationEmail: "419@lakecitycc.com",
+      });
+      const sponsorFields = [
+        { formId: sponsorForm.id, label: "First and Last Name", fieldType: "text" as const, required: true, placeholder: "Enter your full name", sortOrder: 0 },
+        { formId: sponsorForm.id, label: "Phone Number", fieldType: "phone" as const, required: true, placeholder: "Enter your phone number", sortOrder: 1 },
+        { formId: sponsorForm.id, label: "Select what you'd like to sponsor", fieldType: "checkbox_group" as const, required: true, options: ["Meal", "Snack", "Drinks"], sortOrder: 2 },
+        { formId: sponsorForm.id, label: "What items are you providing?", fieldType: "textarea" as const, required: false, placeholder: "Describe what items you will be providing", sortOrder: 3 },
+        { formId: sponsorForm.id, label: "Select the date you are sponsoring a Meal/Snack", fieldType: "radio" as const, required: false, options: ["Wednesday March 26", "Wednesday April 2", "Wednesday April 9", "Wednesday April 16", "Wednesday April 23", "Wednesday April 30", "Wednesday May 7", "Wednesday May 14", "Wednesday May 21", "Wednesday May 28"], sortOrder: 4 },
+      ];
+      for (const field of sponsorFields) {
+        await storage.createFormField(field as any);
+      }
+      log("Seeded club419-meal-sponsor form", "seed");
     }
 
     // Seed volunteer form if it doesn't exist, or update notificationEmail
