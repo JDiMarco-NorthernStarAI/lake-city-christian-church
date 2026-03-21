@@ -79,7 +79,7 @@ async function seedFormsAndSignups() {
     const existingForms = await storage.getForms();
     if (existingForms.length === 0) {
       const studentForm = await storage.createForm({
-        title: "Required Student/Guardian Information",
+        title: "Club 419 Student Information",
         description: "Student Ministry Director: Joey Ekers. Please fill out this form if your student is attending a Club 419 Wednesday gathering.",
         slug: "student-info",
         status: "published",
@@ -88,20 +88,21 @@ async function seedFormsAndSignups() {
         requireAuth: false,
         allowMultiple: true,
         createdBy: 1,
+        notificationEmail: "419@lakecitycc.com",
       });
 
       const studentFields = [
         { formId: studentForm.id, label: "Student First & Last Name", fieldType: "text" as const, required: true, placeholder: "Enter student full name", sortOrder: 0 },
-        { formId: studentForm.id, label: "Student Cell Phone", fieldType: "text" as const, required: false, placeholder: "Enter phone number", sortOrder: 1 },
-        { formId: studentForm.id, label: "Student Address", fieldType: "text" as const, required: false, placeholder: "Enter student address", sortOrder: 2 },
-        { formId: studentForm.id, label: "Student Date of Birth", fieldType: "text" as const, required: true, placeholder: "MM/DD/YYYY", sortOrder: 3 },
+        { formId: studentForm.id, label: "Student Cell Phone", fieldType: "phone" as const, required: false, placeholder: "Enter phone number", sortOrder: 1 },
+        { formId: studentForm.id, label: "Student Address", fieldType: "address" as const, required: false, placeholder: "Enter student address", sortOrder: 2 },
+        { formId: studentForm.id, label: "Student Date of Birth", fieldType: "date" as const, required: true, placeholder: "MM/DD/YYYY", sortOrder: 3 },
         { formId: studentForm.id, label: "Parent/Guardian First and Last Name", fieldType: "text" as const, required: true, placeholder: "Enter parent/guardian full name", sortOrder: 4 },
         { formId: studentForm.id, label: "2nd Parent/Guardian First and Last Name", fieldType: "text" as const, required: false, placeholder: "Enter second parent/guardian full name", sortOrder: 5 },
         { formId: studentForm.id, label: "Emergency Contact: Name and Number", fieldType: "text" as const, required: true, placeholder: "Enter name and phone number", sortOrder: 6 },
         { formId: studentForm.id, label: "2nd Emergency Contact: Name and Number", fieldType: "text" as const, required: true, placeholder: "Enter name and phone number", sortOrder: 7 },
         { formId: studentForm.id, label: "Any Medical Concerns or Limitations?", fieldType: "textarea" as const, required: false, placeholder: "List any medical concerns or limitations", sortOrder: 8 },
-        { formId: studentForm.id, label: "Allergies", fieldType: "checkbox" as const, required: true, options: ["Nuts", "Seasonal", "Medication", "None", "Other"], sortOrder: 9 },
-        { formId: studentForm.id, label: "Does the student have a drivers license?", fieldType: "select" as const, required: true, options: ["Yes", "No", "Learners Permit: must be accompanied by an adult"], sortOrder: 10 },
+        { formId: studentForm.id, label: "Allergies", fieldType: "checkbox_group" as const, required: true, options: ["Nuts", "Seasonal", "Medication", "None", "Other"], sortOrder: 9 },
+        { formId: studentForm.id, label: "Does the student have a drivers license?", fieldType: "radio" as const, required: true, options: ["Yes", "No", "Learners Permit: must be accompanied by an adult"], sortOrder: 10 },
         { formId: studentForm.id, label: "Questions or Concerns?", fieldType: "textarea" as const, required: false, placeholder: "Any questions or concerns you would like to share", sortOrder: 11 },
       ];
       for (const field of studentFields) {
@@ -424,6 +425,13 @@ async function cleanupData() {
       }
       log("Seeded city groups", "seed");
     }
+    // Update student-info form notificationEmail if it exists without one
+    const existingStudentForm = await storage.getFormBySlug("student-info");
+    if (existingStudentForm && !(existingStudentForm as any).notificationEmail) {
+      await storage.updateForm(existingStudentForm.id, { notificationEmail: "419@lakecitycc.com" } as any);
+      log("Updated student-info form notificationEmail", "seed");
+    }
+
     // Update club419 form notificationEmail if it exists without one
     const existingClub419Form = await storage.getFormBySlug("club419-meal-sponsor");
     if (existingClub419Form && !(existingClub419Form as any).notificationEmail) {
