@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Heart, ExternalLink, CreditCard, Building2, Smartphone } from "lucide-react";
+import { Heart, ArrowRight, CreditCard, Building2, Smartphone } from "lucide-react";
 import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -26,6 +27,15 @@ export default function Give() {
     scripture_ref: "2 Corinthians 9:7-8",
   });
 
+  useEffect(() => {
+    // Load Planning Center Church Center modal script
+    if (!document.querySelector('script[src="https://js.churchcenter.com/modal/v1"]')) {
+      const script = document.createElement("script");
+      script.src = "https://js.churchcenter.com/modal/v1";
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -90,7 +100,7 @@ export default function Give() {
                 Your generosity makes a difference in our community and beyond. Thank you for supporting the mission of Lake City Christian Church.
               </p>
 
-              <a href="https://lakecitycc.churchcenter.com/giving" target="_blank" rel="noopener noreferrer">
+              <a href="https://lakecitycc.churchcenter.com/giving?open-in-church-center-modal=true">
                 <Button
                   size="lg"
                   className="w-full text-white border-transparent text-lg py-6"
@@ -98,7 +108,7 @@ export default function Give() {
                   data-testid="button-donate"
                 >
                   Give Now
-                  <ExternalLink className="w-5 h-5 ml-2" />
+                  <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </a>
 
