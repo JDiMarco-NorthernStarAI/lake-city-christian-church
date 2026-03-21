@@ -331,8 +331,12 @@ async function cleanupData() {
       }
       log("Seeded city groups", "seed");
     }
-    // Seed volunteer form if it doesn't exist
+    // Seed volunteer form if it doesn't exist, or update notificationEmail
     const existingVolunteerForm = await storage.getFormBySlug("volunteer-signup");
+    if (existingVolunteerForm && !(existingVolunteerForm as any).notificationEmail) {
+      await storage.updateForm(existingVolunteerForm.id, { notificationEmail: "volunteer@lakecitycc.com" } as any);
+      log("Updated volunteer form notificationEmail", "seed");
+    }
     if (!existingVolunteerForm) {
       const volunteerForm = await storage.createForm({
         title: "You're Invited to Serve!",
@@ -370,8 +374,12 @@ async function cleanupData() {
       log("Seeded volunteer signup form", "seed");
     }
 
-    // Seed small groups form if it doesn't exist
+    // Seed small groups form if it doesn't exist, or update notificationEmail
     const existingSgForm = await storage.getFormBySlug("join-small-group");
+    if (existingSgForm && !(existingSgForm as any).notificationEmail) {
+      await storage.updateForm(existingSgForm.id, { notificationEmail: "smallgroups@lakecitycc.com" } as any);
+      log("Updated small groups form notificationEmail", "seed");
+    }
     if (!existingSgForm) {
       const sgForm = await storage.createForm({
         title: "Join a City Group",
