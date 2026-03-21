@@ -376,14 +376,19 @@ async function cleanupData() {
 
     // Seed small groups form if it doesn't exist, or update notificationEmail
     const existingSgForm = await storage.getFormBySlug("join-small-group");
-    if (existingSgForm && !(existingSgForm as any).notificationEmail) {
-      await storage.updateForm(existingSgForm.id, { notificationEmail: "smallgroups@lakecitycc.com" } as any);
-      log("Updated small groups form notificationEmail", "seed");
+    if (existingSgForm) {
+      const updates: any = {};
+      if (!(existingSgForm as any).notificationEmail) updates.notificationEmail = "smallgroups@lakecitycc.com";
+      if (!existingSgForm.description?.includes("Small Groups admin tab")) updates.description = "This form is managed in the Small Groups admin tab. Groups are added/edited there and shown dynamically on the public form.";
+      if (Object.keys(updates).length > 0) {
+        await storage.updateForm(existingSgForm.id, updates);
+        log("Updated small groups form", "seed");
+      }
     }
     if (!existingSgForm) {
       const sgForm = await storage.createForm({
         title: "Join a City Group",
-        description: "Select the group(s) you're interested in and we'll connect you with a leader.",
+        description: "This form is managed in the Small Groups admin tab. Groups are added/edited there and shown dynamically on the public form.",
         slug: "join-small-group",
         status: "published",
         submitButtonText: "Submit",
