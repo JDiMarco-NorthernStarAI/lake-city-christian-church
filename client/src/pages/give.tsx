@@ -100,16 +100,14 @@ export default function Give() {
                 Your generosity makes a difference in our community and beyond. Thank you for supporting the mission of Lake City Christian Church.
               </p>
 
-              <a href="https://lakecitycc.churchcenter.com/giving?open-in-church-center-modal=true">
-                <Button
-                  size="lg"
-                  className="w-full text-white border-transparent text-lg py-6"
-                  style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
-                  data-testid="button-donate"
-                >
-                  Give Now
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
+              <a
+                href="https://lakecitycc.churchcenter.com/giving?open-in-church-center-modal=true"
+                className="inline-flex items-center justify-center w-full text-white text-lg py-4 px-6 rounded-md font-medium hover:opacity-90 transition-opacity"
+                style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
+                data-testid="button-donate"
+              >
+                Give Now
+                <ArrowRight className="w-5 h-5 ml-2" />
               </a>
 
               <div className="mt-8 pt-6 border-t border-gray-100">
