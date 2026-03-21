@@ -343,7 +343,7 @@ async function cleanupData() {
 
 export async function seedDatabase() {
   try {
-    const existingAdmin = await storage.getUserByUsername("admin");
+    const existingAdmin = await storage.getUserByEmail("trevor@lakecitycc.com");
 
     await seedRolePermissions();
     await seedSmsDefaults();
