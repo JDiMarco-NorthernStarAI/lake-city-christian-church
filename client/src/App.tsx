@@ -55,6 +55,8 @@ function Router() {
       <Route path="/announcements" component={Announcements} />
       <Route path="/give" component={Give} />
       <Route path="/giving">{() => { window.location.replace("/give"); return null; }}</Route>
+      <Route path="/connect">{() => { window.location.replace("/forms/volunteer-signup"); return null; }}</Route>
+      <Route path="/news">{() => { window.location.replace("/announcements"); return null; }}</Route>
       <Route path="/give/success" component={GiveSuccess} />
       <Route path="/plan-visit" component={PlanVisit} />
       <Route path="/contact" component={Contact} />
