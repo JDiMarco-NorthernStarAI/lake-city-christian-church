@@ -118,14 +118,15 @@ async function seedFormsAndSignups() {
         requireAuth: false,
         allowMultiple: true,
         createdBy: 1,
+        notificationEmail: "419@lakecitycc.com",
       });
 
       const sponsorFields = [
         { formId: sponsorForm.id, label: "First and Last Name", fieldType: "text" as const, required: true, placeholder: "Enter your full name", sortOrder: 0 },
-        { formId: sponsorForm.id, label: "Phone Number", fieldType: "text" as const, required: true, placeholder: "Enter your phone number", sortOrder: 1 },
-        { formId: sponsorForm.id, label: "Select what you'd like to sponsor", fieldType: "radio" as const, required: true, options: ["Meal", "Snack", "Drinks"], sortOrder: 2 },
+        { formId: sponsorForm.id, label: "Phone Number", fieldType: "phone" as const, required: true, placeholder: "Enter your phone number", sortOrder: 1 },
+        { formId: sponsorForm.id, label: "Select what you'd like to sponsor", fieldType: "checkbox_group" as const, required: true, options: ["Meal", "Snack", "Drinks"], sortOrder: 2 },
         { formId: sponsorForm.id, label: "What items are you providing?", fieldType: "textarea" as const, required: false, placeholder: "Describe what items you will be providing", sortOrder: 3 },
-        { formId: sponsorForm.id, label: "Select the date you are sponsoring a Meal/Snack", fieldType: "select" as const, required: false, options: ["Wednesday February 4", "Wednesday February 11", "Wednesday February 18", "Wednesday February 25", "Wednesday March 4", "Wednesday March 11", "Wednesday March 18", "Wednesday March 25", "Wednesday April 1", "Wednesday April 8", "Wednesday April 15", "Wednesday April 22", "Wednesday April 29"], sortOrder: 4 },
+        { formId: sponsorForm.id, label: "Select the date you are sponsoring a Meal/Snack", fieldType: "radio" as const, required: false, options: ["Wednesday March 26", "Wednesday April 2", "Wednesday April 9", "Wednesday April 16", "Wednesday April 23", "Wednesday April 30", "Wednesday May 7", "Wednesday May 14", "Wednesday May 21", "Wednesday May 28"], sortOrder: 4 },
       ];
       for (const field of sponsorFields) {
         await storage.createFormField(field as any);
@@ -423,6 +424,13 @@ async function cleanupData() {
       }
       log("Seeded city groups", "seed");
     }
+    // Update club419 form notificationEmail if it exists without one
+    const existingClub419Form = await storage.getFormBySlug("club419-meal-sponsor");
+    if (existingClub419Form && !(existingClub419Form as any).notificationEmail) {
+      await storage.updateForm(existingClub419Form.id, { notificationEmail: "419@lakecitycc.com" } as any);
+      log("Updated club419 form notificationEmail", "seed");
+    }
+
     // Seed volunteer form if it doesn't exist, or update notificationEmail
     const existingVolunteerForm = await storage.getFormBySlug("volunteer-signup");
     if (existingVolunteerForm && !(existingVolunteerForm as any).notificationEmail) {
