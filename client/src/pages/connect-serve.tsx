@@ -50,7 +50,7 @@ export default function ConnectServe() {
     intro_description: "We are all a team and we lead together to create a warm and inviting atmosphere for people to encounter Jesus. Join us as we serve together, grow together, and experience the joy of making a lasting impact while connecting people to a life-changing relationship with Jesus.",
     volunteer_heading: "Volunteer",
     volunteer_description: "There is a place for everyone to serve at Lake City. Whether you love greeting people, working with kids, or serving behind the scenes, we would love to have you on the team.",
-    volunteer_url: "https://docs.google.com/forms/d/e/1FAIpQLSd4-YBkgZV6FI76SNW7ijofq5TDCdXaaD5fj2-P5iHx4A9EIg/viewform",
+    volunteer_url: "/forms/volunteer-signup",
   });
   const [submitted, setSubmitted] = useState(false);
 
@@ -328,7 +328,7 @@ export default function ConnectServe() {
           <p className="text-white/70 text-lg mb-8 max-w-xl mx-auto">
             {c.volunteer_description}
           </p>
-          <a href={c.volunteer_url} target="_blank" rel="noopener noreferrer">
+          <Link href={c.volunteer_url}>
             <Button
               size="lg"
               className="text-white border-transparent"
@@ -336,9 +336,9 @@ export default function ConnectServe() {
               data-testid="link-volunteer-signup"
             >
               I'm Ready!
-              <ExternalLink className="w-4 h-4 ml-2" />
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          </a>
+          </Link>
         </FadeInSection>
       </section>
     </div>

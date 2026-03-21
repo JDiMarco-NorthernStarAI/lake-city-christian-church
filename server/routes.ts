@@ -1617,10 +1617,56 @@ export async function registerRoutes(
           return { submission };
         });
         if ("error" in result) return res.status(400).json({ message: result.error });
+        // Send notification email for capacity-checked forms too
+        if ((form as any).notificationEmail && "submission" in result) {
+          try {
+            const { sendEmail } = await import("./email-service");
+            const { adminNotificationEmail } = await import("./email-templates");
+            const details: Record<string, string> = {};
+            for (const field of fields) {
+              const val = data[field.id];
+              if (val !== undefined && val !== null && val !== "") {
+                details[field.label] = Array.isArray(val) ? val.join(", ") : String(val);
+              }
+            }
+            const emailData = adminNotificationEmail(`New Submission: ${form.title}`, `A new submission was received for "${form.title}".`, details);
+            sendEmail({ to: (form as any).notificationEmail, ...emailData }).catch(() => {});
+          } catch (emailErr) {
+            console.error("Error sending form notification email:", emailErr);
+          }
+        }
         return res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission: result.submission });
       }
 
       const submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
+
+      // Send notification email if configured
+      if ((form as any).notificationEmail) {
+        try {
+          const { sendEmail } = await import("./email-service");
+          const { adminNotificationEmail } = await import("./email-templates");
+          const details: Record<string, string> = {};
+          for (const field of fields) {
+            const val = data[field.id];
+            if (val !== undefined && val !== null && val !== "") {
+              if (Array.isArray(val)) {
+                details[field.label] = val.join(", ");
+              } else {
+                details[field.label] = String(val);
+              }
+            }
+          }
+          const emailData = adminNotificationEmail(
+            `New Submission: ${form.title}`,
+            `A new submission was received for "${form.title}".`,
+            details,
+          );
+          sendEmail({ to: (form as any).notificationEmail, ...emailData }).catch(() => {});
+        } catch (emailErr) {
+          console.error("Error sending form notification email:", emailErr);
+        }
+      }
+
       res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission });
     } catch (err) {
       res.status(500).json({ message: "Error submitting form" });
@@ -2027,10 +2073,7 @@ export async function registerRoutes(
         new Date(),
       );
 
-      // Send to Trevor directly (info@ group forwards back to sender, gets suppressed by Gmail)
-      sendEmail({ to: "trevor@lakecitycc.com", ...emailData }).catch(() => {});
-      // Also send to info@ in case other recipients are added later
-      sendEmail({ to: "info@lakecitycc.com", ...emailData }).catch(() => {});
+      sendEmail({ to: "smallgroups@lakecitycc.com", ...emailData }).catch(() => {});
 
       res.status(201).json(signup);
     } catch (err) {

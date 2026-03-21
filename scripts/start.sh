@@ -29,6 +29,15 @@ node -e "
 echo "Running database schema sync..."
 ./node_modules/.bin/drizzle-kit push --force
 
+echo "Adding notification_email column to forms if missing..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`ALTER TABLE forms ADD COLUMN IF NOT EXISTS notification_email text\`)
+    .then(() => { console.log('notification_email column ready.'); return pool.end(); })
+    .catch(e => { console.error('Column add error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Ensuring media table exists..."
 node -e "
   const { Pool } = require('pg');

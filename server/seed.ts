@@ -331,6 +331,62 @@ async function cleanupData() {
       }
       log("Seeded city groups", "seed");
     }
+    // Seed volunteer form if it doesn't exist
+    const existingVolunteerForm = await storage.getFormBySlug("volunteer-signup");
+    if (!existingVolunteerForm) {
+      const volunteerForm = await storage.createForm({
+        title: "You're Invited to Serve!",
+        description: "Please tell us a little bit about yourself and select the area you're interested in serving! A Team Leader will follow up with you!",
+        slug: "volunteer-signup",
+        status: "published",
+        submitButtonText: "Submit",
+        successMessage: "Thank you for your interest in serving! A Team Leader will follow up with you soon!",
+        requireAuth: false,
+        allowMultiple: true,
+        notificationEmail: "volunteer@lakecitycc.com",
+      } as any);
+      const fid = volunteerForm.id;
+      const fields = [
+        { formId: fid, label: "First and Last Name", fieldType: "text", required: true, sortOrder: 0 },
+        { formId: fid, label: "Phone Number", fieldType: "phone", required: true, sortOrder: 1 },
+        { formId: fid, label: "Email", fieldType: "email", required: true, sortOrder: 2 },
+        { formId: fid, label: "Address", fieldType: "text", required: true, placeholder: "Street, City, State, ZIP", sortOrder: 3 },
+        { formId: fid, label: "Some ministry areas may require a background check. Please accept or decline.", fieldType: "radio", required: true, options: JSON.stringify(["Yes - I give permission for a background check.", "No - I am not comfortable with a background check.", "Other"]), sortOrder: 4 },
+        { formId: fid, label: "Lake City Kids", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Lake City Kids (Nursery)", "Lake City Kids Pre-school", "Lake City Kids K-5th"]), sortOrder: 5 },
+        { formId: fid, label: "Club 419 Student Ministry", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Middle School Students", "High School Students", "Assisting with C419 Gatherings"]), sortOrder: 6 },
+        { formId: fid, label: "Hospitality", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Greeting Team (Parking Lot)", "Greeting Team (Indoor locations)", "Welcome First Time Guests / Serve at Next Steps Table", "Cafe (drink prep / serving)"]), sortOrder: 7 },
+        { formId: fid, label: "Care and Community", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Checking in with elderly who are home-bound", "Sick and Shut-in's", "Maternity Care (meal coordination)"]), sortOrder: 8 },
+        { formId: fid, label: "Local Mission Impact", fieldType: "checkbox_group", required: false, options: JSON.stringify(["Assist with Drives / Collections / Drop Offs etc"]), sortOrder: 9 },
+        { formId: fid, label: "What skill set do you have and want to share?", fieldType: "text", required: true, sortOrder: 10 },
+        { formId: fid, label: "Do you have previous experience?", fieldType: "radio", required: false, options: JSON.stringify(["Yes", "No"]), sortOrder: 11 },
+        { formId: fid, label: "If yes, please describe your previous experience", fieldType: "textarea", required: false, sortOrder: 12 },
+        { formId: fid, label: "What brings you the most joy when it comes to volunteering - especially in the ministry area you're interested in?", fieldType: "textarea", required: false, sortOrder: 13 },
+        { formId: fid, label: "Please check the Interaction Level that describes you the most.", fieldType: "radio", required: true, options: JSON.stringify(["Low Interactions (enjoy assisting with tasks that do not involve working with others)", "Behind-The-Scenes (enjoy prepping/planning and working with others on projects/events)", "Moderate Interaction (enjoy team-building experiences, working with others)", "High Interaction (thrive on high energy situations, large groups and being in front of people)", "Other"]), sortOrder: 14 },
+        { formId: fid, label: "Additional Information / Questions / Concerns", fieldType: "textarea", required: false, sortOrder: 15 },
+      ];
+      for (const f of fields) {
+        await storage.createFormField(f as any);
+      }
+      log("Seeded volunteer signup form", "seed");
+    }
+
+    // Seed small groups form if it doesn't exist
+    const existingSgForm = await storage.getFormBySlug("join-small-group");
+    if (!existingSgForm) {
+      const sgForm = await storage.createForm({
+        title: "Join a City Group",
+        description: "Select the group(s) you're interested in and we'll connect you with a leader.",
+        slug: "join-small-group",
+        status: "published",
+        submitButtonText: "Submit",
+        successMessage: "Your request has been submitted. A group leader will be in touch with you soon!",
+        requireAuth: false,
+        allowMultiple: true,
+        notificationEmail: "smallgroups@lakecitycc.com",
+      } as any);
+      log("Seeded small groups form entry in form builder", "seed");
+    }
+
     const signups = await storage.getSignupEvents();
     for (const signup of signups) {
       await storage.deleteSignupEvent(signup.id);

@@ -269,22 +269,36 @@ export default function PublicForm() {
             {options.map((opt) => {
               const full = isOptionFull(field, opt);
               const suffix = getOptionSuffix(field, opt);
+              const isOther = opt.toLowerCase() === "other";
+              const isSelected = isOther
+                ? typeof formValues[field.id] === "string" && formValues[field.id] !== "" && !options.filter(o => o.toLowerCase() !== "other").includes(formValues[field.id] as string)
+                : formValues[field.id] === opt;
               return (
-                <label key={opt} className={`flex items-center gap-3 ${full ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                  <input
-                    type="radio"
-                    name={`field-${field.id}`}
-                    value={opt}
-                    checked={formValues[field.id] === opt}
-                    onChange={() => handleFieldChange(field.id, opt)}
-                    className="w-4 h-4"
-                    disabled={full}
-                  />
-                  <span className="text-sm">
-                    {opt}
-                    {suffix && <span className={`ml-1 text-xs ${full ? "text-muted-foreground" : "text-blue-400"}`}>{suffix}</span>}
-                  </span>
-                </label>
+                <div key={opt}>
+                  <label className={`flex items-center gap-3 ${full ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                    <input
+                      type="radio"
+                      name={`field-${field.id}`}
+                      value={opt}
+                      checked={isSelected}
+                      onChange={() => handleFieldChange(field.id, isOther ? "Other: " : opt)}
+                      className="w-4 h-4"
+                      disabled={full}
+                    />
+                    <span className="text-sm">
+                      {opt}
+                      {suffix && <span className={`ml-1 text-xs ${full ? "text-muted-foreground" : "text-blue-400"}`}>{suffix}</span>}
+                    </span>
+                  </label>
+                  {isOther && isSelected && (
+                    <Input
+                      className="mt-2 ml-7"
+                      placeholder="Please specify..."
+                      value={(formValues[field.id] as string)?.replace("Other: ", "") || ""}
+                      onChange={(e) => handleFieldChange(field.id, `Other: ${e.target.value}`)}
+                    />
+                  )}
+                </div>
               );
             })}
           </div>

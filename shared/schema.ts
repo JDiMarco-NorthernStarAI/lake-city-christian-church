@@ -303,6 +303,7 @@ export const forms = pgTable("forms", {
   successMessage: text("success_message").default("Thank you for your submission!"),
   requireAuth: boolean("require_auth").notNull().default(false),
   allowMultiple: boolean("allow_multiple").notNull().default(true),
+  notificationEmail: text("notification_email"),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

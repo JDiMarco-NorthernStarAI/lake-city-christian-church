@@ -3078,6 +3078,7 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
     successMessage: "Thank you for your submission!",
     requireAuth: false,
     allowMultiple: true,
+    notificationEmail: "",
   });
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<FormField | null>(null);
@@ -3107,6 +3108,7 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
         successMessage: formWithFields.successMessage || "Thank you for your submission!",
         requireAuth: formWithFields.requireAuth,
         allowMultiple: formWithFields.allowMultiple,
+        notificationEmail: (formWithFields as any).notificationEmail || "",
       });
     }
   }, [formWithFields]);
@@ -3357,6 +3359,15 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
                 value={formData.successMessage}
                 onChange={(e) => setFormData({ ...formData, successMessage: e.target.value })}
                 data-testid="input-form-success-message"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notification Email <span className="text-muted-foreground font-normal">(optional — sends branded alert on each submission)</span></Label>
+              <Input
+                type="email"
+                value={formData.notificationEmail}
+                onChange={(e) => setFormData({ ...formData, notificationEmail: e.target.value })}
+                placeholder="e.g. volunteer@lakecitycc.com"
               />
             </div>
             <div className="flex items-center gap-3">
