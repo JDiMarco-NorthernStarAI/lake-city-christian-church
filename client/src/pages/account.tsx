@@ -647,14 +647,14 @@ export default function Account() {
                       <div className="min-w-0">
                         <p className="text-white text-sm font-medium">
                           {formatCurrency(don.amountCents)}
-                          {don.fund?.name ? ` — ${don.fund.name}` : ""}
+                          {don.fundName ? ` — ${don.fundName}` : don.fund?.name ? ` — ${don.fund.name}` : ""}
                         </p>
                         <p className="text-white/40 text-xs">
-                          {formatDate(don.createdAt)}
-                          {don.frequency !== "one_time" ? ` · ${don.frequency}` : ""}
+                          {formatDate(don.donationDate || don.createdAt)}
+                          {don.paymentMethod && don.paymentMethod !== "unknown" ? ` · ${don.paymentMethod}` : ""}
                         </p>
                       </div>
-                      <StatusBadge status={don.status} />
+                      <StatusBadge status={don.status || "completed"} />
                     </div>
                   ))}
                 </div>

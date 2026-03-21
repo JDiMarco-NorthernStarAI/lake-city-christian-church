@@ -974,6 +974,25 @@ export const userCityGroups = pgTable("user_city_groups", {
 export type UserCityGroup = typeof userCityGroups.$inferSelect;
 export type InsertUserCityGroup = typeof userCityGroups.$inferInsert;
 
+// ======== PLANNING CENTER GIVING SYNC ========
+export const pcoDonations = pgTable("pco_donations", {
+  id: serial("id").primaryKey(),
+  pcoDonationId: text("pco_donation_id").notNull().unique(),
+  pcoPersonId: text("pco_person_id"),
+  donorEmail: text("donor_email"),
+  donorName: text("donor_name"),
+  userId: integer("user_id"),
+  amountCents: integer("amount_cents").notNull(),
+  fundName: text("fund_name"),
+  fundId: text("fund_id"),
+  paymentMethod: text("payment_method"),
+  receivedAt: timestamp("received_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type PcoDonation = typeof pcoDonations.$inferSelect;
+export type InsertPcoDonation = typeof pcoDonations.$inferInsert;
+
 export const createCityGroupSchema = z.object({
   name: z.string().min(1, "Group name is required"),
   description: z.string().optional(),

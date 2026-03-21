@@ -135,6 +135,29 @@ node -e "
     .catch(e => { console.error('User city groups table error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Ensuring pco_donations table exists..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    CREATE TABLE IF NOT EXISTS \"pco_donations\" (
+      \"id\" serial PRIMARY KEY,
+      \"pco_donation_id\" text NOT NULL UNIQUE,
+      \"pco_person_id\" text,
+      \"donor_email\" text,
+      \"donor_name\" text,
+      \"user_id\" integer,
+      \"amount_cents\" integer NOT NULL,
+      \"fund_name\" text,
+      \"fund_id\" text,
+      \"payment_method\" text,
+      \"received_at\" timestamp,
+      \"created_at\" timestamp NOT NULL DEFAULT now()
+    );
+  \`).then(() => { console.log('pco_donations table ready.'); return pool.end(); })
+    .catch(e => { console.error('pco_donations table error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Fixing media paths with double /objects/ prefix..."
 node -e "
   const { Pool } = require('pg');

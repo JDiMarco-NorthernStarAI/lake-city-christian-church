@@ -706,16 +706,26 @@ v1Router.get("/my/donations", requireJwt, async (req, res) => {
     const user = await storage.getUser(userId);
     if (!user || !user.email) return apiResponse(res, 200, []);
 
-    const userDonations = await storage.getDonationsByEmail(user.email);
+    // Try to link any unlinked PCO donations by email
+    await storage.linkPcoDonationsToUser(user.email, userId);
 
-    const enriched = await Promise.all(
-      userDonations.map(async (d) => {
-        const fund = d.fundId ? await storage.getDonationFund(d.fundId) : null;
-        return { ...d, fund: fund || null };
-      })
-    );
+    // Get Planning Center donations
+    const pcoDonations = await storage.getPcoDonationsByUserId(userId);
 
-    return apiResponse(res, 200, enriched);
+    // Format PCO donations to match the giving history UI
+    const formatted = pcoDonations.map(d => ({
+      id: `pco-${d.id}`,
+      amountCents: d.amountCents,
+      fundName: d.fundName || "General Fund",
+      paymentMethod: d.paymentMethod || "unknown",
+      donationDate: d.receivedAt,
+      status: "completed",
+      donorName: d.donorName,
+      donorEmail: d.donorEmail,
+      source: "planning_center",
+    }));
+
+    return apiResponse(res, 200, formatted);
   } catch (err) {
     return apiResponse(res, 500, null, "Server error");
   }

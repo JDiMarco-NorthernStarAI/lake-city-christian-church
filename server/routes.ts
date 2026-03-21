@@ -2035,6 +2035,52 @@ export async function registerRoutes(
     }
   });
 
+  // ======== Planning Center Giving Sync ========
+
+  // Admin: trigger sync
+  app.post("/api/admin/pco-sync", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const { syncPcoDonations } = await import("./pco-sync");
+      const result = await syncPcoDonations();
+      res.json(result);
+    } catch (err) {
+      console.error("PCO sync error:", err);
+      res.status(500).json({ message: "Sync failed" });
+    }
+  });
+
+  // Admin: view all synced donations
+  app.get("/api/admin/pco-donations", requireAdminOrSuperAdmin, async (_req, res) => {
+    try {
+      const donations = await storage.getPcoDonations();
+      res.json(donations);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching donations" });
+    }
+  });
+
+  // User: get my giving history (matched by email)
+  app.get("/api/my/giving", async (req, res) => {
+    if (!req.session?.userId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      // Get donations linked to this user
+      let donations = await storage.getPcoDonationsByUserId(user.id);
+
+      // If none found, try matching by email and link them
+      if (donations.length === 0 && user.email) {
+        await storage.linkPcoDonationsToUser(user.email, user.id);
+        donations = await storage.getPcoDonationsByUserId(user.id);
+      }
+
+      res.json(donations);
+    } catch (err) {
+      res.status(500).json({ message: "Error fetching giving history" });
+    }
+  });
+
   // ======== City Groups (Small Groups) ========
 
   // Public: get active groups for the signup form

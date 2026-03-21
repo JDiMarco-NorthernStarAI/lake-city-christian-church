@@ -39,10 +39,11 @@ import {
   type LoginActivity, type InsertLoginActivity,
   type Media, type InsertMedia,
   type MediaFolder, type InsertMediaFolder,
-  cityGroups, cityGroupSignups, userCityGroups,
+  cityGroups, cityGroupSignups, userCityGroups, pcoDonations,
   type CityGroup, type InsertCityGroup,
   type CityGroupSignup, type InsertCityGroupSignup,
   type UserCityGroup, type InsertUserCityGroup,
+  type PcoDonation, type InsertPcoDonation,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -276,6 +277,16 @@ export interface IStorage {
   getCityGroupSignup(id: number): Promise<CityGroupSignup | undefined>;
   createCityGroupSignup(signup: InsertCityGroupSignup): Promise<CityGroupSignup>;
   deleteCityGroupSignup(id: number): Promise<void>;
+
+  // Planning Center Donations
+  getPcoDonations(): Promise<PcoDonation[]>;
+  getPcoDonationsByUserId(userId: number): Promise<PcoDonation[]>;
+  getPcoDonationsByEmail(email: string): Promise<PcoDonation[]>;
+  getPcoDonationByPcoId(pcoDonationId: string): Promise<PcoDonation | undefined>;
+  createPcoDonation(donation: InsertPcoDonation): Promise<PcoDonation>;
+  updatePcoDonation(id: number, data: Partial<InsertPcoDonation>): Promise<PcoDonation | undefined>;
+  updatePcoDonationName(pcoPersonId: string, name: string): Promise<void>;
+  linkPcoDonationsToUser(email: string, userId: number): Promise<void>;
 
   // User City Group Assignments
   getUserCityGroups(userId: number): Promise<UserCityGroup[]>;
@@ -1367,6 +1378,47 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCityGroupSignup(id: number): Promise<void> {
     await db.delete(cityGroupSignups).where(eq(cityGroupSignups.id, id));
+  }
+
+  // ======== Planning Center Donations ========
+
+  async getPcoDonations(): Promise<PcoDonation[]> {
+    return db.select().from(pcoDonations).orderBy(desc(pcoDonations.receivedAt));
+  }
+
+  async getPcoDonationsByUserId(userId: number): Promise<PcoDonation[]> {
+    return db.select().from(pcoDonations).where(eq(pcoDonations.userId, userId)).orderBy(desc(pcoDonations.receivedAt));
+  }
+
+  async getPcoDonationsByEmail(email: string): Promise<PcoDonation[]> {
+    return db.select().from(pcoDonations).where(sql`lower(${pcoDonations.donorEmail}) = lower(${email})`).orderBy(desc(pcoDonations.receivedAt));
+  }
+
+  async getPcoDonationByPcoId(pcoDonationId: string): Promise<PcoDonation | undefined> {
+    const [d] = await db.select().from(pcoDonations).where(eq(pcoDonations.pcoDonationId, pcoDonationId));
+    return d;
+  }
+
+  async createPcoDonation(donation: InsertPcoDonation): Promise<PcoDonation> {
+    const [created] = await db.insert(pcoDonations).values(donation).onConflictDoNothing().returning();
+    return created;
+  }
+
+  async updatePcoDonation(id: number, data: Partial<InsertPcoDonation>): Promise<PcoDonation | undefined> {
+    const [updated] = await db.update(pcoDonations).set(data).where(eq(pcoDonations.id, id)).returning();
+    return updated;
+  }
+
+  async updatePcoDonationName(pcoPersonId: string, name: string): Promise<void> {
+    await db.update(pcoDonations).set({ donorName: name }).where(
+      and(eq(pcoDonations.pcoPersonId, pcoPersonId), sql`${pcoDonations.donorName} IS NULL`)
+    );
+  }
+
+  async linkPcoDonationsToUser(email: string, userId: number): Promise<void> {
+    await db.update(pcoDonations).set({ userId }).where(
+      and(sql`lower(${pcoDonations.donorEmail}) = lower(${email})`, sql`${pcoDonations.userId} IS NULL`)
+    );
   }
 
   // ======== User City Group Assignments ========

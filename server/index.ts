@@ -100,6 +100,27 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+
+      // Run initial PCO sync after startup, then every 6 hours
+      if (process.env.PCO_APP_ID && process.env.PCO_SECRET) {
+        setTimeout(async () => {
+          try {
+            const { syncPcoDonations } = await import("./pco-sync");
+            await syncPcoDonations();
+          } catch (err) {
+            console.error("[PCO Sync] Initial sync error:", err);
+          }
+        }, 30000); // Wait 30s after startup
+
+        setInterval(async () => {
+          try {
+            const { syncPcoDonations } = await import("./pco-sync");
+            await syncPcoDonations();
+          } catch (err) {
+            console.error("[PCO Sync] Scheduled sync error:", err);
+          }
+        }, 6 * 60 * 60 * 1000); // Every 6 hours
+      }
     },
   );
 })();
