@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Heart, ArrowRight, CreditCard, Building2, Smartphone, X } from "lucide-react";
+import { Heart, ExternalLink, CreditCard, Building2, Smartphone } from "lucide-react";
 import { usePageContent } from "@/hooks/use-page-content";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -27,12 +26,6 @@ export default function Give() {
     scripture_ref: "2 Corinthians 9:7-8",
   });
 
-  const [showGivingModal, setShowGivingModal] = useState(false);
-
-  const handleGiveClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setShowGivingModal(true);
-  }, []);
 
   return (
     <div className="min-h-screen">
@@ -97,16 +90,17 @@ export default function Give() {
                 Your generosity makes a difference in our community and beyond. Thank you for supporting the mission of Lake City Christian Church.
               </p>
 
-              <Button
-                size="lg"
-                className="w-full text-white border-transparent text-lg py-6"
-                style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
-                onClick={handleGiveClick}
-                data-testid="button-donate"
-              >
-                Give Now
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
+              <a href="https://lakecitycc.churchcenter.com/giving" target="_blank" rel="noopener noreferrer">
+                <Button
+                  size="lg"
+                  className="w-full text-white border-transparent text-lg py-6"
+                  style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
+                  data-testid="button-donate"
+                >
+                  Give Now
+                  <ExternalLink className="w-5 h-5 ml-2" />
+                </Button>
+              </a>
 
               <div className="mt-8 pt-6 border-t border-gray-100">
                 <p className="text-sm text-muted-foreground mb-4">Accepted payment methods</p>
@@ -134,24 +128,6 @@ export default function Give() {
         </FadeInSection>
       </section>
 
-      {showGivingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg mx-4 bg-white rounded-lg shadow-2xl overflow-hidden" style={{ height: "85vh", maxHeight: "700px" }}>
-            <button
-              onClick={() => setShowGivingModal(false)}
-              className="absolute top-3 right-3 z-10 p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-600" />
-            </button>
-            <iframe
-              src="https://lakecitycc.churchcenter.com/giving?embed=true"
-              className="w-full h-full border-0"
-              title="Give to Lake City Christian Church"
-              allow="payment"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
