@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import colorLogoPath from "@assets/color_Logo_1770933488638.png";
 import welcomeImgPath from "@assets/LC_Welcome_Area_01_1770933498064.png";
 import heroBackgroundPath from "@assets/Church_View_bw_1773518914154.png";
+import easterBannerPath from "@assets/banner Easter.png";
 import { useQuery } from "@tanstack/react-query";
 import { usePageContent } from "@/hooks/use-page-content";
 
@@ -259,6 +260,19 @@ export default function Home() {
               </Link>
             ))}
           </div>
+        </FadeInSection>
+      </section>
+
+      {/* EASTER WEEKEND BANNER */}
+      <section className="bg-black py-0">
+        <FadeInSection className="max-w-6xl mx-auto">
+          <Link href="/events">
+            <img
+              src={easterBannerPath}
+              alt="Easter Weekend - April 3rd, 4th & 5th 2026. Good Friday Service 6:00PM, Egg Hunt Saturday 1:00PM, Easter Sunday 10:00AM"
+              className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+            />
+          </Link>
         </FadeInSection>
       </section>
 
