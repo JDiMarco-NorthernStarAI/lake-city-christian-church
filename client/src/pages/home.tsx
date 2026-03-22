@@ -125,9 +125,9 @@ export default function Home() {
 
   const stats = [
     { value: 30, label: "Baptisms", suffix: "+" },
-    { value: 12, label: "Ministries", suffix: "+" },
+    { value: 20, label: "Ministries", suffix: "+" },
     { value: 1, label: "Year Since Launch", suffix: "" },
-    { value: 50, label: "Volunteers", suffix: "+" },
+    { value: 100, label: "Volunteers", suffix: "+" },
   ];
 
   return (
