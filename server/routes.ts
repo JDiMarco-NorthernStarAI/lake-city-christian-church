@@ -2049,11 +2049,84 @@ export async function registerRoutes(
     }
   });
 
-  // Admin: view all synced donations
-  app.get("/api/admin/pco-donations", requireAdminOrSuperAdmin, async (_req, res) => {
+  // Admin: view all synced donations with filtering
+  app.get("/api/admin/pco-donations", requireAdminOrSuperAdmin, async (req, res) => {
     try {
       const donations = await storage.getPcoDonations();
-      res.json(donations);
+      const userRoles = req.session?.roles || [];
+      const canSeeIndividual = userRoles.includes("super_admin") || userRoles.includes("accounting");
+
+      // Filter by query params
+      let filtered = donations;
+      const { fund, startDate, endDate, donor, year } = req.query as any;
+      if (fund) filtered = filtered.filter(d => d.fundName === fund);
+      if (startDate) filtered = filtered.filter(d => d.receivedAt && new Date(d.receivedAt) >= new Date(startDate));
+      if (endDate) filtered = filtered.filter(d => d.receivedAt && new Date(d.receivedAt) <= new Date(endDate + "T23:59:59"));
+      if (year) filtered = filtered.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === Number(year));
+      if (donor && canSeeIndividual) filtered = filtered.filter(d => d.donorName?.toLowerCase().includes(donor.toLowerCase()) || d.donorEmail?.toLowerCase().includes(donor.toLowerCase()));
+
+      // Build stats
+      const totalCents = filtered.reduce((sum, d) => sum + d.amountCents, 0);
+      const now = new Date();
+      const thisMonth = filtered.filter(d => d.receivedAt && new Date(d.receivedAt).getMonth() === now.getMonth() && new Date(d.receivedAt).getFullYear() === now.getFullYear());
+      const thisYear = filtered.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === now.getFullYear());
+      const monthlyTotal = thisMonth.reduce((sum, d) => sum + d.amountCents, 0);
+      const yearlyTotal = thisYear.reduce((sum, d) => sum + d.amountCents, 0);
+
+      // Fund breakdown
+      const fundBreakdown: Record<string, number> = {};
+      filtered.forEach(d => {
+        const name = d.fundName || "Unspecified";
+        fundBreakdown[name] = (fundBreakdown[name] || 0) + d.amountCents;
+      });
+
+      // Monthly trend (last 12 months)
+      const monthlyTrend: { month: string; total: number; count: number }[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthDonations = donations.filter(don => don.receivedAt && new Date(don.receivedAt).getMonth() === d.getMonth() && new Date(don.receivedAt).getFullYear() === d.getFullYear());
+        monthlyTrend.push({
+          month: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+          total: monthDonations.reduce((sum, don) => sum + don.amountCents, 0),
+          count: monthDonations.length,
+        });
+      }
+
+      // Unique donors count
+      const uniqueDonors = new Set(filtered.filter(d => d.donorEmail).map(d => d.donorEmail)).size;
+
+      // Yearly totals
+      const yearlyTotals: Record<number, number> = {};
+      donations.forEach(d => {
+        if (d.receivedAt) {
+          const yr = new Date(d.receivedAt).getFullYear();
+          yearlyTotals[yr] = (yearlyTotals[yr] || 0) + d.amountCents;
+        }
+      });
+
+      // If not super_admin/accounting, redact individual donor info
+      const donationList = canSeeIndividual ? filtered : filtered.map(d => ({
+        ...d,
+        donorName: null,
+        donorEmail: null,
+        pcoPersonId: null,
+        userId: null,
+      }));
+
+      res.json({
+        donations: donationList,
+        stats: {
+          totalCents,
+          monthlyTotal,
+          yearlyTotal,
+          donationCount: filtered.length,
+          uniqueDonors,
+          fundBreakdown,
+          monthlyTrend,
+          yearlyTotals,
+        },
+        canSeeIndividual,
+      });
     } catch (err) {
       res.status(500).json({ message: "Error fetching donations" });
     }

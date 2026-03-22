@@ -4090,7 +4090,13 @@ function NotificationsTab() {
 
 function DonationsTab() {
   const { toast } = useToast();
-  const [view, setView] = useState<"history" | "funds" | "reports">("history");
+  const [view, setView] = useState<"overview" | "history" | "reports">("overview");
+  const [fundFilter, setFundFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [donorSearch, setDonorSearch] = useState("");
+  const [syncLoading, setSyncLoading] = useState(false);
+
+  // Keep old state for backward compat
   const [fundDialogOpen, setFundDialogOpen] = useState(false);
   const [manualDonationOpen, setManualDonationOpen] = useState(false);
   const [editingFund, setEditingFund] = useState<DonationFund | null>(null);
@@ -4111,6 +4117,29 @@ function DonationsTab() {
     return `/api/donations/report?${params.toString()}`;
   }
 
+  const { data: pcoData, isLoading: pcoLoading } = useQuery<{
+    donations: any[];
+    stats: {
+      totalCents: number; monthlyTotal: number; yearlyTotal: number;
+      donationCount: number; uniqueDonors: number;
+      fundBreakdown: Record<string, number>;
+      monthlyTrend: { month: string; total: number; count: number }[];
+      yearlyTotals: Record<string, number>;
+    };
+    canSeeIndividual: boolean;
+  }>({
+    queryKey: ["/api/admin/pco-donations", fundFilter, yearFilter, donorSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (fundFilter && fundFilter !== "all") params.set("fund", fundFilter);
+      if (yearFilter && yearFilter !== "all") params.set("year", yearFilter);
+      if (donorSearch) params.set("donor", donorSearch);
+      const res = await fetch(`/api/admin/pco-donations?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch donations");
+      return res.json();
+    },
+  });
+
   const { data: stats } = useQuery<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }>({
     queryKey: ["/api/donations/stats"],
   });
@@ -4122,6 +4151,24 @@ function DonationsTab() {
   const { data: funds, isLoading: fundsLoading } = useQuery<DonationFund[]>({
     queryKey: ["/api/donation-funds"],
   });
+
+  async function triggerSync() {
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/admin/pco-sync", { method: "POST", credentials: "include" });
+      const result = await res.json();
+      toast({ title: `Sync complete: ${result.synced} new, ${result.skipped} existing` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pco-donations"] });
+    } catch {
+      toast({ title: "Sync failed", variant: "destructive" });
+    } finally {
+      setSyncLoading(false);
+    }
+  }
+
+  const pcoFundNames = pcoData ? Object.keys(pcoData.stats.fundBreakdown).sort() : [];
+  const pcoYears = pcoData ? Object.keys(pcoData.stats.yearlyTotals).sort((a, b) => Number(b) - Number(a)) : [];
+  const maxMonthlyBar = pcoData ? Math.max(...pcoData.stats.monthlyTrend.map(m => m.total), 1) : 1;
 
   const { data: reportData, isLoading: reportLoading, refetch: refetchReport } = useQuery<{ donations: Donation[]; totalAmount: number; totalCount: number }>({
     queryKey: ["/api/donations/report", reportStartDate, reportEndDate, reportDonorEmail, reportFundId],
@@ -4279,286 +4326,342 @@ function DonationsTab() {
       <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <h1 className="text-2xl font-bold">Donations</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant={view === "history" ? "default" : "outline"}
-            onClick={() => setView("history")}
-            data-testid="button-view-history"
-          >
+          <Button variant={view === "overview" ? "default" : "outline"} onClick={() => setView("overview")}>
+            <BarChart3 className="w-4 h-4 mr-2" /> Overview
+          </Button>
+          <Button variant={view === "history" ? "default" : "outline"} onClick={() => setView("history")}>
             <DollarSign className="w-4 h-4 mr-2" /> History
           </Button>
-          <Button
-            variant={view === "funds" ? "default" : "outline"}
-            onClick={() => setView("funds")}
-            data-testid="button-view-funds"
-          >
-            <Heart className="w-4 h-4 mr-2" /> Funds
+          <Button variant={view === "reports" ? "default" : "outline"} onClick={() => setView("reports")}>
+            <TrendingUp className="w-4 h-4 mr-2" /> Reports
           </Button>
-          <Button
-            variant={view === "reports" ? "default" : "outline"}
-            onClick={() => setView("reports")}
-            data-testid="button-view-reports"
-          >
-            <BarChart3 className="w-4 h-4 mr-2" /> Reports
+          <Button variant="outline" onClick={triggerSync} disabled={syncLoading}>
+            {syncLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            Sync
           </Button>
         </div>
       </div>
 
-      {view === "history" && (
-        <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card data-testid="stat-total-donated">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Donated</CardTitle>
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="value-total-donated">
-                  {stats ? formatCents(stats.totalAmount) : "$0.00"}
-                </div>
-              </CardContent>
-            </Card>
-            <Card data-testid="stat-total-donations">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Donations</CardTitle>
-                <Heart className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="value-total-donations">
-                  {stats?.totalCount ?? 0}
-                </div>
-              </CardContent>
-            </Card>
-            <Card data-testid="stat-monthly-amount">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">This Month</CardTitle>
-                <TrendingUp className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="value-monthly-amount">
-                  {stats ? formatCents(stats.monthlyAmount) : "$0.00"}
-                </div>
-              </CardContent>
-            </Card>
-            <Card data-testid="stat-monthly-count">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Monthly Count</CardTitle>
-                <BarChart3 className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="value-monthly-count">
-                  {stats?.monthlyCount ?? 0}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      {pcoLoading ? (
+        <p className="text-muted-foreground">Loading donation data...</p>
+      ) : !pcoData ? (
+        <p className="text-muted-foreground">No donation data available. Click Sync to pull from Planning Center.</p>
+      ) : (
+        <>
+          {/* OVERVIEW */}
+          {view === "overview" && (
+            <div>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">All Time</CardTitle>
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatCents(pcoData.stats.totalCents)}</div>
+                    <p className="text-xs text-muted-foreground">{pcoData.stats.donationCount} donations</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">This Year</CardTitle>
+                    <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatCents(pcoData.stats.yearlyTotal)}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">This Month</CardTitle>
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatCents(pcoData.stats.monthlyTotal)}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Unique Donors</CardTitle>
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{pcoData.stats.uniqueDonors}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Avg Donation</CardTitle>
+                    <Heart className="w-4 h-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{pcoData.stats.donationCount > 0 ? formatCents(Math.round(pcoData.stats.totalCents / pcoData.stats.donationCount)) : "$0.00"}</div>
+                  </CardContent>
+                </Card>
+              </div>
 
-          <div className="flex items-center justify-end mb-4">
-            <Button onClick={() => setManualDonationOpen(true)} data-testid="button-add-manual-donation">
-              <Plus className="w-4 h-4 mr-2" /> Record Donation
-            </Button>
-          </div>
-
-          {donationsLoading ? (
-            <p className="text-muted-foreground">Loading donations...</p>
-          ) : (
-            <Table data-testid="table-donations">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Donor</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Fund</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Frequency</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {donations?.map((donation) => (
-                  <TableRow key={donation.id} data-testid={`row-donation-${donation.id}`}>
-                    <TableCell>{donation.donationDate ? formatDate(donation.donationDate.toString()) : (donation.createdAt ? formatDate(donation.createdAt.toString()) : "—")}</TableCell>
-                    <TableCell>
-                      <div>{donation.donorName || "Anonymous"}</div>
-                      {donation.donorEmail && (
-                        <div className="text-sm text-muted-foreground">{donation.donorEmail}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{formatCents(donation.amountCents)}</TableCell>
-                    <TableCell>{getFundName(donation.fundId)}</TableCell>
-                    <TableCell className="capitalize">{(donation.paymentMethod || "stripe").replace("_", " ")}</TableCell>
-                    <TableCell className="capitalize">{donation.frequency.replace("_", " ")}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(donation.status)} data-testid={`badge-status-${donation.id}`}>
-                        {donation.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      )}
-
-      {view === "funds" && (
-        <div>
-          <div className="flex items-center justify-end mb-4">
-            <Button onClick={openAddFund} data-testid="button-add-fund">
-              <Plus className="w-4 h-4 mr-2" /> Add Fund
-            </Button>
-          </div>
-
-          {fundsLoading ? (
-            <p className="text-muted-foreground">Loading funds...</p>
-          ) : (
-            <Table data-testid="table-funds">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {funds?.map((fund) => (
-                  <TableRow key={fund.id} data-testid={`row-fund-${fund.id}`}>
-                    <TableCell className="font-medium">{fund.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{fund.slug}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{fund.description || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={fund.isActive ? "default" : "secondary"} data-testid={`badge-fund-status-${fund.id}`}>
-                        {fund.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEditFund(fund)} data-testid={`button-edit-fund-${fund.id}`}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => handleDeleteFund(fund.id)} data-testid={`button-delete-fund-${fund.id}`}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+              {/* Monthly Trend Bar Chart */}
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Monthly Giving Trend (Last 12 Months)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end gap-1 h-40">
+                    {pcoData.stats.monthlyTrend.map((m) => (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground">{formatCents(m.total)}</span>
+                        <div
+                          className="w-full bg-primary rounded-t-sm min-h-[2px]"
+                          style={{ height: `${Math.max((m.total / maxMonthlyBar) * 100, 2)}%` }}
+                          title={`${m.month}: ${formatCents(m.total)} (${m.count} donations)`}
+                        />
+                        <span className="text-[9px] text-muted-foreground leading-tight text-center">{m.month.replace(" ", "\n")}</span>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-      )}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-      {view === "reports" && (
-        <div>
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input type="date" value={reportStartDate} onChange={(e) => setReportStartDate(e.target.value)} data-testid="input-report-start-date" />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Input type="date" value={reportEndDate} onChange={(e) => setReportEndDate(e.target.value)} data-testid="input-report-end-date" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Donor Email</Label>
-                  <Input placeholder="Filter by email" value={reportDonorEmail} onChange={(e) => setReportDonorEmail(e.target.value)} data-testid="input-report-donor-email" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Fund</Label>
-                  <Select value={reportFundId} onValueChange={setReportFundId}>
-                    <SelectTrigger data-testid="select-report-fund">
-                      <SelectValue placeholder="All funds" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Funds</SelectItem>
-                      {funds?.map((fund) => (
-                        <SelectItem key={fund.id} value={fund.id.toString()}>{fund.name}</SelectItem>
+              {/* Fund Breakdown + Yearly Totals */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Giving by Fund</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {Object.entries(pcoData.stats.fundBreakdown).sort(([,a], [,b]) => b - a).map(([name, cents]) => (
+                        <div key={name}>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>{name}</span>
+                            <span className="font-medium">{formatCents(cents)}</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: `${(cents / pcoData.stats.totalCents) * 100}%` }} />
+                          </div>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Yearly Totals</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(pcoData.stats.yearlyTotals).sort(([a], [b]) => Number(b) - Number(a)).map(([year, cents]) => (
+                        <div key={year} className="flex justify-between items-center py-2 border-b last:border-0">
+                          <span className="font-medium">{year}</span>
+                          <span className="text-lg font-bold">{formatCents(cents)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button onClick={() => refetchReport()} data-testid="button-run-report">
-                  <Filter className="w-4 h-4 mr-2" /> Run Report
-                </Button>
-                <Button variant="outline" onClick={() => { setReportStartDate(""); setReportEndDate(""); setReportDonorEmail(""); setReportFundId(""); }} data-testid="button-clear-filters">
-                  Clear Filters
-                </Button>
-                {reportData?.donations?.length ? (
-                  <Button variant="outline" onClick={exportCSV} data-testid="button-export-csv">
-                    <Download className="w-4 h-4 mr-2" /> Export CSV
-                  </Button>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
-
-          {reportData && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Report Total</CardTitle>
-                  <DollarSign className="w-4 h-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold" data-testid="value-report-total">{formatCents(reportData.totalAmount)}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Donations Found</CardTitle>
-                  <Heart className="w-4 h-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold" data-testid="value-report-count">{reportData.totalCount}</div>
-                </CardContent>
-              </Card>
             </div>
           )}
 
-          {reportLoading ? (
-            <p className="text-muted-foreground">Loading report...</p>
-          ) : reportData?.donations?.length ? (
-            <Table data-testid="table-report">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Donor</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Fund</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reportData.donations.map((d) => (
-                  <TableRow key={d.id} data-testid={`row-report-${d.id}`}>
-                    <TableCell>{d.donationDate ? formatDate(d.donationDate.toString()) : (d.createdAt ? formatDate(d.createdAt.toString()) : "—")}</TableCell>
-                    <TableCell>
-                      <div>{d.donorName || "Anonymous"}</div>
-                      {d.donorEmail && <div className="text-sm text-muted-foreground">{d.donorEmail}</div>}
-                    </TableCell>
-                    <TableCell className="font-medium">{formatCents(d.amountCents)}</TableCell>
-                    <TableCell>{getFundName(d.fundId)}</TableCell>
-                    <TableCell className="capitalize">{(d.paymentMethod || "stripe").replace("_", " ")}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(d.status)}>{d.status}</Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-muted-foreground">{d.notes || "—"}</TableCell>
+          {/* HISTORY */}
+          {view === "history" && (
+            <div>
+              {/* Filters */}
+              <Card className="mb-4">
+                <CardContent className="pt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fund</Label>
+                      <Select value={fundFilter} onValueChange={setFundFilter}>
+                        <SelectTrigger><SelectValue placeholder="All Funds" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Funds</SelectItem>
+                          {pcoFundNames.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Year</Label>
+                      <Select value={yearFilter} onValueChange={setYearFilter}>
+                        <SelectTrigger><SelectValue placeholder="All Years" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Years</SelectItem>
+                          {pcoYears.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {pcoData.canSeeIndividual && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Search Donor</Label>
+                        <Input placeholder="Name or email..." value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Export */}
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-muted-foreground">{pcoData.donations.length} donations</p>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const headers = ["Date", pcoData.canSeeIndividual ? "Donor" : "", pcoData.canSeeIndividual ? "Email" : "", "Amount", "Fund", "Method"].filter(Boolean);
+                  const rows = pcoData.donations.map(d => [
+                    d.receivedAt ? formatDate(d.receivedAt) : "",
+                    ...(pcoData.canSeeIndividual ? [d.donorName || "Anonymous", d.donorEmail || ""] : []),
+                    (d.amountCents / 100).toFixed(2),
+                    d.fundName || "",
+                    d.paymentMethod || "",
+                  ]);
+                  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+                  const blob = new Blob([csv], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = `donations-${new Date().toISOString().split("T")[0]}.csv`; a.click();
+                  URL.revokeObjectURL(url);
+                }}>
+                  <Download className="w-4 h-4 mr-2" /> Export CSV
+                </Button>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    {pcoData.canSeeIndividual && <TableHead>Donor</TableHead>}
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Fund</TableHead>
+                    <TableHead>Method</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : reportData ? (
-            <p className="text-muted-foreground text-center py-8">No donations found matching your filters.</p>
-          ) : null}
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {pcoData.donations.slice(0, 100).map((d: any) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="text-sm">{d.receivedAt ? formatDate(d.receivedAt) : "—"}</TableCell>
+                      {pcoData.canSeeIndividual && (
+                        <TableCell>
+                          <div className="text-sm">{d.donorName || "Anonymous"}</div>
+                          {d.donorEmail && <div className="text-xs text-muted-foreground">{d.donorEmail}</div>}
+                        </TableCell>
+                      )}
+                      <TableCell className="font-medium">{formatCents(d.amountCents)}</TableCell>
+                      <TableCell className="text-sm">{d.fundName || "—"}</TableCell>
+                      <TableCell className="text-sm capitalize">{(d.paymentMethod || "—").replace("_", " ")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {pcoData.donations.length > 100 && (
+                <p className="text-center text-sm text-muted-foreground mt-4">Showing first 100 of {pcoData.donations.length} donations. Use filters to narrow results.</p>
+              )}
+            </div>
+          )}
+
+          {/* REPORTS */}
+          {view === "reports" && (
+            <div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Monthly Trend Detail */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Monthly Detail</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Month</TableHead>
+                          <TableHead>Donations</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Average</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pcoData.stats.monthlyTrend.slice().reverse().map(m => (
+                          <TableRow key={m.month}>
+                            <TableCell className="font-medium">{m.month}</TableCell>
+                            <TableCell>{m.count}</TableCell>
+                            <TableCell>{formatCents(m.total)}</TableCell>
+                            <TableCell>{m.count > 0 ? formatCents(Math.round(m.total / m.count)) : "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                {/* Year-over-Year */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Year-over-Year Comparison</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const years = Object.entries(pcoData.stats.yearlyTotals).sort(([a], [b]) => Number(b) - Number(a));
+                      return (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Year</TableHead>
+                              <TableHead>Total</TableHead>
+                              <TableHead>Change</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {years.map(([year, cents], idx) => {
+                              const prevYear = years[idx + 1];
+                              const change = prevYear ? ((cents - prevYear[1]) / prevYear[1]) * 100 : null;
+                              return (
+                                <TableRow key={year}>
+                                  <TableCell className="font-medium">{year}</TableCell>
+                                  <TableCell className="font-bold">{formatCents(cents)}</TableCell>
+                                  <TableCell>
+                                    {change !== null ? (
+                                      <span className={change >= 0 ? "text-green-600" : "text-red-600"}>
+                                        {change >= 0 ? "+" : ""}{change.toFixed(1)}%
+                                      </span>
+                                    ) : "—"}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Fund Breakdown Table */}
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Fund Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fund</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>% of Giving</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {Object.entries(pcoData.stats.fundBreakdown).sort(([,a], [,b]) => b - a).map(([name, cents]) => (
+                          <TableRow key={name}>
+                            <TableCell className="font-medium">{name}</TableCell>
+                            <TableCell className="font-bold">{formatCents(cents)}</TableCell>
+                            <TableCell>{((cents / pcoData.stats.totalCents) * 100).toFixed(1)}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <Dialog open={fundDialogOpen} onOpenChange={setFundDialogOpen}>

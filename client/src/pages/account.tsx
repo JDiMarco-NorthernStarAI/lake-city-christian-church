@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { usePageContent } from "@/hooks/use-page-content";
 import { v1Fetch, v1Put } from "@/lib/v1Api";
-import { Loader2, User, ClipboardList, DollarSign, FileText, LogOut, Check, X, Clock, Camera } from "lucide-react";
+import { Loader2, User, ClipboardList, DollarSign, FileText, LogOut, Check, X, Clock, Camera, ChevronRight } from "lucide-react";
 import AddressAutocomplete from "@/components/address-autocomplete";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { v1Post } from "@/lib/v1Api";
@@ -610,58 +610,102 @@ export default function Account() {
           </Card>
         )}
 
-        {activeTab === "giving" && (
-          <Card className="bg-zinc-900 border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white text-lg" style={{ fontFamily: "Montserrat, sans-serif" }}>
-                Giving History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {historyLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-white/40" />
-                </div>
-              ) : donationsList.length === 0 ? (
-                <div className="text-center py-8">
-                  <DollarSign className="w-10 h-10 text-white/20 mx-auto mb-3" />
-                  <p className="text-white/50">No giving history yet</p>
-                  <Link href="/give">
-                    <Button
-                      variant="outline"
-                      className="mt-3 text-white/70 border-white/20"
-                      data-testid="link-give"
-                    >
-                      Give Now
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {donationsList.map((don: any) => (
-                    <div
-                      key={don.id}
-                      className="flex items-center justify-between gap-4 p-3 rounded-md bg-zinc-800/50 flex-wrap"
-                      data-testid={`donation-history-${don.id}`}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-white text-sm font-medium">
-                          {formatCurrency(don.amountCents)}
-                          {don.fundName ? ` — ${don.fundName}` : don.fund?.name ? ` — ${don.fund.name}` : ""}
-                        </p>
-                        <p className="text-white/40 text-xs">
-                          {formatDate(don.donationDate || don.createdAt)}
-                          {don.paymentMethod && don.paymentMethod !== "unknown" ? ` · ${don.paymentMethod}` : ""}
-                        </p>
-                      </div>
-                      <StatusBadge status={don.status || "completed"} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {activeTab === "giving" && (() => {
+          // Group donations by year
+          const byYear: Record<number, any[]> = {};
+          donationsList.forEach((don: any) => {
+            const date = don.donationDate || don.createdAt;
+            const year = date ? new Date(date).getFullYear() : new Date().getFullYear();
+            if (!byYear[year]) byYear[year] = [];
+            byYear[year].push(don);
+          });
+          const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+          const currentYear = new Date().getFullYear();
+
+          return (
+            <Card className="bg-zinc-900 border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white text-lg" style={{ fontFamily: "Montserrat, sans-serif" }}>
+                  Giving History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {historyLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+                  </div>
+                ) : donationsList.length === 0 ? (
+                  <div className="text-center py-8">
+                    <DollarSign className="w-10 h-10 text-white/20 mx-auto mb-3" />
+                    <p className="text-white/50">No giving history yet</p>
+                    <Link href="/give">
+                      <Button variant="outline" className="mt-3 text-white/70 border-white/20" data-testid="link-give">
+                        Give Now
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {years.map((year) => {
+                      const yearDonations = byYear[year];
+                      const yearTotal = yearDonations.reduce((sum: number, d: any) => sum + (d.amountCents || 0), 0);
+                      const isCurrentYear = year === currentYear;
+
+                      return (
+                        <details key={year} open={isCurrentYear} className="group">
+                          <summary className="flex items-center justify-between cursor-pointer p-3 rounded-md bg-zinc-800/70 hover:bg-zinc-800 transition-colors list-none">
+                            <div className="flex items-center gap-3">
+                              <ChevronRight className="w-4 h-4 text-white/50 group-open:rotate-90 transition-transform" />
+                              <span className="text-white font-semibold text-lg">{year}</span>
+                              <span className="text-white/40 text-sm">{yearDonations.length} donation{yearDonations.length !== 1 ? "s" : ""}</span>
+                            </div>
+                            <span className="text-white font-bold text-lg">{formatCurrency(yearTotal)}</span>
+                          </summary>
+
+                          {/* Fund breakdown for the year */}
+                          {(() => {
+                            const fundTotals: Record<string, number> = {};
+                            yearDonations.forEach((d: any) => {
+                              const fund = d.fundName || d.fund?.name || "General";
+                              fundTotals[fund] = (fundTotals[fund] || 0) + (d.amountCents || 0);
+                            });
+                            const fundEntries = Object.entries(fundTotals).sort(([,a], [,b]) => (b as number) - (a as number));
+                            return fundEntries.length > 1 ? (
+                              <div className="flex flex-wrap gap-2 mt-2 ml-10">
+                                {fundEntries.map(([fund, cents]) => (
+                                  <span key={fund} className="text-xs bg-zinc-800 px-2 py-1 rounded text-white/60">
+                                    {fund}: {formatCurrency(cents as number)}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null;
+                          })()}
+
+                          <div className="space-y-2 mt-2 ml-7">
+                            {yearDonations.map((don: any) => (
+                              <div key={don.id} className="flex items-center justify-between gap-4 p-3 rounded-md bg-zinc-800/30 flex-wrap" data-testid={`donation-history-${don.id}`}>
+                                <div className="min-w-0">
+                                  <p className="text-white text-sm font-medium">
+                                    {formatCurrency(don.amountCents)}
+                                    {don.fundName ? ` — ${don.fundName}` : don.fund?.name ? ` — ${don.fund.name}` : ""}
+                                  </p>
+                                  <p className="text-white/40 text-xs">
+                                    {formatDate(don.donationDate || don.createdAt)}
+                                    {don.paymentMethod && don.paymentMethod !== "unknown" ? ` · ${don.paymentMethod}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {activeTab === "forms" && (
           <Card className="bg-zinc-900 border-white/10">

@@ -8,6 +8,7 @@ export const AVAILABLE_ROLES = [
   "student_ministry",
   "kids_ministry",
   "small_group",
+  "accounting",
   "admin",
   "super_admin",
 ] as const;
@@ -17,6 +18,7 @@ export const ROLE_LABELS: Record<string, string> = {
   student_ministry: "Student Ministry",
   kids_ministry: "Kids Ministry",
   small_group: "Small Group",
+  accounting: "Accounting",
   admin: "Admin",
   super_admin: "Super Admin",
 };
