@@ -4407,18 +4407,21 @@ function DonationsTab() {
                   <CardTitle className="text-sm font-medium">Monthly Giving Trend (Last 12 Months)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-end gap-1 h-40">
-                    {pcoData.stats.monthlyTrend.map((m) => (
-                      <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground">{formatCents(m.total)}</span>
-                        <div
-                          className="w-full bg-primary rounded-t-sm min-h-[2px]"
-                          style={{ height: `${Math.max((m.total / maxMonthlyBar) * 100, 2)}%` }}
-                          title={`${m.month}: ${formatCents(m.total)} (${m.count} donations)`}
-                        />
-                        <span className="text-[9px] text-muted-foreground leading-tight text-center">{m.month.replace(" ", "\n")}</span>
-                      </div>
-                    ))}
+                  <div className="flex items-end gap-1" style={{ height: "200px" }}>
+                    {pcoData.stats.monthlyTrend.map((m) => {
+                      const barHeight = maxMonthlyBar > 0 ? Math.max((m.total / maxMonthlyBar) * 160, 4) : 4;
+                      return (
+                        <div key={m.month} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">{m.total > 0 ? formatCents(m.total) : ""}</span>
+                          <div
+                            className="w-full bg-primary rounded-t-sm"
+                            style={{ height: `${barHeight}px` }}
+                            title={`${m.month}: ${formatCents(m.total)} (${m.count} donations)`}
+                          />
+                          <span className="text-[9px] text-muted-foreground leading-tight text-center whitespace-nowrap">{m.month}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -4559,34 +4562,188 @@ function DonationsTab() {
 
           {/* REPORTS */}
           {view === "reports" && (
-            <div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Monthly Trend Detail */}
+            <div className="space-y-6">
+              {/* YTD Comparison Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">YTD {new Date().getFullYear()}</CardTitle></CardHeader>
+                  <CardContent><div className="text-2xl font-bold">{formatCents(pcoData.stats.ytdCurrent || 0)}</div></CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">YTD {new Date().getFullYear() - 1}</CardTitle></CardHeader>
+                  <CardContent><div className="text-2xl font-bold">{formatCents(pcoData.stats.ytdPrior || 0)}</div></CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">YTD Change</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${(pcoData.stats.ytdCurrent || 0) >= (pcoData.stats.ytdPrior || 0) ? "text-green-600" : "text-red-600"}`}>
+                      {pcoData.stats.ytdPrior ? `${(((pcoData.stats.ytdCurrent || 0) - pcoData.stats.ytdPrior) / pcoData.stats.ytdPrior * 100).toFixed(1)}%` : "N/A"}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Month vs Prior Year */}
+                <Card className="lg:col-span-2">
                   <CardHeader>
-                    <CardTitle className="text-sm font-medium">Monthly Detail</CardTitle>
+                    <CardTitle className="text-sm font-medium">Month vs. Prior Year</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Month</TableHead>
-                          <TableHead>Donations</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead>Average</TableHead>
+                          <TableHead>This Year</TableHead>
+                          <TableHead>Prior Year</TableHead>
+                          <TableHead>$ Change</TableHead>
+                          <TableHead>% Change</TableHead>
+                          <TableHead>Donations (Current)</TableHead>
+                          <TableHead>Donations (Prior)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {pcoData.stats.monthlyTrend.slice().reverse().map(m => (
-                          <TableRow key={m.month}>
-                            <TableCell className="font-medium">{m.month}</TableCell>
-                            <TableCell>{m.count}</TableCell>
-                            <TableCell>{formatCents(m.total)}</TableCell>
-                            <TableCell>{m.count > 0 ? formatCents(Math.round(m.total / m.count)) : "—"}</TableCell>
-                          </TableRow>
-                        ))}
+                        {(pcoData.stats.monthVsPriorYear || []).slice().reverse().map((m: any) => {
+                          const dollarChange = m.current - m.prior;
+                          const pctChange = m.prior > 0 ? ((m.current - m.prior) / m.prior * 100) : m.current > 0 ? 100 : 0;
+                          return (
+                            <TableRow key={m.month}>
+                              <TableCell className="font-medium">{m.month}</TableCell>
+                              <TableCell>{formatCents(m.current)}</TableCell>
+                              <TableCell className="text-muted-foreground">{formatCents(m.prior)}</TableCell>
+                              <TableCell className={dollarChange >= 0 ? "text-green-600" : "text-red-600"}>
+                                {dollarChange >= 0 ? "+" : ""}{formatCents(dollarChange)}
+                              </TableCell>
+                              <TableCell className={pctChange >= 0 ? "text-green-600" : "text-red-600"}>
+                                {m.prior > 0 || m.current > 0 ? `${pctChange >= 0 ? "+" : ""}${pctChange.toFixed(1)}%` : "—"}
+                              </TableCell>
+                              <TableCell>{m.currentCount}</TableCell>
+                              <TableCell className="text-muted-foreground">{m.priorCount}</TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
+                  </CardContent>
+                </Card>
+
+                {/* Donor Retention */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Donor Retention ({new Date().getFullYear()})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const dr = pcoData.stats.donorRetention || { retained: 0, new: 0, lapsed: 0, currentTotal: 0, priorTotal: 0 };
+                      const retentionRate = dr.priorTotal > 0 ? ((dr.retained / dr.priorTotal) * 100).toFixed(1) : "N/A";
+                      return (
+                        <div className="space-y-4">
+                          <div className="text-center">
+                            <div className="text-3xl font-bold text-primary">{retentionRate}{typeof retentionRate === "string" && retentionRate !== "N/A" ? "%" : ""}</div>
+                            <p className="text-sm text-muted-foreground">Retention Rate</p>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 text-center">
+                            <div>
+                              <div className="text-xl font-bold text-green-600">{dr.retained}</div>
+                              <p className="text-xs text-muted-foreground">Retained</p>
+                            </div>
+                            <div>
+                              <div className="text-xl font-bold text-blue-600">{dr.new}</div>
+                              <p className="text-xs text-muted-foreground">New</p>
+                            </div>
+                            <div>
+                              <div className="text-xl font-bold text-red-600">{dr.lapsed}</div>
+                              <p className="text-xs text-muted-foreground">Lapsed</p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground text-center">
+                            {dr.currentTotal} donors this year vs {dr.priorTotal} last year
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Giving Frequency */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Giving Frequency ({new Date().getFullYear()})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const gf = pcoData.stats.givingFrequency || { oneTime: 0, recurring: 0, avgFrequency: 0 };
+                      const total = gf.oneTime + gf.recurring;
+                      return (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <div className="text-2xl font-bold">{gf.oneTime}</div>
+                              <p className="text-sm text-muted-foreground">One-Time Donors</p>
+                              {total > 0 && <p className="text-xs text-muted-foreground">{((gf.oneTime / total) * 100).toFixed(0)}%</p>}
+                            </div>
+                            <div>
+                              <div className="text-2xl font-bold text-primary">{gf.recurring}</div>
+                              <p className="text-sm text-muted-foreground">Repeat Donors</p>
+                              {total > 0 && <p className="text-xs text-muted-foreground">{((gf.recurring / total) * 100).toFixed(0)}%</p>}
+                            </div>
+                          </div>
+                          <div className="text-center pt-2 border-t">
+                            <div className="text-lg font-bold">{gf.avgFrequency}x</div>
+                            <p className="text-xs text-muted-foreground">Avg donations per donor this year</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* Giving Tier Distribution */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Giving Tiers</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {(pcoData.stats.tierDistribution || []).map((tier: any) => {
+                        const maxCount = Math.max(...(pcoData.stats.tierDistribution || []).map((t: any) => t.count), 1);
+                        return (
+                          <div key={tier.label} className="flex items-center gap-3">
+                            <span className="text-xs w-20 text-right text-muted-foreground">{tier.label}</span>
+                            <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${(tier.count / maxCount) * 100}%` }} />
+                            </div>
+                            <span className="text-xs w-16 text-right">{tier.count} ({formatCents(tier.total)})</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Day of Week */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-medium">Giving by Day of Week</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const dow = pcoData.stats.dayOfWeek || {};
+                      const maxDay = Math.max(...Object.values(dow).map((d: any) => d.total), 1);
+                      return (
+                        <div className="space-y-2">
+                          {Object.entries(dow).map(([day, data]: [string, any]) => (
+                            <div key={day} className="flex items-center gap-3">
+                              <span className="text-xs w-20 text-right text-muted-foreground">{day}</span>
+                              <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-primary rounded-full" style={{ width: `${(data.total / maxDay) * 100}%` }} />
+                              </div>
+                              <span className="text-xs w-24 text-right">{data.count} ({formatCents(data.total)})</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
 
@@ -4632,8 +4789,8 @@ function DonationsTab() {
                   </CardContent>
                 </Card>
 
-                {/* Fund Breakdown Table */}
-                <Card className="lg:col-span-2">
+                {/* Fund Breakdown */}
+                <Card>
                   <CardHeader>
                     <CardTitle className="text-sm font-medium">Fund Breakdown</CardTitle>
                   </CardHeader>
@@ -4658,6 +4815,41 @@ function DonationsTab() {
                     </Table>
                   </CardContent>
                 </Card>
+
+                {/* Top Donors (super_admin/accounting only) */}
+                {pcoData.canSeeIndividual && (pcoData.stats.topDonors || []).length > 0 && (
+                  <Card className="lg:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium">Top Donors (All Time)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Total Given</TableHead>
+                            <TableHead>Donations</TableHead>
+                            <TableHead>Avg Donation</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(pcoData.stats.topDonors || []).map((d: any, i: number) => (
+                            <TableRow key={d.email}>
+                              <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                              <TableCell className="font-medium">{d.name}</TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{d.email}</TableCell>
+                              <TableCell className="font-bold">{formatCents(d.total)}</TableCell>
+                              <TableCell>{d.count}</TableCell>
+                              <TableCell>{formatCents(Math.round(d.total / d.count))}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           )}

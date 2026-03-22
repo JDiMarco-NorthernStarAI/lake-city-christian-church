@@ -2104,6 +2104,100 @@ export async function registerRoutes(
         }
       });
 
+      // Month vs prior year comparison
+      const monthVsPriorYear: { month: string; current: number; prior: number; currentCount: number; priorCount: number }[] = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const priorD = new Date(d.getFullYear() - 1, d.getMonth(), 1);
+        const currentMonth = donations.filter(don => don.receivedAt && new Date(don.receivedAt).getMonth() === d.getMonth() && new Date(don.receivedAt).getFullYear() === d.getFullYear());
+        const priorMonth = donations.filter(don => don.receivedAt && new Date(don.receivedAt).getMonth() === priorD.getMonth() && new Date(don.receivedAt).getFullYear() === priorD.getFullYear());
+        monthVsPriorYear.push({
+          month: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+          current: currentMonth.reduce((s, don) => s + don.amountCents, 0),
+          prior: priorMonth.reduce((s, don) => s + don.amountCents, 0),
+          currentCount: currentMonth.length,
+          priorCount: priorMonth.length,
+        });
+      }
+
+      // YTD vs prior year YTD
+      const ytdCurrent = donations.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === now.getFullYear() && new Date(d.receivedAt).getMonth() <= now.getMonth()).reduce((s, d) => s + d.amountCents, 0);
+      const ytdPrior = donations.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === now.getFullYear() - 1 && new Date(d.receivedAt).getMonth() <= now.getMonth()).reduce((s, d) => s + d.amountCents, 0);
+
+      // Donor retention
+      const currentYearDonors = new Set(donations.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === now.getFullYear() && d.donorEmail).map(d => d.donorEmail));
+      const priorYearDonors = new Set(donations.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === now.getFullYear() - 1 && d.donorEmail).map(d => d.donorEmail));
+      const retainedDonors = [...currentYearDonors].filter(e => priorYearDonors.has(e)).length;
+      const newDonors = [...currentYearDonors].filter(e => !priorYearDonors.has(e)).length;
+      const lapsedDonors = [...priorYearDonors].filter(e => !currentYearDonors.has(e)).length;
+
+      // Giving frequency per donor
+      const donorCounts: Record<string, number> = {};
+      donations.filter(d => d.receivedAt && new Date(d.receivedAt).getFullYear() === now.getFullYear() && d.donorEmail).forEach(d => {
+        donorCounts[d.donorEmail!] = (donorCounts[d.donorEmail!] || 0) + 1;
+      });
+      const freqValues = Object.values(donorCounts);
+      const oneTimeDonors = freqValues.filter(c => c === 1).length;
+      const recurringDonors = freqValues.filter(c => c > 1).length;
+      const avgFrequency = freqValues.length > 0 ? freqValues.reduce((s, v) => s + v, 0) / freqValues.length : 0;
+
+      // Top donors (only for super_admin/accounting)
+      const topDonors: { name: string; email: string; total: number; count: number }[] = [];
+      if (canSeeIndividual) {
+        const donorTotals: Record<string, { name: string; email: string; total: number; count: number }> = {};
+        donations.filter(d => d.donorEmail).forEach(d => {
+          if (!donorTotals[d.donorEmail!]) donorTotals[d.donorEmail!] = { name: d.donorName || "Anonymous", email: d.donorEmail!, total: 0, count: 0 };
+          donorTotals[d.donorEmail!].total += d.amountCents;
+          donorTotals[d.donorEmail!].count++;
+        });
+        topDonors.push(...Object.values(donorTotals).sort((a, b) => b.total - a.total).slice(0, 20));
+      }
+
+      // Fund trends (monthly by fund for last 6 months)
+      const fundTrends: Record<string, { month: string; total: number }[]> = {};
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthLabel = d.toLocaleDateString("en-US", { month: "short" });
+        const monthDons = donations.filter(don => don.receivedAt && new Date(don.receivedAt).getMonth() === d.getMonth() && new Date(don.receivedAt).getFullYear() === d.getFullYear());
+        const byFund: Record<string, number> = {};
+        monthDons.forEach(don => {
+          const fname = don.fundName || "Unspecified";
+          byFund[fname] = (byFund[fname] || 0) + don.amountCents;
+        });
+        for (const [fname, total] of Object.entries(byFund)) {
+          if (!fundTrends[fname]) fundTrends[fname] = [];
+          fundTrends[fname].push({ month: monthLabel, total });
+        }
+      }
+
+      // Day of week distribution
+      const dayOfWeek: Record<string, { total: number; count: number }> = {};
+      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      dayNames.forEach(d => { dayOfWeek[d] = { total: 0, count: 0 }; });
+      donations.forEach(d => {
+        if (d.receivedAt) {
+          const day = dayNames[new Date(d.receivedAt).getDay()];
+          dayOfWeek[day].total += d.amountCents;
+          dayOfWeek[day].count++;
+        }
+      });
+
+      // Giving tier distribution
+      const tiers = [
+        { label: "Under $25", min: 0, max: 2500 },
+        { label: "$25 - $50", min: 2500, max: 5000 },
+        { label: "$50 - $100", min: 5000, max: 10000 },
+        { label: "$100 - $250", min: 10000, max: 25000 },
+        { label: "$250 - $500", min: 25000, max: 50000 },
+        { label: "$500 - $1,000", min: 50000, max: 100000 },
+        { label: "$1,000+", min: 100000, max: Infinity },
+      ];
+      const tierDistribution = tiers.map(tier => ({
+        label: tier.label,
+        count: filtered.filter(d => d.amountCents >= tier.min && d.amountCents < tier.max).length,
+        total: filtered.filter(d => d.amountCents >= tier.min && d.amountCents < tier.max).reduce((s, d) => s + d.amountCents, 0),
+      }));
+
       // If not super_admin/accounting, redact individual donor info
       const donationList = canSeeIndividual ? filtered : filtered.map(d => ({
         ...d,
@@ -2124,6 +2218,15 @@ export async function registerRoutes(
           fundBreakdown,
           monthlyTrend,
           yearlyTotals,
+          monthVsPriorYear,
+          ytdCurrent,
+          ytdPrior,
+          donorRetention: { retained: retainedDonors, new: newDonors, lapsed: lapsedDonors, currentTotal: currentYearDonors.size, priorTotal: priorYearDonors.size },
+          givingFrequency: { oneTime: oneTimeDonors, recurring: recurringDonors, avgFrequency: Math.round(avgFrequency * 10) / 10 },
+          topDonors,
+          fundTrends,
+          dayOfWeek,
+          tierDistribution,
         },
         canSeeIndividual,
       });
