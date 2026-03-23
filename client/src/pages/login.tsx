@@ -27,7 +27,8 @@ export default function Login() {
   // Redirect already-authenticated users
   useEffect(() => {
     if (authLoading || !user) return;
-    if (user.roles?.includes("admin") || user.roles?.includes("super_admin")) {
+    const hasAdminRole = user.roles?.some((r: string) => r !== "member");
+    if (hasAdminRole) {
       navigate("/admin/dashboard");
     } else {
       navigate("/");
@@ -50,7 +51,8 @@ export default function Login() {
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split(".")[1]));
-          if (payload.roles?.includes("admin") || payload.roles?.includes("super_admin")) {
+          const hasAdminRole = payload.roles?.some((r: string) => r !== "member");
+          if (hasAdminRole) {
             navigate("/admin/dashboard");
             return;
           }

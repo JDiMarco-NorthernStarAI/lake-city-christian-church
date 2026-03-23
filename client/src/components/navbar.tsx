@@ -188,7 +188,7 @@ export default function Navbar() {
           {!authLoading && (
             isAuthenticated ? (
               <>
-                {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin")) && (
+                {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin") || user.roles.includes("accounting") || user.roles.includes("student_ministry") || user.roles.includes("kids_ministry") || user.roles.includes("small_group")) && (
                   <a href="/admin/dashboard" onClick={handleAdminClick}>
                     <Button
                       variant="ghost"
@@ -305,7 +305,7 @@ export default function Navbar() {
                   {!authLoading && (
                     isAuthenticated ? (
                       <>
-                        {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin")) && (
+                        {user?.roles && (user.roles.includes("admin") || user.roles.includes("super_admin") || user.roles.includes("accounting") || user.roles.includes("student_ministry") || user.roles.includes("kids_ministry") || user.roles.includes("small_group")) && (
                           <a
                             href="/admin/dashboard"
                             onClick={(e) => { setMobileOpen(false); handleAdminClick(e); }}

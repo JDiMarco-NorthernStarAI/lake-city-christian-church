@@ -66,9 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setTokens(result.data.accessToken, result.data.refreshToken);
       setUser(result.data.user);
 
-      // Auto-bridge JWT to session for admin users so admin dashboard works
+      // Auto-bridge JWT to session so admin dashboard works for any role with features
       const roles: string[] = result.data.user.roles || [];
-      if (roles.includes("admin") || roles.includes("super_admin")) {
+      const hasAdminRole = roles.some(r => r !== "member");
+      if (hasAdminRole) {
         try {
           await fetch("/api/auth/bridge", {
             method: "POST",
@@ -104,9 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setTokens(result.data.accessToken, result.data.refreshToken);
       setUser(result.data.user);
 
-      // Auto-bridge JWT to session for admin users so admin dashboard works
+      // Auto-bridge JWT to session so admin dashboard works for any role with features
       const roles: string[] = result.data.user.roles || [];
-      if (roles.includes("admin") || roles.includes("super_admin")) {
+      const hasAdminRole = roles.some(r => r !== "member");
+      if (hasAdminRole) {
         try {
           await fetch("/api/auth/bridge", {
             method: "POST",
