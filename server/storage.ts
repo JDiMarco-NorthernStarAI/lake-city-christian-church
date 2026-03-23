@@ -642,6 +642,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEnabledFeaturesForRoles(roles: string[]): Promise<string[]> {
+    // super_admin always gets all features
     if (roles.includes("super_admin")) {
       const { AVAILABLE_FEATURES } = await import("@shared/schema");
       return [...AVAILABLE_FEATURES];
@@ -650,16 +651,21 @@ export class DatabaseStorage implements IStorage {
     const allPerms = await db.select().from(rolePermissions);
     const enabledFeatures = new Set<string>();
 
-    if (roles.includes("admin")) {
-      const { AVAILABLE_FEATURES } = await import("@shared/schema");
-      for (const f of AVAILABLE_FEATURES) {
-        enabledFeatures.add(f);
-      }
-    }
-
+    // Check each role's permissions from the database
     for (const perm of allPerms) {
       if (roles.includes(perm.role) && perm.enabled) {
         enabledFeatures.add(perm.feature);
+      }
+    }
+
+    // If a role has NO permissions in the DB yet (first deploy), give admin all features as default
+    if (roles.includes("admin") && enabledFeatures.size === 0) {
+      const hasAdminPerms = allPerms.some(p => p.role === "admin");
+      if (!hasAdminPerms) {
+        const { AVAILABLE_FEATURES } = await import("@shared/schema");
+        for (const f of AVAILABLE_FEATURES) {
+          enabledFeatures.add(f);
+        }
       }
     }
 

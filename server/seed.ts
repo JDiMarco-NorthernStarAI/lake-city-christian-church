@@ -11,6 +11,7 @@ async function seedRolePermissions() {
     student_ministry: ["dashboard", "events", "pages", "messages", "connect", "forms", "signups"],
     kids_ministry: ["dashboard", "events", "pages", "messages", "connect", "forms", "signups"],
     small_group: ["dashboard", "events", "pages", "signups"],
+    accounting: ["dashboard", "donations"],
     admin: [...AVAILABLE_FEATURES],
     super_admin: [...AVAILABLE_FEATURES],
   };

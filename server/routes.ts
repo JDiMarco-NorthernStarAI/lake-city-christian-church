@@ -2038,7 +2038,7 @@ export async function registerRoutes(
   // ======== Planning Center Giving Sync ========
 
   // Admin: trigger sync
-  app.post("/api/admin/pco-sync", requireAdminOrSuperAdmin, async (_req, res) => {
+  app.post("/api/admin/pco-sync", requireFeature("donations"), async (_req, res) => {
     try {
       const { syncPcoDonations } = await import("./pco-sync");
       const result = await syncPcoDonations();
@@ -2050,7 +2050,7 @@ export async function registerRoutes(
   });
 
   // Admin: view all synced donations with filtering
-  app.get("/api/admin/pco-donations", requireAdminOrSuperAdmin, async (req, res) => {
+  app.get("/api/admin/pco-donations", requireFeature("donations"), async (req, res) => {
     try {
       const donations = await storage.getPcoDonations();
       const userRoles = req.session?.roles || [];
