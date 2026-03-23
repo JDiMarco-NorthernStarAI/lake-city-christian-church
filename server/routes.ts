@@ -1223,7 +1223,7 @@ export async function registerRoutes(
   });
 
   // ==================== MEDIA LIBRARY ====================
-  app.get("/api/media", requireAdminOrSuperAdmin, async (req, res) => {
+  app.get("/api/media", requireFeature("media"), async (req, res) => {
     try {
       const folder = req.query.folder as string | undefined;
       const items = await storage.getMedia(folder);
@@ -1237,7 +1237,7 @@ export async function registerRoutes(
   const multer = (await import("multer")).default;
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-  app.post("/api/media/upload", requireAdminOrSuperAdmin, upload.single("file"), async (req, res) => {
+  app.post("/api/media/upload", requireFeature("media"), upload.single("file"), async (req, res) => {
     try {
       const file = req.file;
       if (!file) return res.status(400).json({ message: "No file uploaded" });
@@ -1286,7 +1286,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/media/:id", requireAdminOrSuperAdmin, async (req, res) => {
+  app.delete("/api/media/:id", requireFeature("media"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       const item = await storage.getMediaById(id);
@@ -1310,7 +1310,7 @@ export async function registerRoutes(
 
   // ==================== MEDIA FOLDERS & MANAGEMENT ====================
 
-  app.put("/api/media/:id", requireAdminOrSuperAdmin, async (req, res) => {
+  app.put("/api/media/:id", requireFeature("media"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       const { filename, folder } = req.body;
@@ -1325,7 +1325,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/media/bulk-delete", requireAdminOrSuperAdmin, async (req, res) => {
+  app.post("/api/media/bulk-delete", requireFeature("media"), async (req, res) => {
     try {
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids array required" });
@@ -1349,7 +1349,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/media/storage-stats", requireAdminOrSuperAdmin, async (_req, res) => {
+  app.get("/api/media/storage-stats", requireFeature("media"), async (_req, res) => {
     try {
       const stats = await storage.getMediaStorageStats();
       res.json(stats);
@@ -1358,7 +1358,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/media/folders", requireAdminOrSuperAdmin, async (_req, res) => {
+  app.get("/api/media/folders", requireFeature("media"), async (_req, res) => {
     try {
       const folders = await storage.getMediaFolders();
       res.json(folders);
@@ -1367,7 +1367,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/media/folders", requireAdminOrSuperAdmin, async (req, res) => {
+  app.post("/api/media/folders", requireFeature("media"), async (req, res) => {
     try {
       const { path: folderPath } = req.body;
       if (!folderPath || typeof folderPath !== "string") return res.status(400).json({ message: "path is required" });
@@ -1383,7 +1383,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/media/folders/:id", requireAdminOrSuperAdmin, async (req, res) => {
+  app.put("/api/media/folders/:id", requireFeature("media"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       const { path: newPath } = req.body;
@@ -1400,7 +1400,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/media/folders/:id", requireAdminOrSuperAdmin, async (req, res) => {
+  app.delete("/api/media/folders/:id", requireFeature("media"), async (req, res) => {
     try {
       const id = Number(req.params.id);
       const action = (req.query.action as string) === "delete_contents" ? "delete_contents" : "move_to_general";
