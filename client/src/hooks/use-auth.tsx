@@ -75,6 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             headers: { Authorization: `Bearer ${result.data.accessToken}` },
             credentials: "include",
           });
+          // Invalidate cached auth state so admin dashboard loads fresh
+          const { queryClient } = await import("@/lib/queryClient");
+          await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         } catch {}
       }
 
@@ -110,6 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             headers: { Authorization: `Bearer ${result.data.accessToken}` },
             credentials: "include",
           });
+          const { queryClient } = await import("@/lib/queryClient");
+          await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         } catch {}
       }
 
