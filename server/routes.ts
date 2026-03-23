@@ -261,8 +261,10 @@ export async function registerRoutes(
       if (!user) {
         return res.status(401).json({ message: "User not found" });
       }
-      if (!user.roles.includes("admin") && !user.roles.includes("super_admin")) {
-        return res.status(403).json({ message: "Not an admin" });
+      // Allow any user with a role beyond member to bridge to session
+      const hasAdminRole = user.roles.some((r: string) => r !== "member");
+      if (!hasAdminRole) {
+        return res.status(403).json({ message: "No admin access" });
       }
       req.session.userId = user.id;
       req.session.roles = user.roles;
