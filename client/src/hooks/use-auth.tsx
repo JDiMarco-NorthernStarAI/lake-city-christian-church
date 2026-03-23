@@ -76,9 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             headers: { Authorization: `Bearer ${result.data.accessToken}` },
             credentials: "include",
           });
-          // Invalidate cached auth state so admin dashboard loads fresh
+          // Refetch (not just invalidate) so cache has fresh data before navigation
           const { queryClient } = await import("@/lib/queryClient");
-          await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+          await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
         } catch {}
       }
 
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             credentials: "include",
           });
           const { queryClient } = await import("@/lib/queryClient");
-          await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+          await queryClient.refetchQueries({ queryKey: ["/api/auth/me"] });
         } catch {}
       }
 
