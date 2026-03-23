@@ -717,7 +717,13 @@ export async function registerRoutes(
       const { username, password, roles, email, name, phone, address, city, state, zip, gender, dateOfBirth, maritalStatus, emergencyContactName, emergencyContactPhone, profilePhotoUrl } = req.body;
       const updateData: any = {};
 
-      if (username) updateData.username = username;
+      // Only update username if it actually changed
+      if (username) {
+        const existingUser = await storage.getUser(userId);
+        if (existingUser && username !== existingUser.username) {
+          updateData.username = username;
+        }
+      }
       if (password) updateData.password = await bcrypt.hash(password, 10);
       if (Array.isArray(roles)) {
         if (roles.includes("super_admin") && !req.session.roles?.includes("super_admin")) {
