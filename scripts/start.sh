@@ -178,5 +178,16 @@ node -e "
     .catch(e => { console.error('Media path fix error:', e.message); pool.end(); });
 " "$DB_URL"
 
+echo "Ensuring signup_events external_url column and nullable form_id..."
+node -e "
+  const { Pool } = require('pg');
+  const pool = new Pool({ connectionString: process.argv[1], ssl: { rejectUnauthorized: false } });
+  pool.query(\`
+    ALTER TABLE signup_events ADD COLUMN IF NOT EXISTS external_url text;
+    ALTER TABLE signup_events ALTER COLUMN form_id DROP NOT NULL;
+  \`).then(() => { console.log('signup_events external_url and nullable form_id ready.'); return pool.end(); })
+    .catch(e => { console.error('signup_events migration error:', e.message); pool.end(); });
+" "$DB_URL"
+
 echo "Starting server..."
 node dist/index.cjs
