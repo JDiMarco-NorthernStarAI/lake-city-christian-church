@@ -5209,6 +5209,8 @@ function SignupsTab() {
       externalUrl: signup.externalUrl || "",
     });
     setDisplayType(pss.displayType || "thank_you");
+    const settings = (signup.settings || {}) as any;
+    setQrLogoUrl(settings.qrLogoUrl || "");
     setView("editor");
   }
 
@@ -5287,6 +5289,9 @@ function SignupsTab() {
         displayType: displayType,
         successMessage: form.successMessage || null,
         redirectUrl: form.redirectUrl || null,
+      },
+      settings: {
+        qrLogoUrl: qrLogoUrl || null,
       },
     };
     if (editing) {

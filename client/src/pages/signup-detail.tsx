@@ -479,7 +479,7 @@ export default function SignupDetail() {
           </div>
         )}
 
-        <div className={`relative z-10 px-4 max-w-4xl mx-auto ${event.externalUrl ? "py-16 md:py-20" : "py-24 md:py-32"}`}>
+        <div className={`relative z-10 px-4 max-w-4xl mx-auto ${event.externalUrl ? "pt-8 pb-4 md:pt-12 md:pb-6" : "py-24 md:py-32"}`}>
           <FadeInSection>
             <Button
               variant="ghost"
