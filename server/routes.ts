@@ -1967,8 +1967,14 @@ export async function registerRoutes(
 
   app.post("/api/signups", requireFeature("signups"), async (req, res) => {
     try {
+      const body = { ...req.body };
+      // Coerce date strings to Date objects for Zod validation
+      for (const key of ["signupStartDate", "signupEndDate", "eventDate", "eventEndDate"]) {
+        if (body[key] && typeof body[key] === "string") body[key] = new Date(body[key]);
+        if (body[key] === null || body[key] === "") delete body[key];
+      }
       const parsed = insertSignupEventSchema.parse({
-        ...req.body,
+        ...body,
         createdBy: req.session.userId,
       });
       const event = await storage.createSignupEvent(parsed);
