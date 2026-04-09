@@ -18,6 +18,14 @@ import { Calendar, MapPin, Users, DollarSign, Mail, Phone, CheckCircle, Clock, A
 import type { SignupEvent, FormField } from "@shared/schema";
 import { SIGNUP_CATEGORY_LABELS } from "@shared/schema";
 
+function getImageSrc(path: string | null | undefined) {
+  if (!path) return undefined;
+  if (path.startsWith("http")) return path;
+  if (path.startsWith("/objects/")) return path;
+  if (path.startsWith("/event-images/")) return path;
+  return `/objects${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
     <motion.div
@@ -462,7 +470,7 @@ export default function SignupDetail() {
         {event.imageUrl && (
           <div className="absolute inset-0 z-0">
             <img
-              src={event.imageUrl}
+              src={getImageSrc(event.imageUrl)}
               alt={event.title}
               className="w-full h-full object-cover grayscale opacity-20"
               data-testid="img-event-hero"
