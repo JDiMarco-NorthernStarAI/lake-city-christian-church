@@ -595,7 +595,7 @@ export default function SignupDetail() {
       </section>
 
       {event.externalUrl ? (
-        <section className="bg-black py-12 md:py-20 px-4">
+        <section className="bg-black py-4 md:py-6 px-4">
           <div className="max-w-3xl mx-auto">
             <FadeInSection>
               <div className="w-full rounded-lg overflow-hidden">
