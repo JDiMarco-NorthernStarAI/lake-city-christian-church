@@ -68,6 +68,16 @@ function truncateText(text: string | null | undefined, maxLength: number): strin
   return text.substring(0, maxLength).trimEnd() + "...";
 }
 
+// External sign-ups (Google Forms, etc.) that appear alongside database sign-ups
+const EXTERNAL_SIGNUPS: { title: string; description: string; category: string; href: string }[] = [
+  {
+    title: "T-Shirt Sign Up",
+    description: "Sign up to get your LC3 t-shirt! Fill out the form to reserve yours.",
+    category: "other",
+    href: "/tshirt-signup",
+  },
+];
+
 export default function Signups() {
   const content = usePageContent("signups", {
     hero_title: "Sign Ups",
@@ -84,6 +94,10 @@ export default function Signups() {
   const filtered = activeFilter === "all"
     ? events || []
     : (events || []).filter((e) => activeTab?.categories.includes(e.category));
+
+  const filteredExternal = activeFilter === "all"
+    ? EXTERNAL_SIGNUPS
+    : EXTERNAL_SIGNUPS.filter((e) => activeTab?.categories.includes(e.category));
 
   return (
     <div className="min-h-screen bg-black pt-20">
@@ -158,7 +172,7 @@ export default function Signups() {
                 </Card>
               ))}
             </div>
-          ) : filtered.length === 0 ? (
+          ) : filtered.length === 0 && filteredExternal.length === 0 ? (
             <FadeInSection>
               <div className="text-center py-20" data-testid="text-empty-state">
                 <ClipboardList className="w-16 h-16 text-white/20 mx-auto mb-6" />
@@ -261,6 +275,42 @@ export default function Signups() {
                   </FadeInSection>
                 );
               })}
+              {filteredExternal.map((ext, i) => (
+                <FadeInSection key={`ext-${ext.href}`} delay={(filtered.length + i) * 0.08}>
+                  <Card className="bg-neutral-900 border-neutral-800 overflow-visible h-full">
+                    <CardContent className="p-0 flex flex-col h-full">
+                      <div className="w-full aspect-[4/3] overflow-hidden rounded-t-md bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center">
+                        <ClipboardList className="w-12 h-12 text-white/10" />
+                      </div>
+                      <div className="p-5 flex flex-col flex-1 gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {SIGNUP_CATEGORY_LABELS[ext.category] || ext.category}
+                          </Badge>
+                        </div>
+                        <h3
+                          className="text-base font-bold text-white"
+                          style={{ fontFamily: "Montserrat, sans-serif" }}
+                        >
+                          {ext.title}
+                        </h3>
+                        <p className="text-white/40 text-sm leading-relaxed">
+                          {ext.description}
+                        </p>
+                        <div className="mt-auto">
+                          <Button
+                            className="w-full mt-2 bg-gradient-to-r from-[#0033AA] to-[#0088DD] border-[#0055CC]"
+                            onClick={() => navigate(ext.href)}
+                          >
+                            Sign Up
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </FadeInSection>
+              ))}
             </div>
           )}
         </div>

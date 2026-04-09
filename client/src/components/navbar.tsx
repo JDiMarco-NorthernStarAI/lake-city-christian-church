@@ -52,7 +52,6 @@ const navItems = [
     href: "/plan-visit",
     children: [
       { label: "Sign Ups", href: "/signups" },
-      { label: "T-Shirt Sign Up", href: "/tshirt-signup" },
       { label: "Contact", href: "/contact" },
       { label: "Announcements", href: "/announcements" },
       { label: "Watch", href: "/encounter" },
