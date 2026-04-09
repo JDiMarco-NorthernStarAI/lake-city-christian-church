@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, MapPin, Users, DollarSign, Mail, Phone, CheckCircle, Clock, AlertCircle, Loader2, ClipboardList } from "lucide-react";
+import { Calendar, MapPin, Users, DollarSign, Mail, Phone, CheckCircle, Clock, AlertCircle, Loader2, ClipboardList, ArrowLeft } from "lucide-react";
 import type { SignupEvent, FormField } from "@shared/schema";
 import { SIGNUP_CATEGORY_LABELS } from "@shared/schema";
 
@@ -479,8 +479,15 @@ export default function SignupDetail() {
           </div>
         )}
 
-        <div className="relative z-10 px-4 py-24 md:py-32 max-w-4xl mx-auto">
+        <div className={`relative z-10 px-4 max-w-4xl mx-auto ${event.externalUrl ? "py-16 md:py-20" : "py-24 md:py-32"}`}>
           <FadeInSection>
+            <Button
+              variant="ghost"
+              className="text-white/60 mb-4 -ml-2"
+              onClick={() => navigate("/signups")}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Sign Ups
+            </Button>
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <Badge variant="secondary" className="text-xs" data-testid="badge-event-category">
                 {categoryLabel}
