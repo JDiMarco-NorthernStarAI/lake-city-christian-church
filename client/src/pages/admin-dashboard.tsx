@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getQueryFn } from "@/lib/queryClient";
@@ -34,7 +34,8 @@ import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068
 import AdminSmsTab from "@/pages/admin-sms";
 import AdminMediaTab from "@/pages/admin-media";
 import ImagePickerModal from "@/components/image-picker-modal";
-import { MessageSquare, Inbox, ImageIcon } from "lucide-react";
+import { MessageSquare, Inbox, ImageIcon, QrCode } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 
 function getImageSrc(path: string | null | undefined) {
   if (!path) return undefined;
@@ -5148,6 +5149,19 @@ function SignupsTab() {
     externalUrl: "",
   });
   const [signupImagePickerOpen, setSignupImagePickerOpen] = useState(false);
+  const [qrLogoUrl, setQrLogoUrl] = useState("");
+  const [qrLogoPickerOpen, setQrLogoPickerOpen] = useState(false);
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  const downloadQrCode = useCallback(() => {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = `qr-${form.slug || "signup"}.png`;
+    link.href = url;
+    link.click();
+  }, [form.slug]);
 
   function generateSlug(title: string) {
     return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -5518,6 +5532,68 @@ function SignupsTab() {
             </form>
           </CardContent>
         </Card>
+
+        {(editing || form.slug) && (
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <QrCode className="w-5 h-5" /> QR Code Generator
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Sign Up URL</Label>
+                    <Input
+                      value={`https://www.lakecitycc.com/signups/${form.slug || editing?.slug || ""}`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Center Logo (optional)</Label>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" className="gap-2" onClick={() => setQrLogoPickerOpen(true)}>
+                        <ImageIcon className="w-4 h-4" /> {qrLogoUrl ? "Change Logo" : "Choose Logo"}
+                      </Button>
+                      {qrLogoUrl && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setQrLogoUrl("")}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    {qrLogoUrl && (
+                      <img src={getImageSrc(qrLogoUrl)} alt="QR Logo" className="w-16 h-16 object-contain rounded mt-1" />
+                    )}
+                    <ImagePickerModal
+                      open={qrLogoPickerOpen}
+                      onClose={() => setQrLogoPickerOpen(false)}
+                      onSelect={(path) => setQrLogoUrl(path)}
+                      defaultFolder="general"
+                    />
+                  </div>
+                  <Button type="button" className="gap-2" onClick={downloadQrCode}>
+                    <Download className="w-4 h-4" /> Download QR Code
+                  </Button>
+                </div>
+                <div className="flex items-center justify-center">
+                  <div ref={qrRef} className="bg-white p-4 rounded-lg inline-block">
+                    <QRCodeCanvas
+                      value={`https://www.lakecitycc.com/signups/${form.slug || editing?.slug || ""}`}
+                      size={256}
+                      level="H"
+                      imageSettings={qrLogoUrl ? {
+                        src: getImageSrc(qrLogoUrl) || "",
+                        height: 60,
+                        width: 60,
+                        excavate: true,
+                      } : undefined}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
