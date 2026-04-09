@@ -586,6 +586,27 @@ export default function SignupDetail() {
         </div>
       </section>
 
+      {event.externalUrl ? (
+        <section className="bg-black py-12 md:py-20 px-4">
+          <div className="max-w-3xl mx-auto">
+            <FadeInSection>
+              <div className="w-full rounded-lg overflow-hidden">
+                <iframe
+                  src={event.externalUrl.replace("/viewform", "/viewform?embedded=true")}
+                  width="100%"
+                  height="1200"
+                  frameBorder="0"
+                  marginHeight={0}
+                  marginWidth={0}
+                  className="bg-white rounded-lg"
+                >
+                  Loading...
+                </iframe>
+              </div>
+            </FadeInSection>
+          </div>
+        </section>
+      ) : (
       <section className="bg-black py-12 md:py-20 px-4">
         <div className="max-w-2xl mx-auto">
           {submitted && submitResult ? (
@@ -783,6 +804,7 @@ export default function SignupDetail() {
           )}
         </div>
       </section>
+      )}
     </div>
   );
 }

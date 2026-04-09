@@ -34,7 +34,6 @@ import PublicForm from "@/pages/public-form";
 import Signups from "@/pages/signups";
 import SignupDetail from "@/pages/signup-detail";
 import SmsTerms from "@/pages/sms-terms";
-import TshirtSignup from "@/pages/tshirt-signup";
 import { useAnalytics } from "@/hooks/use-analytics";
 import NotificationPrompt from "@/components/notification-prompt";
 
@@ -63,7 +62,6 @@ function Router() {
       <Route path="/plan-visit" component={PlanVisit} />
       <Route path="/contact" component={Contact} />
       <Route path="/sms-terms" component={SmsTerms} />
-      <Route path="/tshirt-signup" component={TshirtSignup} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/account" component={Account} />

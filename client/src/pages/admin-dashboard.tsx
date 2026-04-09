@@ -5145,6 +5145,7 @@ function SignupsTab() {
     contactPhone: "",
     successMessage: "",
     redirectUrl: "",
+    externalUrl: "",
   });
   const [signupImagePickerOpen, setSignupImagePickerOpen] = useState(false);
 
@@ -5159,7 +5160,7 @@ function SignupsTab() {
       formId: 0, imageUrl: "", thumbnailUrl: "", signupStartDate: "", signupEndDate: "",
       eventDate: "", eventEndDate: "", location: "", cost: "", maxSignups: "",
       waitlistEnabled: false, contactName: "", contactEmail: "", contactPhone: "",
-      successMessage: "", redirectUrl: "",
+      successMessage: "", redirectUrl: "", externalUrl: "",
     });
     setDisplayType("thank_you");
     setView("editor");
@@ -5191,6 +5192,7 @@ function SignupsTab() {
       contactPhone: signup.contactPhone || "",
       successMessage: pss.successMessage || "",
       redirectUrl: pss.redirectUrl || "",
+      externalUrl: signup.externalUrl || "",
     });
     setDisplayType(pss.displayType || "thank_you");
     setView("editor");
@@ -5241,8 +5243,8 @@ function SignupsTab() {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
-    if (!form.formId) {
-      toast({ title: "Please select a form", variant: "destructive" });
+    if (!form.formId && !form.externalUrl) {
+      toast({ title: "Please select a form or provide an external form URL", variant: "destructive" });
       return;
     }
     const payload: any = {
@@ -5252,7 +5254,8 @@ function SignupsTab() {
       category: form.category,
       status: form.status,
       visibility: form.visibility,
-      formId: form.formId,
+      formId: form.formId || null,
+      externalUrl: form.externalUrl || null,
       imageUrl: form.imageUrl || null,
       thumbnailUrl: form.thumbnailUrl || null,
       signupStartDate: form.signupStartDate || null,
@@ -5362,7 +5365,21 @@ function SignupsTab() {
               </div>
 
               <div className="space-y-2">
-                <Label>Form *</Label>
+                <Label>External Form URL (Google Forms, etc.)</Label>
+                <Input
+                  value={form.externalUrl}
+                  onChange={(e) => setForm({ ...form, externalUrl: e.target.value })}
+                  placeholder="https://docs.google.com/forms/d/e/..."
+                  data-testid="input-signup-external-url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  If set, clicking "Sign Up" will show this form embedded on the page instead of the built-in form.
+                </p>
+              </div>
+
+              {!form.externalUrl && (
+              <div className="space-y-2">
+                <Label>Form {form.externalUrl ? "" : "*"}</Label>
                 <Select value={form.formId ? String(form.formId) : ""} onValueChange={(v) => setForm({ ...form, formId: parseInt(v) })}>
                   <SelectTrigger data-testid="select-signup-form">
                     <SelectValue placeholder="Select a form" />
@@ -5374,6 +5391,7 @@ function SignupsTab() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
