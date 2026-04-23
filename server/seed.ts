@@ -289,19 +289,14 @@ async function cleanupData() {
       }
     }
 
-    // Ensure Paul & Leslie Aguilar exist
+    // Remove any misspelled "Aguiar" team members (correct spelling is "Aguilar")
     const teamAfterCleanup = await storage.getTeamMembers();
-    const hasAguilar = teamAfterCleanup.some(m => m.name.toLowerCase().includes("aguilar"));
-    if (!hasAguilar) {
-      await storage.createTeamMember({
-        name: "Paul & Leslie Aguilar",
-        role: "Serve Ministry Team Leaders",
-        bio: null,
-        photoUrl: null,
-        isFeatured: false,
-        sortOrder: 7,
-      });
-      log("Added Paul & Leslie Aguilar to team", "seed");
+    for (const m of teamAfterCleanup) {
+      const lower = m.name.toLowerCase();
+      if (lower.includes("aguiar") && !lower.includes("aguilar")) {
+        await storage.deleteTeamMember(m.id);
+        log(`Removed misspelled team member: ${m.name}`, "seed");
+      }
     }
     // Seed or update city groups
     const existingGroups = await storage.getCityGroups();
