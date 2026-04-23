@@ -275,96 +275,7 @@ async function cleanupData() {
       }
     }
 
-    // Ensure current events exist
-    const currentEvents = await storage.getEvents();
-    const eventTitles = new Set(currentEvents.map(e => e.title));
-    const newEvents = [
-      {
-        title: "Club 419",
-        subtitle: "Middle & High School Students",
-        date: "WEDNESDAYS @ 6:30-8:00PM",
-        body: "Weekly on Wednesday's! Students meet from 6:30-8:00PM. See you then!",
-        isUpcoming: true,
-        imageUrl: "/event-images/club-419.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Men's Ministry",
-        subtitle: "All Men Welcome",
-        date: "SATURDAY MARCH 7TH @ 8:30AM",
-        body: "Men's Ministry gathers the 1st Saturday of the month. Breakfast is provided.",
-        isUpcoming: true,
-        imageUrl: "/event-images/mens-ministry.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Women's Ministry",
-        subtitle: "Ladies of All Ages Welcome",
-        date: "SATURDAY MARCH 21ST @ 10:00-11:00AM",
-        body: "Join us for a time of prayer, devotional topic and a light snack! Bring a friend!",
-        isUpcoming: true,
-        imageUrl: "/event-images/womens-ministry.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Serve Ministry",
-        subtitle: "Ongoing Local Impact",
-        date: "ONGOING",
-        body: "Make a local impact! K-4th Grade individually prepackaged snacks needed: Pretzels, Crackers, Veggie Straws, Rice Crispy Treats, Gummy Fruit Snacks, Muffin Minis, Raisins/Chips, Bottled Water (any size). Items must be nut free.\n\nContacts: Paul & Leslie Aguiar\nMrpaulaguiar@gmail.com\nLeslieAgs69@gmail.com",
-        isUpcoming: true,
-        imageUrl: "/event-images/local-impact-snacks.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Club 419 - Sponsor a Meal",
-        subtitle: "Student Ministry Opportunity",
-        date: "SELECT AN AVAILABLE DATE",
-        body: "You're helping create an opportunity for kids to come around the table and create a space for conversation and mentorship! You can easily select an open date and let us know what you're bringing! Select Student Ministry in the drop down tab for more info.",
-        isUpcoming: true,
-        imageUrl: "/event-images/club-419-sponsor.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Good Friday Service",
-        subtitle: "Easter Weekend",
-        date: "FRIDAY APRIL 3RD @ 6:00PM",
-        body: "Message, Worship, Communion & Fellowship",
-        isUpcoming: true,
-        imageUrl: "/event-images/easter-banner.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Egg Hunt Saturday",
-        subtitle: "Easter Weekend",
-        date: "SATURDAY APRIL 4TH @ 1:00PM",
-        body: "Toddlers - Age 12. Hotdogs & drinks provided.",
-        isUpcoming: true,
-        imageUrl: "/event-images/easter-banner.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-      {
-        title: "Easter Sunday",
-        subtitle: "Easter Weekend",
-        date: "SUNDAY APRIL 5TH @ 10:00AM",
-        body: "Worship Service. Join us as we celebrate the resurrection of Jesus Christ!",
-        isUpcoming: true,
-        imageUrl: "/event-images/easter-banner.png",
-        location: "Lake City Christian Church",
-        locationAddress: "6717 Fry Road, Middleburg Heights, OH 44130",
-      },
-    ];
-    for (const evt of newEvents) {
-      if (!eventTitles.has(evt.title)) {
-        await storage.createEvent(evt);
-      }
-    }
+    // Events are managed via admin dashboard — do not auto-recreate deleted events
 
     // Deduplicate sermons
     const sermons = await storage.getSermons();
@@ -566,10 +477,6 @@ async function cleanupData() {
       log("Seeded small groups form entry in form builder", "seed");
     }
 
-    const signups = await storage.getSignupEvents();
-    for (const signup of signups) {
-      await storage.deleteSignupEvent(signup.id);
-    }
     log("Data cleanup completed", "seed");
   } catch (e) {
     log(`Data cleanup error: ${e}`, "seed");
