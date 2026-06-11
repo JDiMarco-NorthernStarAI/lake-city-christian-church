@@ -289,15 +289,6 @@ async function cleanupData() {
       }
     }
 
-    // Remove any misspelled "Aguiar" team members (correct spelling is "Aguilar")
-    const teamAfterCleanup = await storage.getTeamMembers();
-    for (const m of teamAfterCleanup) {
-      const lower = m.name.toLowerCase();
-      if (lower.includes("aguiar") && !lower.includes("aguilar")) {
-        await storage.deleteTeamMember(m.id);
-        log(`Removed misspelled team member: ${m.name}`, "seed");
-      }
-    }
     // Seed or update city groups
     const existingGroups = await storage.getCityGroups();
     // Update existing groups that are missing or have short descriptions
@@ -542,7 +533,7 @@ export async function seedDatabase() {
       { name: "Joey Ekers", role: "Student Ministry Director", sortOrder: 4 },
       { name: "Shanna Littleton", role: "Communications / Ministry Assistant", sortOrder: 5 },
       { name: "Tim & Jen Orlosky", role: "Small Group Coordinators", sortOrder: 6 },
-      { name: "Paul & Leslie Aguilar", role: "Serve Ministry Team Leaders", sortOrder: 7 },
+      { name: "Paul & Leslie Aguiar", role: "Serve Ministry Team Leaders", sortOrder: 7 },
     ];
 
     for (const member of teamData) {
