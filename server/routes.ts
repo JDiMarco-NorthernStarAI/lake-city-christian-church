@@ -1992,10 +1992,18 @@ export async function registerRoutes(
 
   app.patch("/api/signups/:id", requireFeature("signups"), async (req, res) => {
     try {
-      const event = await storage.updateSignupEvent(Number(req.params.id), req.body);
+      const body = { ...req.body };
+      // Coerce date strings to Date objects (matches the create route) so the
+      // DB doesn't reject string values for timestamp columns.
+      for (const key of ["signupStartDate", "signupEndDate", "eventDate", "eventEndDate"]) {
+        if (body[key] && typeof body[key] === "string") body[key] = new Date(body[key]);
+        if (body[key] === null || body[key] === "") delete body[key];
+      }
+      const event = await storage.updateSignupEvent(Number(req.params.id), body);
       if (!event) return res.status(404).json({ message: "Signup event not found" });
       res.json(event);
     } catch (err) {
+      console.error("Update signup event error:", err);
       res.status(500).json({ message: "Error updating signup event" });
     }
   });
