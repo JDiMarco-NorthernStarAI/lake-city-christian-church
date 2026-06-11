@@ -1,5 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getAccessToken } from "@/lib/v1Api";
+import { getAccessToken, tryRefresh } from "@/lib/v1Api";
 
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -28,12 +28,26 @@ export async function apiRequest(
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  const res = await fetch(url, {
+  const body = data ? JSON.stringify(data) : undefined;
+  let res = await fetch(url, {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body,
     credentials: "include",
   });
+
+  // Access token may have expired (15m lifetime). Refresh once and retry.
+  if (res.status === 401 && getAccessToken()) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await fetch(url, {
+        method,
+        headers: { ...headers, ...getAuthHeaders() },
+        body,
+        credentials: "include",
+      });
+    }
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -45,10 +59,22 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    let res = await fetch(url, {
       credentials: "include",
       headers: getAuthHeaders(),
     });
+
+    // Access token may have expired (15m lifetime). Refresh once and retry.
+    if (res.status === 401 && getAccessToken()) {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        res = await fetch(url, {
+          credentials: "include",
+          headers: getAuthHeaders(),
+        });
+      }
+    }
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
