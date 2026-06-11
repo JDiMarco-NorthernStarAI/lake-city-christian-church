@@ -367,7 +367,19 @@ export const donations = pgTable("donations", {
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertSermonSchema = createInsertSchema(sermons).omit({ id: true });
-export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, updatedAt: true });
+// Client sends timestamps as ISO strings (and blank fields as ""); coerce to
+// Date, treating empty/null as no value.
+const optionalDate = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? null : v),
+  z.coerce.date().nullable(),
+).optional();
+
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  eventDate: optionalDate,
+  endDate: optionalDate,
+  signupDeadline: optionalDate,
+  deletedAt: optionalDate,
+});
 export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({ id: true });
 export const insertContactSchema = createInsertSchema(contactSubmissions).omit({ id: true, createdAt: true });
 export const insertConnectCardSchema = createInsertSchema(connectCards).omit({ id: true, createdAt: true });
