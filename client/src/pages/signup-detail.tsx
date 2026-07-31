@@ -231,8 +231,17 @@ export default function SignupDetail() {
     submitMutation.mutate({ formData: formValues, guestCount });
   }
 
+  function getOptionLabels(field: FormField): string[] {
+    if (!Array.isArray(field.options)) return [];
+    return (field.options as any[]).map((o: any) => {
+      if (typeof o === "string") return o;
+      if (o && typeof o === "object" && o.label) return o.label;
+      return String(o);
+    });
+  }
+
   function renderField(field: FormField) {
-    const options: string[] = Array.isArray(field.options) ? field.options : [];
+    const options: string[] = getOptionLabels(field);
 
     switch (field.fieldType) {
       case "text":
