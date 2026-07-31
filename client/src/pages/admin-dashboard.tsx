@@ -45,6 +45,16 @@ function getImageSrc(path: string | null | undefined) {
   return `/objects${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+// datetime-local inputs expect wall-clock time in the browser's timezone;
+// slicing toISOString() directly would show UTC and shift the saved time on
+// every edit round-trip.
+function toDatetimeLocal(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
 type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "media" | "pages" | "settings" | "users" | "roles" | "submissions" | "small_groups";
 
 const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
@@ -1062,7 +1072,7 @@ function EventsTab() {
 
   function openEdit(event: Event) {
     setEditing(event);
-    setForm({ title: event.title, subtitle: event.subtitle || "", date: event.date, body: event.body, imageUrl: event.imageUrl || "", isUpcoming: event.isUpcoming, eventDate: event.eventDate ? new Date(event.eventDate).toISOString().slice(0, 16) : "", pinned: (event as any).pinned || "" });
+    setForm({ title: event.title, subtitle: event.subtitle || "", date: event.date, body: event.body, imageUrl: event.imageUrl || "", isUpcoming: event.isUpcoming, eventDate: toDatetimeLocal(event.eventDate), pinned: (event as any).pinned || "" });
     setDialogOpen(true);
   }
 
@@ -5193,10 +5203,10 @@ function SignupsTab() {
       formId: signup.formId,
       imageUrl: signup.imageUrl || "",
       thumbnailUrl: signup.thumbnailUrl || "",
-      signupStartDate: signup.signupStartDate ? new Date(signup.signupStartDate).toISOString().slice(0, 16) : "",
-      signupEndDate: signup.signupEndDate ? new Date(signup.signupEndDate).toISOString().slice(0, 16) : "",
-      eventDate: signup.eventDate ? new Date(signup.eventDate).toISOString().slice(0, 16) : "",
-      eventEndDate: signup.eventEndDate ? new Date(signup.eventEndDate).toISOString().slice(0, 16) : "",
+      signupStartDate: toDatetimeLocal(signup.signupStartDate),
+      signupEndDate: toDatetimeLocal(signup.signupEndDate),
+      eventDate: toDatetimeLocal(signup.eventDate),
+      eventEndDate: toDatetimeLocal(signup.eventEndDate),
       location: signup.location || "",
       cost: signup.cost || "",
       maxSignups: signup.maxSignups != null ? String(signup.maxSignups) : "",

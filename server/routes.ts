@@ -1994,10 +1994,11 @@ export async function registerRoutes(
     try {
       const body = { ...req.body };
       // Coerce date strings to Date objects (matches the create route) so the
-      // DB doesn't reject string values for timestamp columns.
+      // DB doesn't reject string values for timestamp columns. Unlike create,
+      // null/empty must pass through as null so an existing date can be cleared.
       for (const key of ["signupStartDate", "signupEndDate", "eventDate", "eventEndDate"]) {
         if (body[key] && typeof body[key] === "string") body[key] = new Date(body[key]);
-        if (body[key] === null || body[key] === "") delete body[key];
+        else if (body[key] === "") body[key] = null;
       }
       const event = await storage.updateSignupEvent(Number(req.params.id), body);
       if (!event) return res.status(404).json({ message: "Signup event not found" });
