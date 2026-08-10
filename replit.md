@@ -46,7 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **Form Builder Tables**: forms (configurable forms with slug, status, settings), form_fields (fields with type, order, options), form_submissions (submitted data as JSONB)
 - **Donation Tables**: donation_funds (named giving categories with slug/active status), donations (amount in cents, frequency, Stripe session/payment/subscription IDs, status tracking)
 - **Push Notification Tables**: push_subscriptions (endpoint, VAPID keys, user/device tracking), notification_logs (title, body, type, delivery stats)
-- **Sign Ups Tables**: signup_events (event registration with form linkage, capacity, waitlist, categories, post-submission display settings), signup_submissions (user registrations with status, check-in tracking, waitlist position)
+- **Sign Ups Tables**: signup_events (event registration with form linkage, capacity, waitlist, categories, post-submission display settings, external_url for embedded Google Forms, settings JSONB for QR logo), signup_submissions (user registrations with status, check-in tracking, waitlist position)
 
 ### Storage Layer
 - `server/storage.ts` defines an `IStorage` interface with a database-backed implementation using Drizzle
@@ -54,6 +54,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Seed Data
 - `server/seed.ts` creates a default admin user (username: "admin", password: "lakecity2024") and populates initial team members, sermons, and other content on first run
+- **IMPORTANT**: The `cleanupData()` function in seed.ts runs on every server startup. It must NOT recreate admin-managed content (events, signups, team members) because doing so means deleted items come back on every deploy. Keep cleanupData() limited to: (1) one-time cleanups that remove bad/misspelled historical data, (2) deduplication by exact name, (3) ensuring admin login accounts have correct roles/passwords. Do NOT add "ensure X exists" blocks that recreate deleted content.
 
 ### Project Structure
 ```
@@ -132,3 +133,19 @@ migrations/           # Drizzle migration output directory
 - `zod` + `drizzle-zod` — Schema validation
 - `react-hook-form` — Form state management
 - Shadcn/ui ecosystem (Radix UI primitives, class-variance-authority, tailwind-merge, clsx)
+- `qrcode.react` — QR code generation with logo overlay support (used in admin signup editor)
+
+### Deployment
+- **Hosting**: AWS ECS (Elastic Container Service) on cluster `upstream-therapeutics`, service `lc3-service`
+- **Container Registry**: AWS ECR, repository `lc3`
+- **CI/CD**: GitHub Actions (`deploy.yml`) — auto-deploys on push to `main`. Builds Docker image, pushes to ECR, updates ECS task definition.
+- **Database**: AWS RDS PostgreSQL (`lc3-database` in us-east-2)
+- **Startup Script**: `scripts/start.sh` — runs `drizzle-kit push --force` and explicit ALTER TABLE migrations before starting the server. New schema changes should include an explicit migration in this script for reliability.
+- **Domain**: https://www.lakecitycc.com
+
+### Sign Ups with External Forms
+- Sign up events can optionally have an `external_url` field (e.g., Google Form URL)
+- When set, `form_id` is not required — the built-in form selector is hidden in the admin
+- On the public sign up detail page, external URL signups show an embedded iframe instead of the built-in form
+- The admin editor includes a QR Code Generator with optional center logo (persisted in `settings.qrLogoUrl`)
+- Images on sign up cards/detail pages use `getImageSrc()` helper to resolve `/objects/` prefix paths

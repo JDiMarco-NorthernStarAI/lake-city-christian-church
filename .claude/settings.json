@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(MSYS_NO_PATHCONV=1 aws ecs describe-task-definition --task-definition lc3 --query 'taskDefinition.{taskRole:taskRoleArn,executionRole:executionRoleArn}')",
+      "Bash(MSYS_NO_PATHCONV=1 aws ecs describe-task-definition --task-definition lc3 --query 'taskDefinition.containerDefinitions[0].environment[].name' --output text)",
+      "Bash(MSYS_NO_PATHCONV=1 aws iam put-role-policy --role-name lc3-ecs-task-role --policy-name S3Access --policy-document '{\"\"Version\"\":\"\"2012-10-17\"\",\"\"Statement\"\":[{\"\"Effect\"\":\"\"Allow\"\",\"\"Action\"\":[\"\"s3:GetObject\"\",\"\"s3:PutObject\"\",\"\"s3:HeadObject\"\",\"\"s3:DeleteObject\"\"],\"\"Resource\"\":\"\"arn:aws:s3:::lc3-storage/*\"\"}]}')",
+      "Bash(MSYS_NO_PATHCONV=1 aws s3api get-bucket-policy --bucket lc3-storage --query Policy --output text)"
+    ]
+  }
+}
