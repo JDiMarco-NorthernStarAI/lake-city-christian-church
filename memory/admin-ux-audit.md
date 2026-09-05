@@ -30,7 +30,7 @@ Triggered by Shanna Littleton (Director of Communications) getting stuck creatin
 
 ### Plan (see artifact for detail)
 1. ✅ DONE (commit f4d54b7, 2026-09-05): fund/record-donation UI wired (+new Funds view), Settings clear bug, SMS group edit, capacity enforced on signup-event path + pg advisory locks (keyspace 1=form, 2=signup event), optionUsage on signup detail page, ConfirmDelete component (client/src/components/confirm-delete.tsx) on all deletes, friendly error parsing in queryClient, unsaved-guard (client/src/lib/unsaved-guard.ts) for sign-up editor/settings/page content/roles, mobile drawer auto-close (AdminSidebarNav w/ useSidebar), dialog max-h-[90dvh], media rail responsive, form editor stays after create (onCreated prop), empty states.
-2. Sign-up wizard with inline form building + grouped sidebar + "what's still needed" panel
+2. ✅ DONE (commit 8053ac0, 2026-09-05): SignupsTab is a 3-step wizard (Details → Questions & Items → Publish & Share); step 1 auto-creates the signup's form (slug `<slug>-form`, published) and saves a draft; FormFieldsEditor extracted (shared by FormEditor + wizard); sidebar grouped via NAV_GROUPS (People & Sign-Ups / Content / Communication / Church), Submissions renamed "Responses" and consolidated (signup rosters + standalone forms); SubmissionsView roster shows answer columns + "What's Still Needed" item panel with print; plain-language status/visibility/display labels; server enforces visibility (members_only login, unlisted excluded from list) and closed = viewable-but-rejecting.
 3. Shanna's toolkit: per-claim quantities, confirmation emails, per-fund reports, PC funds
 4. Ministry-scoped roles, dashboard quick actions, messages reply, search, SMS UX
 
