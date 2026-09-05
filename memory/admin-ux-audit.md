@@ -36,7 +36,9 @@ Triggered by Shanna Littleton (Director of Communications) getting stuck creatin
 
 NOT done (future work): merging the parallel events/event_signups vs signup_events systems; routing Team/User photos through Media Library; CAPTCHA (Turnstile) if honeypot doesn't stop spam; pagination on long lists; URL routing per admin section.
 
-Spam context (2026-09-05): bots had flooded Connect Cards and user registrations with gibberish entries. Jason cleans up via new bulk-delete UI (real users are mixed in — never auto-delete by heuristic). If spam persists past the honeypot, next step is a CAPTCHA (e.g. Cloudflare Turnstile).
+Spam context (2026-09-05): bots had flooded Connect Cards and user registrations with gibberish entries. Jason cleaned Users manually; Connect Cards via Select Likely Spam. Hardening (commit a31b1ca): heuristics live in shared/spam-heuristics.ts (used by client selector AND server; tuned so zero-vowel words flag but "Smith" (1/5 vowels) doesn't — tested against real samples); server silently drops spam-content connect cards and rejects spam-pattern registrations; ALL public forms stamp formStartedAt and guarded endpoints use requireTimestamp (missing → 400 "refresh the page", never silent-drop, protects stale tabs). If spam persists, next step is Cloudflare Turnstile.
+
+Shanna comms: draft reply created in Jason's Gmail (thread "Lake City form question", 2026-09-05) — plain-language guide to the new sign-up wizard, items/limits, emails, printing, payment links, QR codes, Responses. Jason to review/send and set her up with a scoped login.
 
 Note: repo has ~164 PRE-EXISTING tsc errors (jwt, web-push types, pcoData stats typing, Stripe Invoice.subscription). Build (vite/esbuild) ignores them. Compare against baseline before blaming new code.
 
