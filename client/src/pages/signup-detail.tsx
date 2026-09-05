@@ -40,6 +40,16 @@ function FadeInSection({ children, className = "", delay = 0 }: { children: Reac
   );
 }
 
+interface OptionUsageInfo {
+  capacity?: number;
+  used: number;
+  remaining?: number;
+}
+
+interface SignupFormField extends FormField {
+  optionUsage?: Record<string, OptionUsageInfo>;
+}
+
 interface SignupDetailData {
   event: SignupEvent;
   form: {
@@ -50,7 +60,7 @@ interface SignupDetailData {
     submitButtonText: string | null;
     successMessage: string | null;
   } | null;
-  fields: FormField[];
+  fields: SignupFormField[];
 }
 
 interface SubmitResponse {
@@ -240,7 +250,21 @@ export default function SignupDetail() {
     });
   }
 
-  function renderField(field: FormField) {
+  function isOptionFull(field: SignupFormField, optLabel: string): boolean {
+    if (!field.optionUsage) return false;
+    const info = field.optionUsage[optLabel];
+    return !!(info && info.capacity && info.remaining !== undefined && info.remaining <= 0);
+  }
+
+  function getOptionSuffix(field: SignupFormField, optLabel: string): string {
+    if (!field.optionUsage) return "";
+    const info = field.optionUsage[optLabel];
+    if (!info || !info.capacity) return "";
+    if (info.remaining !== undefined && info.remaining <= 0) return " (Full)";
+    return ` (${info.remaining} spot${info.remaining === 1 ? "" : "s"} left)`;
+  }
+
+  function renderField(field: SignupFormField) {
     const options: string[] = getOptionLabels(field);
 
     switch (field.fieldType) {
@@ -333,7 +357,9 @@ export default function SignupDetail() {
             </SelectTrigger>
             <SelectContent>
               {options.map((opt) => (
-                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                <SelectItem key={opt} value={opt} disabled={isOptionFull(field, opt)}>
+                  {opt}{getOptionSuffix(field, opt)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -341,19 +367,23 @@ export default function SignupDetail() {
       case "radio":
         return (
           <div className="space-y-2" data-testid={`radio-field-${field.id}`}>
-            {options.map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name={`field-${field.id}`}
-                  value={opt}
-                  checked={formValues[field.id] === opt}
-                  onChange={() => handleFieldChange(field.id, opt)}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-white/70">{opt}</span>
-              </label>
-            ))}
+            {options.map((opt) => {
+              const full = isOptionFull(field, opt);
+              return (
+                <label key={opt} className={`flex items-center gap-3 ${full ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                  <input
+                    type="radio"
+                    name={`field-${field.id}`}
+                    value={opt}
+                    checked={formValues[field.id] === opt}
+                    onChange={() => handleFieldChange(field.id, opt)}
+                    disabled={full}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-white/70">{opt}{getOptionSuffix(field, opt)}</span>
+                </label>
+              );
+            })}
           </div>
         );
       case "checkbox":
@@ -369,15 +399,20 @@ export default function SignupDetail() {
       case "checkbox_group":
         return (
           <div className="space-y-2" data-testid={`checkbox-group-field-${field.id}`}>
-            {options.map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer">
-                <Checkbox
-                  checked={((formValues[field.id] as string[]) || []).includes(opt)}
-                  onCheckedChange={(checked) => handleCheckboxGroupChange(field.id, opt, checked === true)}
-                />
-                <span className="text-sm text-white/70">{opt}</span>
-              </label>
-            ))}
+            {options.map((opt) => {
+              const full = isOptionFull(field, opt);
+              const checked = ((formValues[field.id] as string[]) || []).includes(opt);
+              return (
+                <label key={opt} className={`flex items-center gap-3 ${full && !checked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                  <Checkbox
+                    checked={checked}
+                    disabled={full && !checked}
+                    onCheckedChange={(c) => handleCheckboxGroupChange(field.id, opt, c === true)}
+                  />
+                  <span className="text-sm text-white/70">{opt}{getOptionSuffix(field, opt)}</span>
+                </label>
+              );
+            })}
           </div>
         );
       default:

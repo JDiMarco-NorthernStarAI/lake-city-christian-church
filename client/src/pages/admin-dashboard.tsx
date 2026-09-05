@@ -34,6 +34,13 @@ import wordsLogoPath from "@assets/Lake_City_Words_Logo_No_Background_1771426068
 import AdminSmsTab from "@/pages/admin-sms";
 import AdminMediaTab from "@/pages/admin-media";
 import ImagePickerModal from "@/components/image-picker-modal";
+import ConfirmDelete from "@/components/confirm-delete";
+import { getUnsaved, setUnsaved } from "@/lib/unsaved-guard";
+import { useSidebar } from "@/components/ui/sidebar";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MessageSquare, Inbox, ImageIcon, QrCode } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 
@@ -84,6 +91,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const { logout: authLogout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [pendingTab, setPendingTab] = useState<Tab | null>(null);
 
   const { data: user, isLoading: authLoading, error: authError } = useQuery<{
     id: number;
@@ -147,30 +155,48 @@ export default function AdminDashboard() {
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarMenu>
-                  {navItems.map((item) => (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        isActive={activeTab === item.id}
-                        onClick={() => setActiveTab(item.id)}
-                        data-testid={`nav-${item.id}`}
-                      >
-                        <item.icon className="w-4 h-4" />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton onClick={handleLogout} data-testid="nav-logout">
-                      <LogOut className="w-4 h-4" />
-                      <span>Logout</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
+                <AdminSidebarNav
+                  navItems={navItems}
+                  activeTab={activeTab}
+                  onNavigate={(tab) => {
+                    if (getUnsaved() && tab !== activeTab) {
+                      setPendingTab(tab);
+                      return;
+                    }
+                    setActiveTab(tab);
+                  }}
+                  onLogout={handleLogout}
+                />
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
         </Sidebar>
+
+        <AlertDialog open={pendingTab !== null} onOpenChange={(v) => { if (!v) setPendingTab(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes{getUnsaved() ? ` in the ${getUnsaved()}` : ""}. If you leave now, they will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Stay</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (pendingTab) {
+                    setUnsaved(null);
+                    setActiveTab(pendingTab);
+                  }
+                  setPendingTab(null);
+                }}
+              >
+                Leave anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="flex-1 overflow-auto flex flex-col">
           <header className="flex items-center gap-2 p-3 border-b md:hidden sticky top-0 z-50 bg-background">
@@ -203,6 +229,46 @@ export default function AdminDashboard() {
         </div>
       </div>
     </SidebarProvider>
+  );
+}
+
+function AdminSidebarNav({
+  navItems,
+  activeTab,
+  onNavigate,
+  onLogout,
+}: {
+  navItems: typeof allNavItems;
+  activeTab: Tab;
+  onNavigate: (tab: Tab) => void;
+  onLogout: () => void;
+}) {
+  // Close the mobile drawer after picking a section so the page is visible
+  const { setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenu>
+      {navItems.map((item) => (
+        <SidebarMenuItem key={item.id}>
+          <SidebarMenuButton
+            isActive={activeTab === item.id}
+            onClick={() => {
+              onNavigate(item.id as Tab);
+              setOpenMobile(false);
+            }}
+            data-testid={`nav-${item.id}`}
+          >
+            <item.icon className="w-4 h-4" />
+            <span>{item.label}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+      <SidebarMenuItem>
+        <SidebarMenuButton onClick={onLogout} data-testid="nav-logout">
+          <LogOut className="w-4 h-4" />
+          <span>Logout</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
@@ -953,6 +1019,15 @@ function SermonsTab() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : !sermons?.length ? (
+        <Card>
+          <CardContent className="py-12 text-center space-y-3">
+            <p className="text-muted-foreground">No sermons yet.</p>
+            <Button onClick={openAdd}>
+              <Plus className="w-4 h-4 mr-2" /> Add Sermon
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <Table data-testid="table-sermons">
           <TableHeader>
@@ -974,9 +1049,15 @@ function SermonsTab() {
                     <Button size="icon" variant="ghost" onClick={() => openEdit(sermon)} data-testid={`button-edit-sermon-${sermon.id}`}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(sermon.id)} data-testid={`button-delete-sermon-${sermon.id}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <ConfirmDelete
+                      title={`Delete "${sermon.title}"?`}
+                      description="This removes the sermon from the website. This cannot be undone."
+                      onConfirm={() => deleteMutation.mutate(sermon.id)}
+                    >
+                      <Button size="icon" variant="ghost" aria-label="Delete sermon" data-testid={`button-delete-sermon-${sermon.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ConfirmDelete>
                   </div>
                 </TableCell>
               </TableRow>
@@ -1108,6 +1189,15 @@ function EventsTab() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : !events?.length ? (
+        <Card>
+          <CardContent className="py-12 text-center space-y-3">
+            <p className="text-muted-foreground">No events yet.</p>
+            <Button onClick={openAdd}>
+              <Plus className="w-4 h-4 mr-2" /> Add Event
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <Table data-testid="table-events">
           <TableHeader>
@@ -1173,9 +1263,15 @@ function EventsTab() {
                     <Button size="icon" variant="ghost" onClick={() => openEdit(event)} data-testid={`button-edit-event-${event.id}`}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(event.id)} data-testid={`button-delete-event-${event.id}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <ConfirmDelete
+                      title={`Delete "${event.title}"?`}
+                      description="This removes the event from the website, including any signups attached to it. This cannot be undone."
+                      onConfirm={() => deleteMutation.mutate(event.id)}
+                    >
+                      <Button size="icon" variant="ghost" aria-label="Delete event" data-testid={`button-delete-event-${event.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ConfirmDelete>
                   </div>
                 </TableCell>
               </TableRow>
@@ -1388,6 +1484,15 @@ function TeamTab() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : !team?.length ? (
+        <Card>
+          <CardContent className="py-12 text-center space-y-3">
+            <p className="text-muted-foreground">No team members yet.</p>
+            <Button onClick={openAdd}>
+              <Plus className="w-4 h-4 mr-2" /> Add Team Member
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {team?.map((member) => (
@@ -1410,9 +1515,16 @@ function TeamTab() {
                   <Button size="icon" variant="ghost" onClick={() => openEdit(member)} data-testid={`button-edit-team-${member.id}`}>
                     <Pencil className="w-4 h-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(member.id)} data-testid={`button-delete-team-${member.id}`}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <ConfirmDelete
+                    title={`Remove ${member.name}?`}
+                    description="This removes them from the team page on the website. This cannot be undone."
+                    confirmLabel="Remove"
+                    onConfirm={() => deleteMutation.mutate(member.id)}
+                  >
+                    <Button size="icon" variant="ghost" aria-label="Remove team member" data-testid={`button-delete-team-${member.id}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </ConfirmDelete>
                 </div>
               </CardHeader>
               {member.bio && (
@@ -1598,9 +1710,15 @@ function ConnectCardsTab() {
                       <Button size="icon" variant="ghost" onClick={() => { setForwardCardId(card.id); setForwardOpen(true); }} data-testid={`button-forward-connect-${card.id}`}>
                         <Send className="w-4 h-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this connect card?")) deleteMutation.mutate(card.id); }} data-testid={`button-delete-connect-${card.id}`}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <ConfirmDelete
+                        title="Delete this connect card?"
+                        description={`This permanently deletes the card from ${card.firstName} ${card.lastName}, including any prayer request. This cannot be undone.`}
+                        onConfirm={() => deleteMutation.mutate(card.id)}
+                      >
+                        <Button size="icon" variant="ghost" aria-label="Delete connect card" data-testid={`button-delete-connect-${card.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </ConfirmDelete>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1658,10 +1776,16 @@ function ConnectCardsTab() {
                   <Send className="w-4 h-4 mr-2" />
                   Forward
                 </Button>
-                <Button variant="destructive" onClick={() => { if (confirm("Delete this connect card?")) { deleteMutation.mutate(selectedCard.id); } }} data-testid="button-delete-from-detail">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </Button>
+                <ConfirmDelete
+                  title="Delete this connect card?"
+                  description="This permanently deletes the card, including any prayer request. This cannot be undone."
+                  onConfirm={() => deleteMutation.mutate(selectedCard.id)}
+                >
+                  <Button variant="destructive" data-testid="button-delete-from-detail">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                </ConfirmDelete>
               </div>
             </div>
           )}
@@ -1924,6 +2048,7 @@ const pageConfigs: PageConfig[] = [
 
 function PagesTab() {
   const [selectedPage, setSelectedPage] = useState(pageConfigs[0].id);
+  const [pendingPage, setPendingPage] = useState<string | null>(null);
   const { toast } = useToast();
 
   const config = pageConfigs.find((p) => p.id === selectedPage)!;
@@ -1961,6 +2086,7 @@ function PagesTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/content", selectedPage] });
+      setUnsaved(null);
       toast({ title: "Saved", description: `${config.label} content updated.` });
     },
     onError: () => {
@@ -1970,6 +2096,14 @@ function PagesTab() {
 
   function handleSave() {
     saveMutation.mutate(values);
+  }
+
+  function switchPage(pageId: string) {
+    if (getUnsaved() && pageId !== selectedPage) {
+      setPendingPage(pageId);
+      return;
+    }
+    setSelectedPage(pageId);
   }
 
   return (
@@ -1983,7 +2117,7 @@ function PagesTab() {
             {pageConfigs.map((page) => (
               <button
                 key={page.id}
-                onClick={() => setSelectedPage(page.id)}
+                onClick={() => switchPage(page.id)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between gap-2 transition-colors ${
                   selectedPage === page.id
                     ? "bg-primary text-primary-foreground"
@@ -2022,16 +2156,15 @@ function PagesTab() {
                       {field.type === "textarea" ? (
                         <Textarea
                           value={values[field.key] || ""}
-                          onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                          onChange={(e) => { setValues({ ...values, [field.key]: e.target.value }); setUnsaved("page editor"); }}
                           placeholder={field.placeholder || ""}
-                          rows={3}
-                          className="resize-none"
+                          rows={4}
                           data-testid={`input-content-${field.key}`}
                         />
                       ) : (
                         <Input
                           value={values[field.key] || ""}
-                          onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                          onChange={(e) => { setValues({ ...values, [field.key]: e.target.value }); setUnsaved("page editor"); }}
                           placeholder={field.placeholder || ""}
                           data-testid={`input-content-${field.key}`}
                         />
@@ -2044,6 +2177,32 @@ function PagesTab() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={pendingPage !== null} onOpenChange={(v) => { if (!v) setPendingPage(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes on this page. If you switch pages now, they will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingPage) {
+                  setUnsaved(null);
+                  setSelectedPage(pendingPage);
+                }
+                setPendingPage(null);
+              }}
+            >
+              Leave anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -2066,27 +2225,22 @@ function SettingsTab() {
     }
   }, [settings, initialized]);
 
-  const saveMutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      await apiRequest("PUT", `/api/settings/${key}`, { value });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
+  const [saving, setSaving] = useState(false);
 
   async function handleSave() {
+    setSaving(true);
     try {
+      // Save every key, including blanks, so clearing a field actually clears it
       for (const key of settingKeys) {
-        if (values[key]) {
-          await apiRequest("PUT", `/api/settings/${key}`, { value: values[key] });
-        }
+        await apiRequest("PUT", `/api/settings/${key}`, { value: values[key] ?? "" });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      setUnsaved(null);
       toast({ title: "Settings saved" });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -2113,13 +2267,13 @@ function SettingsTab() {
               <Label>{labelMap[key] || key}</Label>
               <Input
                 value={values[key] || ""}
-                onChange={(e) => setValues({ ...values, [key]: e.target.value })}
+                onChange={(e) => { setValues({ ...values, [key]: e.target.value }); setUnsaved("settings"); }}
                 data-testid={`input-setting-${key}`}
               />
             </div>
           ))}
-          <Button onClick={handleSave} data-testid="button-save-settings">
-            Save Settings
+          <Button onClick={handleSave} disabled={saving} data-testid="button-save-settings">
+            {saving ? "Saving..." : "Save Settings"}
           </Button>
         </div>
       )}
@@ -2503,9 +2657,15 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                       <UsersRound className="w-4 h-4" />
                     </Button>
                     {u.id !== currentUser.id && (
-                      <Button size="icon" variant="ghost" onClick={() => { if (confirm("Delete this user?")) deleteMutation.mutate(u.id); }} data-testid={`button-delete-user-${u.id}`}>
+                      <ConfirmDelete
+                        title={`Delete ${u.username || "this user"}'s account?`}
+                        description="They will no longer be able to log in, and their profile is permanently removed. This cannot be undone."
+                        onConfirm={() => deleteMutation.mutate(u.id)}
+                      >
+                      <Button size="icon" variant="ghost" aria-label="Delete user" data-testid={`button-delete-user-${u.id}`}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
+                      </ConfirmDelete>
                     )}
                   </div>
                 </TableCell>
@@ -2856,12 +3016,14 @@ function RolesTab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/role-permissions"] });
+      setUnsaved(null);
       toast({ title: "Permissions saved" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   function togglePerm(role: string, feature: string) {
+    setUnsaved("role permissions");
     setLocalPerms((prev) => ({
       ...prev,
       [role]: {
@@ -2999,7 +3161,7 @@ function FormsTab() {
   }
 
   if (view === "editor") {
-    return <FormEditor formId={editingFormId} onBack={goToList} />;
+    return <FormEditor formId={editingFormId} onBack={goToList} onCreated={(id) => setEditingFormId(id)} />;
   }
 
   if (view === "submissions" && viewingSubmissionsFormId) {
@@ -3119,9 +3281,15 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
                     <Button size="icon" variant="ghost" onClick={() => duplicateMutation.mutate(form.id)} disabled={duplicateMutation.isPending} data-testid={`button-duplicate-form-${form.id}`}>
                       <Copy className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(form.id)} data-testid={`button-delete-form-${form.id}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <ConfirmDelete
+                      title={`Delete "${form.title}"?`}
+                      description={`This deletes the form, all of its questions, and all ${form.submissionCount ?? 0} submission${(form.submissionCount ?? 0) === 1 ? "" : "s"} people have made. This cannot be undone.`}
+                      onConfirm={() => deleteMutation.mutate(form.id)}
+                    >
+                      <Button size="icon" variant="ghost" aria-label="Delete form" data-testid={`button-delete-form-${form.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ConfirmDelete>
                   </div>
                 </TableCell>
               </TableRow>
@@ -3134,7 +3302,7 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
   );
 }
 
-function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => void }) {
+function FormEditor({ formId, onBack, onCreated }: { formId: number | null; onBack: () => void; onCreated?: (id: number) => void }) {
   const { toast } = useToast();
   const isNew = formId === null;
   const [formData, setFormData] = useState({
@@ -3200,8 +3368,13 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
     },
     onSuccess: (newForm: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
-      toast({ title: "Form created" });
-      onBack();
+      toast({ title: "Form created", description: "Now add the questions people will answer." });
+      // Stay in the editor on the new form so fields can be added right away
+      if (newForm?.id && onCreated) {
+        onCreated(newForm.id);
+      } else {
+        onBack();
+      }
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -3373,7 +3546,16 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
           <CardHeader>
             <CardTitle>Form Settings</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
+            {/* A real <form> so required/pattern validation runs in the browser
+                instead of surfacing as server errors */}
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveForm();
+              }}
+            >
             <div className="space-y-2">
               <Label>Title</Label>
               <Input
@@ -3392,13 +3574,18 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
               />
             </div>
             <div className="space-y-2">
-              <Label>URL Slug</Label>
+              <Label>Web Address</Label>
               <Input
                 value={formData.slug}
                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                 required
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                title="Lowercase letters, numbers, and hyphens only (e.g. fall-tailgate)"
                 data-testid="input-form-slug"
               />
+              <p className="text-xs text-muted-foreground">
+                The form will live at lakecitycc.com/forms/<strong>{formData.slug || "your-form-name"}</strong> — filled in automatically from the title.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
@@ -3455,13 +3642,14 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
               <Label>Allow multiple submissions</Label>
             </div>
             <Button
-              onClick={handleSaveForm}
+              type="submit"
               className="w-full"
               disabled={createFormMutation.isPending || updateFormMutation.isPending}
               data-testid="button-save-form"
             >
               <Save className="w-4 h-4 mr-2" /> {isNew ? "Create Form" : "Save Changes"}
             </Button>
+            </form>
           </CardContent>
         </Card>
 
@@ -3518,9 +3706,15 @@ function FormEditor({ formId, onBack }: { formId: number | null; onBack: () => v
                         <Button size="icon" variant="ghost" onClick={() => openEditField(field)} data-testid={`button-edit-field-${field.id}`}>
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => deleteFieldMutation.mutate(field.id)} data-testid={`button-delete-field-${field.id}`}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <ConfirmDelete
+                          title={`Delete the "${field.label}" question?`}
+                          description="Answers people already gave for this question will no longer be shown with their submissions. This cannot be undone."
+                          onConfirm={() => deleteFieldMutation.mutate(field.id)}
+                        >
+                          <Button size="icon" variant="ghost" aria-label="Delete question" data-testid={`button-delete-field-${field.id}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </ConfirmDelete>
                       </div>
                     </div>
                   ))}
@@ -3796,14 +3990,15 @@ function SubmissionsTab() {
                         {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : ""}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => deleteSubmissionMutation.mutate(sub.id)}
-                          data-testid={`button-delete-submission-${sub.id}`}
+                        <ConfirmDelete
+                          title="Delete this submission?"
+                          description="This permanently deletes this person's response. This cannot be undone."
+                          onConfirm={() => deleteSubmissionMutation.mutate(sub.id)}
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                          <Button size="icon" variant="ghost" aria-label="Delete submission" data-testid={`button-delete-submission-${sub.id}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </ConfirmDelete>
                       </TableCell>
                     </TableRow>
                   );
@@ -3895,14 +4090,15 @@ function FormSubmissionsView({ formId, onBack }: { formId: number; onBack: () =>
                       {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : ""}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => deleteSubmissionMutation.mutate(sub.id)}
-                        data-testid={`button-delete-submission-${sub.id}`}
+                      <ConfirmDelete
+                        title="Delete this submission?"
+                        description="This permanently deletes this person's response. This cannot be undone."
+                        onConfirm={() => deleteSubmissionMutation.mutate(sub.id)}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <Button size="icon" variant="ghost" aria-label="Delete submission" data-testid={`button-delete-submission-${sub.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </ConfirmDelete>
                     </TableCell>
                   </TableRow>
                 );
@@ -4101,7 +4297,7 @@ function NotificationsTab() {
 
 function DonationsTab() {
   const { toast } = useToast();
-  const [view, setView] = useState<"overview" | "history" | "reports">("overview");
+  const [view, setView] = useState<"overview" | "history" | "reports" | "funds">("overview");
   const [fundFilter, setFundFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [donorSearch, setDonorSearch] = useState("");
@@ -4113,20 +4309,6 @@ function DonationsTab() {
   const [editingFund, setEditingFund] = useState<DonationFund | null>(null);
   const [fundForm, setFundForm] = useState({ name: "", slug: "", description: "", isActive: true });
   const [manualForm, setManualForm] = useState({ donorName: "", donorEmail: "", amountDollars: "", fundId: "", paymentMethod: "cash", notes: "", donationDate: new Date().toISOString().split("T")[0] });
-
-  const [reportStartDate, setReportStartDate] = useState("");
-  const [reportEndDate, setReportEndDate] = useState("");
-  const [reportDonorEmail, setReportDonorEmail] = useState("");
-  const [reportFundId, setReportFundId] = useState("");
-
-  function buildReportQueryKey() {
-    const params = new URLSearchParams();
-    if (reportStartDate) params.set("startDate", reportStartDate);
-    if (reportEndDate) params.set("endDate", reportEndDate);
-    if (reportDonorEmail) params.set("donorEmail", reportDonorEmail);
-    if (reportFundId && reportFundId !== "all") params.set("fundId", reportFundId);
-    return `/api/donations/report?${params.toString()}`;
-  }
 
   const { data: pcoData, isLoading: pcoLoading } = useQuery<{
     donations: any[];
@@ -4151,14 +4333,6 @@ function DonationsTab() {
     },
   });
 
-  const { data: stats } = useQuery<{ totalAmount: number; totalCount: number; monthlyAmount: number; monthlyCount: number }>({
-    queryKey: ["/api/donations/stats"],
-  });
-
-  const { data: donations, isLoading: donationsLoading } = useQuery<Donation[]>({
-    queryKey: ["/api/donations"],
-  });
-
   const { data: funds, isLoading: fundsLoading } = useQuery<DonationFund[]>({
     queryKey: ["/api/donation-funds"],
   });
@@ -4180,16 +4354,6 @@ function DonationsTab() {
   const pcoFundNames = pcoData ? Object.keys(pcoData.stats.fundBreakdown).sort() : [];
   const pcoYears = pcoData ? Object.keys(pcoData.stats.yearlyTotals).sort((a, b) => Number(b) - Number(a)) : [];
   const maxMonthlyBar = pcoData ? Math.max(...pcoData.stats.monthlyTrend.map(m => m.total), 1) : 1;
-
-  const { data: reportData, isLoading: reportLoading, refetch: refetchReport } = useQuery<{ donations: Donation[]; totalAmount: number; totalCount: number }>({
-    queryKey: ["/api/donations/report", reportStartDate, reportEndDate, reportDonorEmail, reportFundId],
-    queryFn: async () => {
-      const res = await fetch(buildReportQueryKey(), { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch report");
-      return res.json();
-    },
-    enabled: view === "reports",
-  });
 
   const createFundMutation = useMutation({
     mutationFn: async (data: any) => { await apiRequest("POST", "/api/donation-funds", data); },
@@ -4278,58 +4442,12 @@ function DonationsTab() {
     });
   }
 
-  function handleDeleteFund(id: number) {
-    if (confirm("Are you sure you want to delete this fund?")) {
-      deleteFundMutation.mutate(id);
-    }
-  }
-
-  function getFundName(fundId: number | null) {
-    if (!fundId || !funds) return "—";
-    const fund = funds.find((f) => f.id === fundId);
-    return fund ? fund.name : "Unknown";
-  }
-
   function formatCents(cents: number) {
     return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-  }
-
-  function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-    switch (status) {
-      case "completed": return "default";
-      case "pending": return "secondary";
-      case "refunded": return "destructive";
-      case "failed": return "destructive";
-      default: return "outline";
-    }
-  }
-
-  function exportCSV() {
-    if (!reportData?.donations?.length) return;
-    const headers = ["Date", "Donor Name", "Donor Email", "Amount", "Fund", "Payment Method", "Frequency", "Status", "Notes"];
-    const rows = reportData.donations.map((d) => [
-      d.donationDate ? formatDate(d.donationDate.toString()) : (d.createdAt ? formatDate(d.createdAt.toString()) : ""),
-      d.donorName || "Anonymous",
-      d.donorEmail || "",
-      (d.amountCents / 100).toFixed(2),
-      getFundName(d.fundId),
-      d.paymentMethod || "stripe",
-      d.frequency,
-      d.status,
-      d.notes || "",
-    ]);
-    const csvContent = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `donations-report-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   return (
@@ -4346,14 +4464,20 @@ function DonationsTab() {
           <Button variant={view === "reports" ? "default" : "outline"} onClick={() => setView("reports")}>
             <TrendingUp className="w-4 h-4 mr-2" /> Reports
           </Button>
-          <Button variant="outline" onClick={triggerSync} disabled={syncLoading}>
+          <Button variant={view === "funds" ? "default" : "outline"} onClick={() => setView("funds")} data-testid="button-donations-funds">
+            Funds
+          </Button>
+          <Button variant="outline" onClick={() => setManualDonationOpen(true)} data-testid="button-record-donation">
+            Record Donation
+          </Button>
+          <Button variant="outline" onClick={triggerSync} disabled={syncLoading} title="Pull the latest donations from Planning Center">
             {syncLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            Sync
+            Sync Planning Center
           </Button>
         </div>
       </div>
 
-      {pcoLoading ? (
+      {view !== "funds" && (pcoLoading ? (
         <p className="text-muted-foreground">Loading donation data...</p>
       ) : !pcoData ? (
         <p className="text-muted-foreground">No donation data available. Click Sync to pull from Planning Center.</p>
@@ -4865,6 +4989,72 @@ function DonationsTab() {
             </div>
           )}
         </>
+      ))}
+
+      {view === "funds" && (
+        <div className="space-y-4" data-testid="donations-funds-view">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <p className="text-sm text-muted-foreground max-w-xl">
+              Funds let donors designate what their gift is for (e.g. Building Fund, Missions).
+              Gifts given through Planning Center use the funds set up there; these funds apply
+              to donations recorded here on the website.
+            </p>
+            <Button onClick={openAddFund} data-testid="button-add-fund">
+              <Plus className="w-4 h-4 mr-2" /> Add Fund
+            </Button>
+          </div>
+          {fundsLoading ? (
+            <p className="text-muted-foreground">Loading funds...</p>
+          ) : !funds?.length ? (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                No funds yet. Click "Add Fund" to create your first designated fund.
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {funds.map((fund) => (
+                      <TableRow key={fund.id}>
+                        <TableCell className="font-medium">{fund.name}</TableCell>
+                        <TableCell className="text-muted-foreground max-w-[300px] truncate">{fund.description || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={fund.isActive ? "default" : "secondary"}>{fund.isActive ? "Active" : "Inactive"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => openEditFund(fund)} aria-label={`Edit ${fund.name}`} data-testid={`button-edit-fund-${fund.id}`}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <ConfirmDelete
+                              title={`Delete "${fund.name}"?`}
+                              description="Donations already recorded under this fund keep their history, but the fund will no longer be available for new donations. This cannot be undone."
+                              onConfirm={() => deleteFundMutation.mutate(fund.id)}
+                            >
+                              <Button variant="ghost" size="icon" aria-label={`Delete ${fund.name}`} data-testid={`button-delete-fund-${fund.id}`}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </ConfirmDelete>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       <Dialog open={fundDialogOpen} onOpenChange={setFundDialogOpen}>
@@ -4875,11 +5065,23 @@ function DonationsTab() {
           <form onSubmit={handleFundSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Name</Label>
-              <Input value={fundForm.name} onChange={(e) => setFundForm({ ...fundForm, name: e.target.value })} required data-testid="input-fund-name" />
+              <Input
+                value={fundForm.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  // Auto-generate the ID from the name for new funds
+                  const slug = editingFund ? fundForm.slug : name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+                  setFundForm({ ...fundForm, name, slug });
+                }}
+                placeholder="e.g. Building Fund"
+                required
+                data-testid="input-fund-name"
+              />
             </div>
             <div className="space-y-2">
-              <Label>Slug</Label>
+              <Label>Fund ID</Label>
               <Input value={fundForm.slug} onChange={(e) => setFundForm({ ...fundForm, slug: e.target.value })} required data-testid="input-fund-slug" />
+              <p className="text-xs text-muted-foreground">Filled in automatically — a short identifier used in giving links and reports.</p>
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -5111,9 +5313,15 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
                         Cancel
                       </Button>
                     )}
-                    <Button size="icon" variant="ghost" onClick={() => deleteSubMutation.mutate(sub.id)} data-testid={`button-delete-sub-${sub.id}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <ConfirmDelete
+                      title="Delete this signup?"
+                      description="This permanently removes this person from the roster, including their form answers. If you just need to free their spot, use Cancel instead. This cannot be undone."
+                      onConfirm={() => deleteSubMutation.mutate(sub.id)}
+                    >
+                      <Button size="icon" variant="ghost" aria-label="Delete signup" data-testid={`button-delete-sub-${sub.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ConfirmDelete>
                   </div>
                 </TableCell>
               </TableRow>
@@ -5177,7 +5385,20 @@ function SignupsTab() {
     return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
 
+  // Warn before navigating away with unsaved editor changes
+  const skipDirtyRef = useRef(0);
+  useEffect(() => {
+    if (view !== "editor") setUnsaved(null);
+  }, [view]);
+  useEffect(() => {
+    if (view !== "editor") return;
+    if (skipDirtyRef.current > 0) { skipDirtyRef.current--; return; }
+    setUnsaved("sign up editor");
+  }, [form]);
+  useEffect(() => () => setUnsaved(null), []);
+
   function openCreate() {
+    skipDirtyRef.current = 1;
     setEditing(null);
     setForm({
       title: "", slug: "", description: "", category: "event", status: "draft", visibility: "public",
@@ -5191,6 +5412,7 @@ function SignupsTab() {
   }
 
   function openEdit(signup: SignupEvent) {
+    skipDirtyRef.current = 1;
     setEditing(signup);
     const pss = (signup.postSubmissionSettings || {}) as any;
     setForm({
@@ -5408,17 +5630,31 @@ function SignupsTab() {
 
               {!form.externalUrl && (
               <div className="space-y-2">
-                <Label>Form {form.externalUrl ? "" : "*"}</Label>
-                <Select value={form.formId ? String(form.formId) : ""} onValueChange={(v) => setForm({ ...form, formId: parseInt(v) })}>
-                  <SelectTrigger data-testid="select-signup-form">
-                    <SelectValue placeholder="Select a form" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formsList?.map((f) => (
-                      <SelectItem key={f.id} value={String(f.id)}>{f.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Form *</Label>
+                {!formsList?.length ? (
+                  <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+                    No forms exist yet. Go to the <strong>Form Builder</strong> section in the sidebar to
+                    create the form people will fill out, then come back here to attach it.
+                  </p>
+                ) : (
+                  <>
+                    <Select value={form.formId ? String(form.formId) : ""} onValueChange={(v) => setForm({ ...form, formId: parseInt(v, 10) })}>
+                      <SelectTrigger data-testid="select-signup-form">
+                        <SelectValue placeholder="Select a form" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formsList.map((f) => (
+                          <SelectItem key={f.id} value={String(f.id)}>
+                            {f.title}{f.status !== "published" ? ` (${f.status})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      The questions people answer when they sign up. Build or edit forms in the Form Builder section.
+                    </p>
+                  </>
+                )}
               </div>
               )}
 
@@ -5624,6 +5860,16 @@ function SignupsTab() {
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : !signups?.length ? (
+        <Card>
+          <CardContent className="py-12 text-center space-y-3">
+            <p className="text-muted-foreground">No sign ups yet.</p>
+            <p className="text-sm text-muted-foreground">Create your first sign up — you'll pick or build the form people fill out, set dates and capacity, and get a shareable link and QR code.</p>
+            <Button onClick={openCreate}>
+              <Plus className="w-4 h-4 mr-2" /> Create Sign Up
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <Table data-testid="table-signups">
           <TableHeader>
@@ -5657,12 +5903,18 @@ function SignupsTab() {
                     <Button size="icon" variant="ghost" onClick={() => openEdit(signup)} data-testid={`button-edit-signup-${signup.id}`}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openSubmissions(signup)} data-testid={`button-submissions-signup-${signup.id}`}>
+                    <Button size="icon" variant="ghost" title="View signups" aria-label="View signups" onClick={() => openSubmissions(signup)} data-testid={`button-submissions-signup-${signup.id}`}>
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(signup.id)} data-testid={`button-delete-signup-${signup.id}`}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <ConfirmDelete
+                      title={`Delete "${signup.title}"?`}
+                      description={`This deletes the sign up AND all ${signup.currentSignupCount} response${signup.currentSignupCount === 1 ? "" : "s"} people have submitted. This cannot be undone.`}
+                      onConfirm={() => deleteMutation.mutate(signup.id)}
+                    >
+                      <Button size="icon" variant="ghost" title="Delete" aria-label="Delete sign up" data-testid={`button-delete-signup-${signup.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ConfirmDelete>
                   </div>
                 </TableCell>
               </TableRow>
@@ -5848,9 +6100,15 @@ function SmallGroupsTab() {
                       <Button variant="ghost" size="icon" onClick={() => openEdit(group)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => { if (confirm("Delete this group?")) deleteGroupMut.mutate(group.id); }}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <ConfirmDelete
+                        title={`Delete "${group.name}"?`}
+                        description="This removes the group from the website and the signup page. This cannot be undone."
+                        onConfirm={() => deleteGroupMut.mutate(group.id)}
+                      >
+                        <Button variant="ghost" size="icon" aria-label="Delete group">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </ConfirmDelete>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -5897,9 +6155,15 @@ function SmallGroupsTab() {
                     </TableCell>
                     <TableCell>{new Date(signup.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => { if (confirm("Delete this signup?")) deleteSignupMut.mutate(signup.id); }}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <ConfirmDelete
+                        title={`Delete ${signup.name}'s signup?`}
+                        description="This permanently removes their small group signup. This cannot be undone."
+                        onConfirm={() => deleteSignupMut.mutate(signup.id)}
+                      >
+                        <Button variant="ghost" size="icon" aria-label="Delete signup">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </ConfirmDelete>
                     </TableCell>
                   </TableRow>
                 ))}

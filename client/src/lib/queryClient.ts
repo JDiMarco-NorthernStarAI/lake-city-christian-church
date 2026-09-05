@@ -13,7 +13,18 @@ function getAuthHeaders(): Record<string, string> {
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    // Surface the server's human-readable message instead of raw JSON/status
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.message === "string") message = parsed.message;
+    } catch {
+      // not JSON — keep the raw text
+    }
+    if (res.status >= 500 && (!message || message === res.statusText)) {
+      message = "Something went wrong on our end. Please try again.";
+    }
+    throw new Error(message);
   }
 }
 

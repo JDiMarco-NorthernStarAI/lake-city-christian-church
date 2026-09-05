@@ -18,6 +18,7 @@ import {
   Phone, Clock, TrendingUp, AlertTriangle, CheckCircle2, XCircle, ArrowUpRight,
 } from "lucide-react";
 import type { SmsGroup, SmsTemplate, SmsMessage, SmsSettings, SmsIncomingMessage, SmsOptOut } from "@shared/schema";
+import ConfirmDelete from "@/components/confirm-delete";
 
 export default function AdminSmsTab() {
   const [subTab, setSubTab] = useState("overview");
@@ -501,8 +502,19 @@ function SmsGroups() {
     onSuccess: () => {
       toast({ title: "Group created" });
       queryClient.invalidateQueries({ queryKey: ["/api/sms/groups"] });
-      setShowCreate(false);
-      setForm({ name: "", description: "", groupType: "custom", filterCriteria: "" });
+      closeDialog();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiRequest("PUT", `/api/sms/groups/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Group updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/sms/groups"] });
+      closeDialog();
     },
   });
 
@@ -514,12 +526,34 @@ function SmsGroups() {
     },
   });
 
-  const handleCreate = () => {
+  function openEdit(group: SmsGroup) {
+    setEditGroup(group);
+    setForm({
+      name: group.name,
+      description: group.description || "",
+      groupType: group.groupType,
+      filterCriteria: group.filterCriteria ? JSON.stringify(group.filterCriteria, null, 2) : "",
+    });
+    setShowCreate(true);
+  }
+
+  function closeDialog() {
+    setShowCreate(false);
+    setEditGroup(null);
+    setForm({ name: "", description: "", groupType: "custom", filterCriteria: "" });
+  }
+
+  const handleSave = () => {
     let filterCriteria = null;
     if (form.filterCriteria.trim()) {
       try { filterCriteria = JSON.parse(form.filterCriteria); } catch { toast({ title: "Invalid filter JSON", variant: "destructive" }); return; }
     }
-    createMutation.mutate({ name: form.name, description: form.description, groupType: form.groupType, filterCriteria });
+    const data = { name: form.name, description: form.description, groupType: form.groupType, filterCriteria };
+    if (editGroup) {
+      updateMutation.mutate({ id: editGroup.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   if (isLoading) return <p className="text-muted-foreground">Loading...</p>;
@@ -555,9 +589,18 @@ function SmsGroups() {
                     <TableCell className="text-muted-foreground max-w-[200px] truncate">{g.description || "-"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(g.id)} data-testid={`button-delete-group-${g.id}`}>
-                          <Trash2 className="w-4 h-4" />
+                        <Button size="icon" variant="ghost" aria-label="Edit group" onClick={() => openEdit(g)} data-testid={`button-edit-group-${g.id}`}>
+                          <Pencil className="w-4 h-4" />
                         </Button>
+                        <ConfirmDelete
+                          title={`Delete "${g.name}"?`}
+                          description="Messages already sent to this group are kept, but you won't be able to send to it anymore. This cannot be undone."
+                          onConfirm={() => deleteMutation.mutate(g.id)}
+                        >
+                          <Button size="icon" variant="ghost" aria-label="Delete group" data-testid={`button-delete-group-${g.id}`}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </ConfirmDelete>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -568,10 +611,10 @@ function SmsGroups() {
         </CardContent>
       </Card>
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(v) => { if (!v) closeDialog(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create SMS Group</DialogTitle>
+            <DialogTitle>{editGroup ? "Edit SMS Group" : "Create SMS Group"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -614,9 +657,9 @@ function SmsGroups() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!form.name.trim() || createMutation.isPending} data-testid="button-save-group">
-              {createMutation.isPending ? "Creating..." : "Create Group"}
+            <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+            <Button onClick={handleSave} disabled={!form.name.trim() || createMutation.isPending || updateMutation.isPending} data-testid="button-save-group">
+              {createMutation.isPending || updateMutation.isPending ? "Saving..." : editGroup ? "Save Changes" : "Create Group"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -673,9 +716,15 @@ function SmsTemplates() {
                 <CardTitle className="text-base">{t.name}</CardTitle>
                 <Badge variant="secondary" className="mt-1">{t.category}</Badge>
               </div>
-              <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(t.id)} data-testid={`button-delete-template-${t.id}`}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <ConfirmDelete
+                title={`Delete the "${t.name}" template?`}
+                description="This cannot be undone."
+                onConfirm={() => deleteMutation.mutate(t.id)}
+              >
+                <Button size="icon" variant="ghost" aria-label="Delete template" data-testid={`button-delete-template-${t.id}`}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </ConfirmDelete>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground break-words">{t.body}</p>

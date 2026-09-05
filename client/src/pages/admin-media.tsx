@@ -263,9 +263,9 @@ export default function AdminMediaTab() {
         </Card>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex flex-col md:flex-row gap-4">
         {/* Folder sidebar */}
-        <div className="w-56 shrink-0 space-y-1">
+        <div className="md:w-56 shrink-0 space-y-1">
           <button
             onClick={() => { setCurrentFolder("all"); setSelectedIds(new Set()); }}
             className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 ${currentFolder === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
@@ -631,7 +631,7 @@ function FolderButton({ path, label, depth, count, active, onClick, onRename, on
         <span className="ml-auto text-xs opacity-70">{count}</span>
       </button>
       {!isDefault && (
-        <div className={`absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-0.5 ${active ? "" : ""}`}>
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex md:hidden md:group-hover:flex gap-0.5">
           <button
             onClick={e => { e.stopPropagation(); onRename(); }}
             className="p-1 rounded hover:bg-muted/80"

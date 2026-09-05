@@ -16,7 +16,7 @@ import {
   subscribePushSchema, sendNotificationSchema,
   insertSignupEventSchema, insertSignupSubmissionSchema,
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { seedDatabase } from "./seed";
 import { XMLParser } from "fast-xml-parser";
@@ -540,7 +540,8 @@ export async function registerRoutes(
 
   app.put("/api/settings/:key", requireFeature("settings"), async (req, res) => {
     const { value } = req.body;
-    if (!value) return res.status(400).json({ message: "Value required" });
+    // Empty string is valid — it clears the setting (e.g. removing a social link)
+    if (typeof value !== "string") return res.status(400).json({ message: "Value required" });
     await storage.setSetting(req.params.key, value);
     res.json({ message: "Updated" });
   });
@@ -1565,6 +1566,40 @@ export async function registerRoutes(
     return usage;
   }
 
+  // Returns an error message if any capacity-limited option in `data` is
+  // already full. Callers must hold the form's advisory lock (keyspace 1)
+  // so concurrent claims on the last slot serialize.
+  async function checkOptionCapacity(formId: number, fields: any[], data: Record<string, any>): Promise<string | null> {
+    const optionTypes = ["select", "radio", "checkbox_group"];
+    const capacityFields = fields.filter(
+      (f) => optionTypes.includes(f.fieldType) && f.options && parseFieldOptions(f.options).some((o) => o.capacity)
+    );
+    if (capacityFields.length === 0) return null;
+    const submissions = await storage.getFormSubmissions(formId);
+    for (const field of capacityFields) {
+      const parsed = parseFieldOptions(field.options);
+      const usage = computeOptionUsage(field.id, parsed, submissions);
+      const val = data[field.id];
+      const vals = Array.isArray(val) ? val : typeof val === "string" ? [val] : [];
+      for (const v of vals) {
+        if (typeof v === "string" && usage[v]?.capacity && usage[v].remaining !== undefined && usage[v].remaining! <= 0) {
+          return `"${v}" for ${field.label} is full. Please choose a different option.`;
+        }
+      }
+    }
+    return null;
+  }
+
+  function decorateFieldsWithUsage(fields: any[], submissions: any[]): any[] {
+    const optionTypes = ["select", "radio", "checkbox_group"];
+    return fields.map((field) => {
+      if (!optionTypes.includes(field.fieldType) || !field.options) return field;
+      const parsed = parseFieldOptions(field.options);
+      if (!parsed.some((o) => o.capacity)) return field;
+      return { ...field, optionUsage: computeOptionUsage(field.id, parsed, submissions) };
+    });
+  }
+
   app.get("/api/public/forms/:slug", async (req, res) => {
     try {
       const form = await storage.getFormBySlug(req.params.slug);
@@ -1603,56 +1638,21 @@ export async function registerRoutes(
         optionTypes.includes(f.fieldType) && f.options && parseFieldOptions(f.options).some((o) => o.capacity)
       );
 
+      let submission;
       if (hasCapacityFields) {
+        // The advisory lock (keyspace 1, form id) serializes concurrent
+        // claims; inner storage calls commit before the lock releases.
         const result = await db.transaction(async (tx) => {
-          const submissions = await storage.getFormSubmissions(form.id);
-          for (const field of fields) {
-            if (!optionTypes.includes(field.fieldType) || !field.options) continue;
-            const parsed = parseFieldOptions(field.options);
-            if (!parsed.some((o) => o.capacity)) continue;
-            const usage = computeOptionUsage(field.id, parsed, submissions);
-            const val = data[field.id];
-            if (typeof val === "string" && usage[val] && usage[val].capacity && usage[val].remaining !== undefined && usage[val].remaining! <= 0) {
-              return { error: `"${val}" for ${field.label} is full. Please choose a different option.` };
-            }
-            if (Array.isArray(val)) {
-              for (const v of val) {
-                if (typeof v === "string" && usage[v] && usage[v].capacity && usage[v].remaining !== undefined && usage[v].remaining! <= 0) {
-                  return { error: `"${v}" for ${field.label} is full. Please choose a different option.` };
-                }
-              }
-            }
-          }
-          const submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
-          return { submission };
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${form.id})`);
+          const error = await checkOptionCapacity(form.id, fields, data);
+          if (error) return { error };
+          return { submission: await storage.createFormSubmission({ formId: form.id, data, userId: null }) };
         });
         if ("error" in result) return res.status(400).json({ message: result.error });
-        // Send notification email for capacity-checked forms too
-        if ((form as any).notificationEmail && "submission" in result) {
-          try {
-            const { sendEmail } = await import("./email-service");
-            const { adminNotificationEmail } = await import("./email-templates");
-            const details: Record<string, string> = {};
-            for (const field of fields) {
-              const val = data[field.id];
-              if (val !== undefined && val !== null && val !== "") {
-                if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
-                  details[field.label] = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
-                } else {
-                  details[field.label] = Array.isArray(val) ? val.join(", ") : String(val);
-                }
-              }
-            }
-            const emailData = adminNotificationEmail(`New Submission: ${form.title}`, `A new submission was received for "${form.title}".`, details);
-            sendEmail({ to: (form as any).notificationEmail, ...emailData }).catch(() => {});
-          } catch (emailErr) {
-            console.error("Error sending form notification email:", emailErr);
-          }
-        }
-        return res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission: result.submission });
+        submission = result.submission;
+      } else {
+        submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
       }
-
-      const submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
 
       // Send notification email if configured
       if ((form as any).notificationEmail) {
@@ -1663,10 +1663,10 @@ export async function registerRoutes(
           for (const field of fields) {
             const val = data[field.id];
             if (val !== undefined && val !== null && val !== "") {
-              if (Array.isArray(val)) {
-                details[field.label] = val.join(", ");
+              if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
+                details[field.label] = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
               } else {
-                details[field.label] = String(val);
+                details[field.label] = Array.isArray(val) ? val.join(", ") : String(val);
               }
             }
           }
@@ -1850,6 +1850,8 @@ export async function registerRoutes(
         form = await storage.getForm(event.formId);
         if (form) {
           fields = await storage.getFormFields(form.id);
+          const submissions = await storage.getFormSubmissions(form.id);
+          fields = decorateFieldsWithUsage(fields, submissions);
         }
       }
       res.json({ event, form, fields });
@@ -1871,43 +1873,60 @@ export async function registerRoutes(
       if (event.signupEndDate && now > new Date(event.signupEndDate)) {
         return res.status(400).json({ message: "Registration has closed" });
       }
-      let submissionStatus: "confirmed" | "waitlisted" = "confirmed";
-      let waitlistPosition: number | null = null;
-      if (event.maxSignups && event.currentSignupCount >= event.maxSignups) {
-        if (!event.waitlistEnabled) {
-          return res.status(400).json({ message: "This event is full" });
+      // Advisory locks serialize concurrent signups so the last spot (or the
+      // last capacity-limited item on the linked form) can't be double-booked.
+      // Inner storage calls commit before the locks release at transaction end.
+      const result = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(2, ${event.id})`);
+        if (event.formId) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(1, ${event.formId})`);
         }
-        submissionStatus = "waitlisted";
-        waitlistPosition = event.waitlistCount + 1;
-      }
-      let formSubmissionId: number | null = null;
-      if (event.formId && req.body.formData) {
-        const formSubmission = await storage.createFormSubmission({
-          formId: event.formId,
-          data: req.body.formData,
+        // Re-read counts now that we hold the lock
+        const current = await storage.getSignupEvent(event.id);
+        if (!current) return { error: "Signup event not found" };
+        let submissionStatus: "confirmed" | "waitlisted" = "confirmed";
+        let waitlistPosition: number | null = null;
+        if (current.maxSignups && current.currentSignupCount >= current.maxSignups) {
+          if (!current.waitlistEnabled) {
+            return { error: "This event is full" };
+          }
+          submissionStatus = "waitlisted";
+          waitlistPosition = current.waitlistCount + 1;
+        }
+        let formSubmissionId: number | null = null;
+        if (current.formId && req.body.formData) {
+          const fields = await storage.getFormFields(current.formId);
+          const capacityError = await checkOptionCapacity(current.formId, fields, req.body.formData);
+          if (capacityError) return { error: capacityError };
+          const formSubmission = await storage.createFormSubmission({
+            formId: current.formId,
+            data: req.body.formData,
+          });
+          formSubmissionId = formSubmission.id;
+        }
+        const submission = await storage.createSignupSubmission({
+          signupEventId: current.id,
+          formSubmissionId,
+          userId: req.session?.userId || null,
+          signupNumber: current.currentSignupCount + 1,
+          status: submissionStatus,
+          waitlistPosition,
+          guestCount: req.body.guestCount || 0,
         });
-        formSubmissionId = formSubmission.id;
-      }
-      const submission = await storage.createSignupSubmission({
-        signupEventId: event.id,
-        formSubmissionId,
-        userId: req.session?.userId || null,
-        signupNumber: event.currentSignupCount + 1,
-        status: submissionStatus,
-        waitlistPosition,
-        guestCount: req.body.guestCount || 0,
+        if (submissionStatus === "waitlisted") {
+          await storage.updateSignupEvent(current.id, {
+            waitlistCount: current.waitlistCount + 1,
+          });
+        } else {
+          await storage.incrementSignupCount(current.id);
+        }
+        return { submission, status: submissionStatus, waitlistPosition };
       });
-      if (submissionStatus === "waitlisted") {
-        await storage.updateSignupEvent(event.id, {
-          waitlistCount: event.waitlistCount + 1,
-        });
-      } else {
-        await storage.incrementSignupCount(event.id);
-      }
+      if ("error" in result) return res.status(400).json({ message: result.error });
       res.json({
-        submission,
-        status: submissionStatus,
-        waitlistPosition,
+        submission: result.submission,
+        status: result.status,
+        waitlistPosition: result.waitlistPosition,
         postSubmissionSettings: event.postSubmissionSettings,
       });
     } catch (err) {
@@ -1979,11 +1998,21 @@ export async function registerRoutes(
         ...body,
         createdBy: req.session.userId,
       });
+      const newSlug = (parsed as any).slug as string | undefined;
+      if (newSlug) {
+        const existing = await storage.getSignupEventBySlug(newSlug);
+        if (existing) return res.status(400).json({ message: `The web address "${newSlug}" is already used by another sign up. Please choose a different one.` });
+      }
       const event = await storage.createSignupEvent(parsed);
       res.json(event);
     } catch (err: any) {
       if (err.name === "ZodError") {
-        return res.status(400).json({ message: "Validation error", errors: err.errors });
+        const first = err.errors?.[0];
+        const where = first?.path?.length ? ` (${first.path.join(".")})` : "";
+        return res.status(400).json({ message: `${first?.message || "Some information is invalid"}${where}` });
+      }
+      if (err.code === "23505") {
+        return res.status(400).json({ message: "That web address is already used by another sign up. Please choose a different one." });
       }
       console.error("Create signup event error:", err);
       res.status(500).json({ message: "Error creating signup event" });
@@ -2003,7 +2032,10 @@ export async function registerRoutes(
       const event = await storage.updateSignupEvent(Number(req.params.id), body);
       if (!event) return res.status(404).json({ message: "Signup event not found" });
       res.json(event);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.code === "23505") {
+        return res.status(400).json({ message: "That web address is already used by another sign up. Please choose a different one." });
+      }
       console.error("Update signup event error:", err);
       res.status(500).json({ message: "Error updating signup event" });
     }

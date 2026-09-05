@@ -9,6 +9,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Copy, Pencil, Trash2, Crop, FolderInput } from "lucide-react";
 import type { Media, MediaFolder } from "@shared/schema";
 import MediaCropModal from "./media-crop-modal";
+import ConfirmDelete from "./confirm-delete";
 
 function getImageSrc(path: string) {
   if (path.startsWith("http")) return path;
@@ -143,7 +144,13 @@ export default function MediaDetailModal({ open, onClose, item, folders, onDelet
               <Button variant="outline" size="sm" onClick={() => { setNewFilename(item.filename); setEditing(true); }}><Pencil className="w-4 h-4 mr-1" /> Rename</Button>
               <Button variant="outline" size="sm" onClick={() => { setNewFolder(item.folder); setMoving(true); }}><FolderInput className="w-4 h-4 mr-1" /> Move</Button>
               <Button variant="outline" size="sm" onClick={() => setCropOpen(true)}><Crop className="w-4 h-4 mr-1" /> Crop/Resize</Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}><Trash2 className="w-4 h-4 mr-1" /> {deleting ? "Deleting..." : "Delete"}</Button>
+              <ConfirmDelete
+                title={`Delete "${item.filename}"?`}
+                description="This permanently deletes the image from the media library. Anywhere it's used on the website will show a broken image. This cannot be undone."
+                onConfirm={handleDelete}
+              >
+                <Button variant="destructive" size="sm" disabled={deleting}><Trash2 className="w-4 h-4 mr-1" /> {deleting ? "Deleting..." : "Delete"}</Button>
+              </ConfirmDelete>
             </DialogFooter>
           )}
         </DialogContent>

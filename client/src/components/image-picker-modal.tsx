@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, Trash2, Loader2, Image as ImageIcon, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { MediaFolder } from "@shared/schema";
+import ConfirmDelete from "@/components/confirm-delete";
 
 interface MediaItem {
   id: number;
@@ -225,18 +226,22 @@ export default function ImagePickerModal({ open, onClose, onSelect, defaultFolde
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1 text-xs text-white truncate">
                     {item.filename}
                   </div>
-                  <button
-                    className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm("Delete this image?")) {
-                        deleteMutation.mutate(item.id);
-                        if (selectedId === item.id) setSelectedId(null);
-                      }
+                  <ConfirmDelete
+                    title={`Delete "${item.filename}"?`}
+                    description="This permanently deletes the image from the media library. Anywhere it's used on the website will show a broken image. This cannot be undone."
+                    onConfirm={() => {
+                      deleteMutation.mutate(item.id);
+                      if (selectedId === item.id) setSelectedId(null);
                     }}
                   >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                    <button
+                      aria-label="Delete image"
+                      className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </ConfirmDelete>
                   {selectedId === item.id && (
                     <div className="absolute top-1 left-1 bg-blue-500 text-white rounded-full p-0.5">
                       <Check className="w-3 h-3" />
