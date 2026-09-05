@@ -49,6 +49,9 @@ See [user-setup.md](user-setup.md) — Jason's dev environment, AWS CLI, Replit 
 - Kids Ministry: "KidMin Leaders", Ministries descriptions updated
 - Navbar: solid black, seed deduplicates events/sermons/team
 
+## Admin UX Audit (2026-09-05)
+See [admin-ux-audit.md](admin-ux-audit.md) — full audit findings, confirmed bugs/dead UI, and the 4-phase improvement plan (artifact link inside).
+
 ## Pending Work
 - Apple OAuth — has Dev account, HTTPS now available, ready to configure (see go-live-checklist.md)
 - Media Library admin — crop/resize, nested folders, bulk ops need finishing
