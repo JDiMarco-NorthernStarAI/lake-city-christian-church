@@ -29,9 +29,11 @@ Triggered by Shanna Littleton (Director of Communications) getting stuck creatin
 - Sidebar: flat alphabetical 17 items; Form Builder / Sign Ups / Submissions scattered at positions 6/14/16
 
 ### Plan (see artifact for detail)
-1. Stop the bleeding (bug fixes + delete confirms + friendly errors + mobile)
+1. ✅ DONE (commit f4d54b7, 2026-09-05): fund/record-donation UI wired (+new Funds view), Settings clear bug, SMS group edit, capacity enforced on signup-event path + pg advisory locks (keyspace 1=form, 2=signup event), optionUsage on signup detail page, ConfirmDelete component (client/src/components/confirm-delete.tsx) on all deletes, friendly error parsing in queryClient, unsaved-guard (client/src/lib/unsaved-guard.ts) for sign-up editor/settings/page content/roles, mobile drawer auto-close (AdminSidebarNav w/ useSidebar), dialog max-h-[90dvh], media rail responsive, form editor stays after create (onCreated prop), empty states.
 2. Sign-up wizard with inline form building + grouped sidebar + "what's still needed" panel
 3. Shanna's toolkit: per-claim quantities, confirmation emails, per-fund reports, PC funds
 4. Ministry-scoped roles, dashboard quick actions, messages reply, search, SMS UX
+
+Note: repo has ~164 PRE-EXISTING tsc errors (jwt, web-push types, pcoData stats typing, Stripe Invoice.subscription). Build (vite/esbuild) ignores them. Compare against baseline before blaming new code.
 
 Related: [[form-builder]], [[giving]], [[planning-center]]
