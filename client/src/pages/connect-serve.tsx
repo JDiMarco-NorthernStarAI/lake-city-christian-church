@@ -16,6 +16,7 @@ import coffeeImgPath from "@assets/LC_Coffe_Shop_1770933498062.png";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSpamGuard } from "@/components/spam-guard";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -68,9 +69,10 @@ export default function ConnectServe() {
   });
 
   const { toast } = useToast();
+  const spamGuard = useSpamGuard();
   const mutation = useMutation({
     mutationFn: async (data: ConnectFormValues) => {
-      await apiRequest("POST", "/api/connect", data);
+      await apiRequest("POST", "/api/connect", { ...data, ...spamGuard.values() });
     },
     onSuccess: () => {
       setSubmitted(true);
@@ -167,6 +169,7 @@ export default function ConnectServe() {
               ) : (
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    {spamGuard.field}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}

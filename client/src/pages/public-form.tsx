@@ -156,9 +156,22 @@ export default function PublicForm() {
     }
   }
 
+  // A claim is either a plain label (bringing 1) or { label, quantity }
+  type ClaimEntry = string | { label: string; quantity: number };
+  function entryLabel(e: ClaimEntry): string { return typeof e === "string" ? e : e.label; }
+  function entryQty(e: ClaimEntry): number { return typeof e === "string" ? 1 : e.quantity; }
+
   function handleCheckboxGroupChange(fieldId: number, option: string, checked: boolean) {
-    const current = (formValues[fieldId] as string[]) || [];
-    const updated = checked ? [...current, option] : current.filter((v: string) => v !== option);
+    const current = (formValues[fieldId] as ClaimEntry[]) || [];
+    const updated = checked ? [...current, option] : current.filter((v) => entryLabel(v) !== option);
+    handleFieldChange(fieldId, updated);
+  }
+
+  function handleClaimQtyChange(fieldId: number, option: string, quantity: number) {
+    const current = (formValues[fieldId] as ClaimEntry[]) || [];
+    const updated = current.map((v) =>
+      entryLabel(v) === option ? (quantity > 1 ? { label: option, quantity } : option) : v
+    );
     handleFieldChange(fieldId, updated);
   }
 
@@ -320,19 +333,42 @@ export default function PublicForm() {
             {options.map((opt) => {
               const full = isOptionFull(field, opt);
               const suffix = getOptionSuffix(field, opt);
-              const isChecked = ((formValues[field.id] as string[]) || []).includes(opt);
+              const entries = (formValues[field.id] as ClaimEntry[]) || [];
+              const entry = entries.find((e) => entryLabel(e) === opt);
+              const isChecked = entry !== undefined;
+              const info = field.optionUsage?.[opt];
+              const maxQty = info?.capacity ? (info.remaining ?? 1) : 20;
               return (
-                <label key={opt} className={`flex items-center gap-3 ${full && !isChecked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                  <Checkbox
-                    checked={isChecked}
-                    onCheckedChange={(checked) => handleCheckboxGroupChange(field.id, opt, checked === true)}
-                    disabled={full && !isChecked}
-                  />
-                  <span className="text-sm">
-                    {opt}
-                    {suffix && <span className={`ml-1 text-xs ${full ? "text-muted-foreground" : "text-blue-400"}`}>{suffix}</span>}
-                  </span>
-                </label>
+                <div key={opt} className="space-y-1">
+                  <label className={`flex items-center gap-3 ${full && !isChecked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={(checked) => handleCheckboxGroupChange(field.id, opt, checked === true)}
+                      disabled={full && !isChecked}
+                    />
+                    <span className="text-sm">
+                      {opt}
+                      {suffix && <span className={`ml-1 text-xs ${full ? "text-muted-foreground" : "text-blue-400"}`}>{suffix}</span>}
+                    </span>
+                  </label>
+                  {isChecked && maxQty > 1 && (
+                    <div className="flex items-center gap-2 pl-7">
+                      <span className="text-xs text-muted-foreground">How many?</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={maxQty}
+                        value={entry ? entryQty(entry) : 1}
+                        onChange={(e) => {
+                          const q = Math.max(1, Math.min(maxQty, parseInt(e.target.value, 10) || 1));
+                          handleClaimQtyChange(field.id, opt, q);
+                        }}
+                        className="w-20 h-8"
+                        data-testid={`input-claim-qty-${field.id}-${opt}`}
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

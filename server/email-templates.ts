@@ -131,6 +131,37 @@ export function eventSignupConfirmationEmail(
   };
 }
 
+export function signupConfirmationEmail(
+  name: string | null,
+  eventTitle: string,
+  eventDate: string | null,
+  eventLocation: string | null,
+  status: "confirmed" | "waitlisted",
+  details: Record<string, string> = {},
+  options: { cost?: string | null; paymentUrl?: string | null; signupUrl?: string | null } = {}
+): { subject: string; html: string } {
+  const statusText = status === "waitlisted"
+    ? "The sign up is currently full, so you've been added to the waitlist. We'll let you know if a spot opens up."
+    : "You're all set! Here's a copy of what you signed up for.";
+  const detailRows = [
+    detailRow("Sign Up", eventTitle),
+    eventDate ? detailRow("Date", eventDate) : "",
+    eventLocation ? detailRow("Location", eventLocation) : "",
+    options.cost ? detailRow("Cost", options.cost) : "",
+    ...Object.entries(details).map(([k, v]) => detailRow(k, v)),
+  ].join("");
+  return {
+    subject: `${status === "waitlisted" ? "Waitlisted" : "You're signed up"}: ${eventTitle} - ${CHURCH_NAME}`,
+    html: baseLayout("Sign Up Confirmation", `
+      ${heading(status === "waitlisted" ? "You're on the Waitlist" : "You're Signed Up!")}
+      ${paragraph(`Hi ${name || "there"}, ${statusText}`)}
+      ${detailsTable(detailRows)}
+      ${options.paymentUrl ? paragraph("This sign up has a cost — you can pay online here:") + button("Pay Online", options.paymentUrl) : ""}
+      ${options.signupUrl ? button("View the Sign Up", options.signupUrl) : ""}
+    `),
+  };
+}
+
 export function connectCardConfirmationEmail(firstName: string): { subject: string; html: string } {
   return {
     subject: `Thanks for connecting! - ${CHURCH_NAME}`,

@@ -16,6 +16,7 @@ import {
 } from "./jwt";
 import { z } from "zod";
 import crypto from "crypto";
+import { publicFormGuard } from "./spam-guard";
 
 const objectStorage = new ObjectStorageService();
 
@@ -72,7 +73,7 @@ function sanitizeUser(user: any) {
   return safe;
 }
 
-v1Router.post("/auth/register", async (req, res) => {
+v1Router.post("/auth/register", publicFormGuard({ limit: 3, fakeSuccess: { success: false, data: null, error: "Registration could not be completed. Please contact the church office." } }), async (req, res) => {
   try {
     const parsed = registerUserSchema.safeParse(req.body);
     if (!parsed.success) {

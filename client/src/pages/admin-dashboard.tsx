@@ -55,6 +55,20 @@ function getImageSrc(path: string | null | undefined) {
 // datetime-local inputs expect wall-clock time in the browser's timezone;
 // slicing toISOString() directly would show UTC and shift the saved time on
 // every edit round-trip.
+// Render a stored answer value, including item claims that may be plain
+// labels or { label, quantity } objects, and address objects.
+function formatAnswer(v: any): string {
+  if (v == null || v === "") return "";
+  if (Array.isArray(v)) {
+    return v.map((e) => (typeof e === "object" && e?.label ? (e.quantity > 1 ? `${e.label} (x${e.quantity})` : e.label) : String(e))).join(", ");
+  }
+  if (typeof v === "object") {
+    if (v.address !== undefined) return [v.address, v.city, v.state, v.zip].filter(Boolean).join(", ");
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
 function toDatetimeLocal(value: string | Date | null | undefined): string {
   if (!value) return "";
   const d = new Date(value);
@@ -1680,6 +1694,7 @@ function ConnectCardsTab() {
   const [forwardCardId, setForwardCardId] = useState<number | null>(null);
   const [forwardEmail, setForwardEmail] = useState("");
   const [forwarding, setForwarding] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -1694,6 +1709,28 @@ function ConnectCardsTab() {
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
     },
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiRequest("POST", "/api/connect/bulk-delete", { ids });
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/connect"] });
+      setSelectedIds(new Set());
+      toast({ title: result?.message || "Cards deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function toggleSelected(id: number, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+  const allSelected = !!cards?.length && cards.every((c) => selectedIds.has(c.id));
 
   async function handleForward() {
     if (!forwardCardId || !forwardEmail) return;
@@ -1714,7 +1751,21 @@ function ConnectCardsTab() {
 
   return (
     <div data-testid="tab-connect">
-      <h1 className="text-2xl font-bold mb-6">Connect Cards</h1>
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+        <h1 className="text-2xl font-bold">Connect Cards</h1>
+        {selectedIds.size > 0 && (
+          <ConfirmDelete
+            title={`Delete ${selectedIds.size} connect card${selectedIds.size === 1 ? "" : "s"}?`}
+            description="The selected cards are permanently deleted, including any prayer requests. This cannot be undone."
+            confirmLabel={`Delete ${selectedIds.size}`}
+            onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+          >
+            <Button variant="destructive" size="sm" disabled={bulkDeleteMutation.isPending} data-testid="button-bulk-delete-connect">
+              <Trash2 className="w-4 h-4 mr-2" /> Delete Selected ({selectedIds.size})
+            </Button>
+          </ConfirmDelete>
+        )}
+      </div>
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
@@ -1725,6 +1776,16 @@ function ConnectCardsTab() {
           <Table data-testid="table-connect">
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={(checked) => {
+                      setSelectedIds(checked === true ? new Set(cards.map((c) => c.id)) : new Set());
+                    }}
+                    aria-label="Select all"
+                    data-testid="checkbox-select-all-connect"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
@@ -1738,6 +1799,14 @@ function ConnectCardsTab() {
             <TableBody>
               {cards.map((card) => (
                 <TableRow key={card.id} data-testid={`row-connect-${card.id}`}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(card.id)}
+                      onCheckedChange={(checked) => toggleSelected(card.id, checked === true)}
+                      aria-label={`Select ${card.firstName} ${card.lastName}`}
+                      data-testid={`checkbox-select-connect-${card.id}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{card.firstName} {card.lastName}</TableCell>
                   <TableCell>{card.email}</TableCell>
                   <TableCell>{card.phone || "-"}</TableCell>
@@ -2365,6 +2434,8 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
   });
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [searchText, setSearchText] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<AdminUser | null>(null);
@@ -2420,6 +2491,11 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
         if (!allUserGroups.some(ug => ug.userId === u.id && ug.cityGroupId === groupId)) return false;
       }
     }
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase();
+      const haystack = [u.name, u.username, u.email, u.phone].filter(Boolean).join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
     return true;
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -2464,6 +2540,33 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await apiRequest("POST", "/api/users/bulk-delete", { ids });
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setSelectedIds(new Set());
+      toast({ title: result?.message || "Accounts deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function toggleSelected(id: number, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+
+  // Selectable = visible rows that aren't the current user or an admin
+  const selectableUsers = (filteredUsers || []).filter(
+    (u) => u.id !== currentUser.id && !u.roles.some((r) => r === "admin" || r === "super_admin")
+  );
+  const allSelected = selectableUsers.length > 0 && selectableUsers.every((u) => selectedIds.has(u.id));
 
   async function uploadPhotoForUser(userId: number, file: File) {
     try {
@@ -2605,7 +2708,17 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
         </Button>
       </div>
 
-      <div className="flex gap-4 mb-4 flex-wrap">
+      <div className="flex gap-4 mb-4 flex-wrap items-center">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search name, email, phone..."
+            className="pl-9 w-[240px]"
+            data-testid="input-user-search"
+          />
+        </div>
         <div className="flex items-center gap-2">
           <Label className="text-sm whitespace-nowrap">Filter by Role:</Label>
           <Select value={filterRole} onValueChange={setFilterRole}>
@@ -2631,10 +2744,22 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
             </SelectContent>
           </Select>
         </div>
-        {(filterRole !== "all" || filterGroup !== "all") && (
-          <Button variant="ghost" size="sm" onClick={() => { setFilterRole("all"); setFilterGroup("all"); }}>
+        {(filterRole !== "all" || filterGroup !== "all" || searchText) && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterRole("all"); setFilterGroup("all"); setSearchText(""); }}>
             Clear Filters
           </Button>
+        )}
+        {selectedIds.size > 0 && (
+          <ConfirmDelete
+            title={`Delete ${selectedIds.size} account${selectedIds.size === 1 ? "" : "s"}?`}
+            description="The selected accounts will be permanently removed and can no longer log in. Admin accounts and your own account are never deleted. This cannot be undone."
+            confirmLabel={`Delete ${selectedIds.size}`}
+            onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+          >
+            <Button variant="destructive" size="sm" disabled={bulkDeleteMutation.isPending} data-testid="button-bulk-delete-users">
+              <Trash2 className="w-4 h-4 mr-2" /> Delete Selected ({selectedIds.size})
+            </Button>
+          </ConfirmDelete>
         )}
       </div>
 
@@ -2644,6 +2769,16 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
         <Table data-testid="table-users">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={(checked) => {
+                    setSelectedIds(checked === true ? new Set(selectableUsers.map((u) => u.id)) : new Set());
+                  }}
+                  aria-label="Select all"
+                  data-testid="checkbox-select-all-users"
+                />
+              </TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
@@ -2655,6 +2790,16 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
           <TableBody>
             {filteredUsers?.map((u) => (
               <TableRow key={u.id} data-testid={`row-user-${u.id}`}>
+                <TableCell>
+                  {u.id !== currentUser.id && !u.roles.some((r) => r === "admin" || r === "super_admin") && (
+                    <Checkbox
+                      checked={selectedIds.has(u.id)}
+                      onCheckedChange={(checked) => toggleSelected(u.id, checked === true)}
+                      aria-label={`Select ${u.name || u.username}`}
+                      data-testid={`checkbox-select-user-${u.id}`}
+                    />
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Avatar className="w-8 h-8">
@@ -2685,7 +2830,7 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
                       <div className="flex gap-1 flex-wrap">
                         {gNames.map((n, i) => <Badge key={i} variant="outline" className="text-xs">{n}</Badge>)}
                       </div>
-                    ) : <span className="text-muted-foreground text-xs">\u2014</span>;
+                    ) : <span className="text-muted-foreground text-xs">{"\u2014"}</span>;
                   })()}
                 </TableCell>
                 <TableCell>
@@ -4110,13 +4255,7 @@ function FormSubmissionsView({ formId, onBack }: { formId: number; onBack: () =>
                   <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
                     {fields.map((f) => (
                       <TableCell key={f.id}>
-                        {data[f.id.toString()] !== undefined
-                          ? Array.isArray(data[f.id.toString()])
-                            ? (data[f.id.toString()] as string[]).join(", ")
-                            : String(data[f.id.toString()])
-                          : data[f.label] !== undefined
-                            ? String(data[f.label])
-                            : ""}
+                        {formatAnswer(data[f.id.toString()] ?? data[f.label])}
                       </TableCell>
                     ))}
                     <TableCell className="text-muted-foreground text-sm">
@@ -4369,6 +4508,60 @@ function DonationsTab() {
   const { data: funds, isLoading: fundsLoading } = useQuery<DonationFund[]>({
     queryKey: ["/api/donation-funds"],
   });
+
+  // Giving-by-fund report (combines Planning Center + website giving)
+  const [fundReportStart, setFundReportStart] = useState("");
+  const [fundReportEnd, setFundReportEnd] = useState("");
+  const { data: fundReport, isLoading: fundReportLoading } = useQuery<{
+    funds: { fund: string; pcoCents: number; webCents: number; totalCents: number; count: number }[];
+    totals: { pcoCents: number; webCents: number; totalCents: number; count: number };
+  }>({
+    queryKey: ["/api/admin/fund-report", fundReportStart, fundReportEnd],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (fundReportStart) params.set("startDate", fundReportStart);
+      if (fundReportEnd) params.set("endDate", fundReportEnd);
+      const res = await fetch(`/api/admin/fund-report?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load fund report");
+      return res.json();
+    },
+    enabled: view === "reports",
+  });
+
+  function setFundRange(range: "month" | "ytd" | "all") {
+    const now = new Date();
+    if (range === "all") {
+      setFundReportStart("");
+      setFundReportEnd("");
+    } else if (range === "month") {
+      setFundReportStart(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]);
+      setFundReportEnd("");
+    } else {
+      setFundReportStart(new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0]);
+      setFundReportEnd("");
+    }
+  }
+
+  function exportFundReportCSV() {
+    if (!fundReport?.funds?.length) return;
+    const headers = ["Fund", "Planning Center", "Website", "Total", "Gifts"];
+    const rows = fundReport.funds.map((r) => [
+      r.fund,
+      (r.pcoCents / 100).toFixed(2),
+      (r.webCents / 100).toFixed(2),
+      (r.totalCents / 100).toFixed(2),
+      String(r.count),
+    ]);
+    rows.push(["TOTAL", (fundReport.totals.pcoCents / 100).toFixed(2), (fundReport.totals.webCents / 100).toFixed(2), (fundReport.totals.totalCents / 100).toFixed(2), String(fundReport.totals.count)]);
+    const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `giving-by-fund-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function triggerSync() {
     setSyncLoading(true);
@@ -4731,6 +4924,61 @@ function DonationsTab() {
           {/* REPORTS */}
           {view === "reports" && (
             <div className="space-y-6">
+              {/* Giving by Fund — combines Planning Center + website giving */}
+              <Card data-testid="card-fund-report">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap space-y-0">
+                  <CardTitle className="text-sm font-medium">Giving by Fund</CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => setFundRange("month")}>This Month</Button>
+                    <Button variant="outline" size="sm" onClick={() => setFundRange("ytd")}>This Year</Button>
+                    <Button variant="outline" size="sm" onClick={() => setFundRange("all")}>All Time</Button>
+                    <Input type="date" value={fundReportStart} onChange={(e) => setFundReportStart(e.target.value)} className="w-auto h-8" aria-label="Start date" />
+                    <span className="text-muted-foreground text-sm">to</span>
+                    <Input type="date" value={fundReportEnd} onChange={(e) => setFundReportEnd(e.target.value)} className="w-auto h-8" aria-label="End date" />
+                    <Button variant="outline" size="sm" onClick={exportFundReportCSV} disabled={!fundReport?.funds?.length}>
+                      <Download className="w-4 h-4 mr-1" /> CSV
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {fundReportLoading ? (
+                    <p className="text-muted-foreground text-sm">Loading...</p>
+                  ) : !fundReport?.funds?.length ? (
+                    <p className="text-muted-foreground text-sm">No giving recorded in this date range.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fund</TableHead>
+                          <TableHead className="text-right">Planning Center</TableHead>
+                          <TableHead className="text-right">Website</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="text-right">Gifts</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {fundReport.funds.map((r) => (
+                          <TableRow key={r.fund}>
+                            <TableCell className="font-medium">{r.fund}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatCents(r.pcoCents)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatCents(r.webCents)}</TableCell>
+                            <TableCell className="text-right tabular-nums font-bold">{formatCents(r.totalCents)}</TableCell>
+                            <TableCell className="text-right tabular-nums">{r.count}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow>
+                          <TableCell className="font-bold">Total</TableCell>
+                          <TableCell className="text-right tabular-nums font-bold">{formatCents(fundReport.totals.pcoCents)}</TableCell>
+                          <TableCell className="text-right tabular-nums font-bold">{formatCents(fundReport.totals.webCents)}</TableCell>
+                          <TableCell className="text-right tabular-nums font-bold">{formatCents(fundReport.totals.totalCents)}</TableCell>
+                          <TableCell className="text-right tabular-nums font-bold">{fundReport.totals.count}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* YTD Comparison Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
@@ -5271,7 +5519,10 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
 
   function fmtVal(v: any): string {
     if (v == null || v === "") return "";
-    if (Array.isArray(v)) return v.join(", ");
+    if (Array.isArray(v)) {
+      // Claim entries: plain labels or { label, quantity }
+      return v.map((e) => (typeof e === "object" && e?.label ? (e.quantity > 1 ? `${e.label} (x${e.quantity})` : e.label) : String(e))).join(", ");
+    }
     if (typeof v === "object") return [v.address, v.city, v.state, v.zip].filter(Boolean).join(", ");
     return String(v);
   }
@@ -5294,7 +5545,11 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
     for (const fs of formSubs || []) {
       const val = (fs.data as any)?.[field.id] ?? (fs.data as any)?.[String(field.id)];
       const vals = Array.isArray(val) ? val : typeof val === "string" ? [val] : [];
-      for (const v of vals) if (counts[v] !== undefined) counts[v]++;
+      for (const v of vals) {
+        const label = typeof v === "object" && v?.label ? v.label : String(v);
+        const qty = typeof v === "object" && v?.quantity > 1 ? v.quantity : 1;
+        if (counts[label] !== undefined) counts[label] += qty;
+      }
     }
     return { field, items: opts.map((o) => ({ ...o, claimed: counts[o.label] || 0 })) };
   });
@@ -5546,6 +5801,7 @@ function SignupsTab() {
   const [signupImagePickerOpen, setSignupImagePickerOpen] = useState(false);
   const [qrLogoUrl, setQrLogoUrl] = useState("");
   const [qrLogoPickerOpen, setQrLogoPickerOpen] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -5587,6 +5843,7 @@ function SignupsTab() {
     });
     setDisplayType("thank_you");
     setQrLogoUrl("");
+    setPaymentUrl("");
     setStep(1);
     setView("editor");
   }
@@ -5623,6 +5880,7 @@ function SignupsTab() {
     setDisplayType(pss.displayType || "thank_you");
     const settings = (signup.settings || {}) as any;
     setQrLogoUrl(settings.qrLogoUrl || "");
+    setPaymentUrl(settings.paymentUrl || "");
     setStep(1);
     setView("editor");
   }
@@ -5677,6 +5935,7 @@ function SignupsTab() {
       },
       settings: {
         qrLogoUrl: qrLogoUrl || null,
+        paymentUrl: paymentUrl || null,
       },
       ...overrides,
     };
@@ -5873,9 +6132,24 @@ function SignupsTab() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Cost <span className="text-muted-foreground font-normal">(optional — shown to people signing up, e.g. "$10 for the book")</span></Label>
-                  <Input value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} data-testid="input-signup-cost" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Cost <span className="text-muted-foreground font-normal">(optional — e.g. "$10 for the book")</span></Label>
+                    <Input value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} data-testid="input-signup-cost" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Online payment link <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      value={paymentUrl}
+                      onChange={(e) => setPaymentUrl(e.target.value)}
+                      placeholder="https://lakecitycc.churchcenter.com/giving/to/..."
+                      data-testid="input-signup-payment-url"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Paste a Planning Center giving link (it can point at a specific fund). A "Pay Online"
+                      button appears on the sign up page and in confirmation emails — no separate collection box needed.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -5886,6 +6160,7 @@ function SignupsTab() {
                   <div className="space-y-2">
                     <Label>Contact Email</Label>
                     <Input type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} data-testid="input-signup-contact-email" />
+                    <p className="text-xs text-muted-foreground">Gets an email each time someone signs up.</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Contact Phone</Label>

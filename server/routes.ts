@@ -22,6 +22,7 @@ import { seedDatabase } from "./seed";
 import { XMLParser } from "fast-xml-parser";
 import v1Router from "./v1-routes";
 import { verifyAccessToken } from "./jwt";
+import { publicFormGuard } from "./spam-guard";
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -415,7 +416,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/contact", async (req, res) => {
+  app.post("/api/contact", publicFormGuard(), async (req, res) => {
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const submission = await storage.createContactSubmission(parsed.data);
@@ -460,7 +461,7 @@ export async function registerRoutes(
     res.json(data);
   });
 
-  app.post("/api/connect", async (req, res) => {
+  app.post("/api/connect", publicFormGuard(), async (req, res) => {
     const parsed = insertConnectCardSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const card = await storage.createConnectCard(parsed.data);
@@ -488,6 +489,20 @@ export async function registerRoutes(
       res.json({ message: "Deleted" });
     } catch (err) {
       res.status(500).json({ message: "Failed to delete" });
+    }
+  });
+
+  // Bulk delete for clearing out spam cards
+  app.post("/api/connect/bulk-delete", requireFeature("connect"), async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map((n: any) => parseInt(n, 10)).filter((n: number) => !isNaN(n)) : [];
+      if (!ids.length) return res.status(400).json({ message: "No cards selected" });
+      for (const id of ids) {
+        await storage.deleteConnectCard(id);
+      }
+      res.json({ message: `Deleted ${ids.length} card${ids.length === 1 ? "" : "s"}` });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete selected cards" });
     }
   });
 
@@ -769,6 +784,29 @@ export async function registerRoutes(
     }
     await storage.deleteUser(userId);
     res.json({ message: "Deleted" });
+  });
+
+  // Bulk delete for clearing out spam registrations. Admin and super-admin
+  // accounts are skipped as a safety net, along with the caller's own account.
+  app.post("/api/users/bulk-delete", requireFeature("users"), async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map((n: any) => Number(n)).filter((n: number) => !isNaN(n)) : [];
+      if (!ids.length) return res.status(400).json({ message: "No users selected" });
+      let deleted = 0;
+      let skipped = 0;
+      for (const id of ids) {
+        if (id === req.session.userId) { skipped++; continue; }
+        const u = await storage.getUser(id);
+        if (!u) continue;
+        if ((u.roles || []).some((r: string) => r === "admin" || r === "super_admin")) { skipped++; continue; }
+        await storage.deleteUser(id);
+        deleted++;
+      }
+      res.json({ message: `Deleted ${deleted} account${deleted === 1 ? "" : "s"}${skipped ? ` (skipped ${skipped} admin/own account${skipped === 1 ? "" : "s"})` : ""}` });
+    } catch (err) {
+      console.error("Bulk user delete error:", err);
+      res.status(500).json({ message: "Failed to delete selected users" });
+    }
   });
 
   app.post("/api/users/:id/photo", requireFeature("users"), async (req, res) => {
@@ -1537,6 +1575,29 @@ export async function registerRoutes(
     });
   }
 
+  // A claim entry is either a plain option label (quantity 1) or
+  // { label, quantity } when someone offers to bring more than one.
+  function parseClaimEntries(val: any): Array<{ label: string; quantity: number }> {
+    const arr = Array.isArray(val) ? val : typeof val === "string" ? [val] : [];
+    const out: Array<{ label: string; quantity: number }> = [];
+    for (const v of arr) {
+      if (typeof v === "string") {
+        out.push({ label: v, quantity: 1 });
+      } else if (v && typeof v === "object" && typeof v.label === "string") {
+        const q = Number(v.quantity);
+        out.push({ label: v.label, quantity: Number.isFinite(q) && q > 0 ? Math.floor(q) : 1 });
+      }
+    }
+    return out;
+  }
+
+  function formatClaimValue(val: any): string {
+    if (typeof val === "string") return val;
+    return parseClaimEntries(val)
+      .map((e) => (e.quantity > 1 ? `${e.label} (x${e.quantity})` : e.label))
+      .join(", ");
+  }
+
   function computeOptionUsage(fieldId: number, options: Array<{ label: string; capacity?: number }>, submissions: any[]): Record<string, { capacity?: number; used: number; remaining?: number }> {
     const usage: Record<string, { capacity?: number; used: number; remaining?: number }> = {};
     for (const opt of options) {
@@ -1546,13 +1607,9 @@ export async function registerRoutes(
     for (const sub of submissions) {
       const data = sub.data as Record<string, any>;
       const val = data[fieldId] ?? data[fieldKey];
-      if (typeof val === "string" && usage[val] !== undefined) {
-        usage[val].used++;
-      } else if (Array.isArray(val)) {
-        for (const v of val) {
-          if (typeof v === "string" && usage[v] !== undefined) {
-            usage[v].used++;
-          }
+      for (const entry of parseClaimEntries(val)) {
+        if (usage[entry.label] !== undefined) {
+          usage[entry.label].used += entry.quantity;
         }
       }
     }
@@ -1579,11 +1636,20 @@ export async function registerRoutes(
     for (const field of capacityFields) {
       const parsed = parseFieldOptions(field.options);
       const usage = computeOptionUsage(field.id, parsed, submissions);
-      const val = data[field.id];
-      const vals = Array.isArray(val) ? val : typeof val === "string" ? [val] : [];
-      for (const v of vals) {
-        if (typeof v === "string" && usage[v]?.capacity && usage[v].remaining !== undefined && usage[v].remaining! <= 0) {
-          return `"${v}" for ${field.label} is full. Please choose a different option.`;
+      // Sum requested quantity per label so one submission claiming the same
+      // item twice is checked as a whole.
+      const requested: Record<string, number> = {};
+      for (const entry of parseClaimEntries(data[field.id])) {
+        requested[entry.label] = (requested[entry.label] || 0) + entry.quantity;
+      }
+      for (const [label, qty] of Object.entries(requested)) {
+        const info = usage[label];
+        if (!info?.capacity || info.remaining === undefined) continue;
+        if (info.remaining <= 0) {
+          return `"${label}" for ${field.label} is full. Please choose a different option.`;
+        }
+        if (qty > info.remaining) {
+          return `Only ${info.remaining} of "${label}" ${info.remaining === 1 ? "is" : "are"} still needed for ${field.label}. Please lower the quantity.`;
         }
       }
     }
@@ -1621,9 +1687,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/public/forms/:slug/submit", async (req, res) => {
+  app.post("/api/public/forms/:slug/submit", publicFormGuard({ fakeSuccess: { message: "Thank you for your submission!" } }), async (req, res) => {
     try {
-      const form = await storage.getFormBySlug(req.params.slug);
+      const form = await storage.getFormBySlug(String(req.params.slug));
       if (!form || form.status !== "published") return res.status(404).json({ message: "Form not found" });
       const fields = await storage.getFormFields(form.id);
       const data = req.body;
@@ -1665,8 +1731,10 @@ export async function registerRoutes(
             if (val !== undefined && val !== null && val !== "") {
               if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
                 details[field.label] = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
+              } else if (Array.isArray(val)) {
+                details[field.label] = formatClaimValue(val);
               } else {
-                details[field.label] = Array.isArray(val) ? val.join(", ") : String(val);
+                details[field.label] = String(val);
               }
             }
           }
@@ -1869,9 +1937,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/public/signups/:slug/submit", async (req, res) => {
+  app.post("/api/public/signups/:slug/submit", publicFormGuard({ fakeSuccess: { submission: null, status: "confirmed", waitlistPosition: null, postSubmissionSettings: {} } }), async (req, res) => {
     try {
-      const event = await storage.getSignupEventBySlug(req.params.slug);
+      const event = await storage.getSignupEventBySlug(String(req.params.slug));
       if (!event || (event.status !== "published" && event.status !== "closed")) {
         return res.status(404).json({ message: "Signup event not found" });
       }
@@ -1938,6 +2006,75 @@ export async function registerRoutes(
         return { submission, status: submissionStatus, waitlistPosition };
       });
       if ("error" in result) return res.status(400).json({ message: result.error });
+
+      // Confirmation to the person + notification to the sign up's contact
+      // person (fire-and-forget; failures never block the signup).
+      (async () => {
+        try {
+          const { sendEmail } = await import("./email-service");
+          const { signupConfirmationEmail, adminNotificationEmail } = await import("./email-templates");
+          const formData = (req.body.formData || {}) as Record<string, any>;
+          const fields = event.formId ? await storage.getFormFields(event.formId) : [];
+          const details: Record<string, string> = {};
+          let submitterEmail: string | null = null;
+          let submitterName: string | null = null;
+          for (const field of fields) {
+            const val = formData[field.id] ?? formData[String(field.id)];
+            if (val === undefined || val === null || val === "") continue;
+            let text: string;
+            if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
+              text = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
+            } else if (Array.isArray(val)) {
+              text = formatClaimValue(val);
+            } else {
+              text = String(val);
+            }
+            details[field.label] = text;
+            if (!submitterEmail && field.fieldType === "email") submitterEmail = text;
+            if (!submitterName && field.fieldType === "text" && /name/i.test(field.label)) submitterName = text;
+          }
+          if (!submitterName) {
+            const firstText = fields.find((f) => f.fieldType === "text");
+            if (firstText) {
+              const v = formData[firstText.id] ?? formData[String(firstText.id)];
+              if (typeof v === "string") submitterName = v;
+            }
+          }
+          const settings = (event.settings || {}) as any;
+          const eventDateText = event.eventDate
+            ? new Date(event.eventDate).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "full", timeStyle: "short" })
+            : null;
+          const signupUrl = `https://www.lakecitycc.com/signups/${event.slug}`;
+          if (submitterEmail) {
+            const emailData = signupConfirmationEmail(
+              submitterName,
+              event.title,
+              eventDateText,
+              event.location,
+              result.status === "waitlisted" ? "waitlisted" : "confirmed",
+              details,
+              { cost: event.cost, paymentUrl: settings.paymentUrl || null, signupUrl },
+            );
+            sendEmail({ to: submitterEmail, ...emailData }).catch(() => {});
+          }
+          let notifyTo: string | null = event.contactEmail || null;
+          if (!notifyTo && event.formId) {
+            const form = await storage.getForm(event.formId);
+            notifyTo = (form as any)?.notificationEmail || null;
+          }
+          if (notifyTo) {
+            const emailData = adminNotificationEmail(
+              `New Signup: ${event.title}`,
+              `${submitterName || "Someone"} just signed up${result.status === "waitlisted" ? " (waitlisted)" : ""}.`,
+              details,
+            );
+            sendEmail({ to: notifyTo, ...emailData }).catch(() => {});
+          }
+        } catch (err) {
+          console.error("Error sending signup emails:", err);
+        }
+      })();
+
       res.json({
         submission: result.submission,
         status: result.status,
@@ -2118,6 +2255,51 @@ export async function registerRoutes(
     } catch (err) {
       console.error("PCO sync error:", err);
       res.status(500).json({ message: "Sync failed" });
+    }
+  });
+
+  // Admin: giving grouped by designated fund for a date range, combining the
+  // Planning Center ledger (where real giving flows) and website donations.
+  app.get("/api/admin/fund-report", requireFeature("donations"), async (req, res) => {
+    try {
+      const start = req.query.startDate ? new Date(String(req.query.startDate)) : null;
+      const end = req.query.endDate ? new Date(String(req.query.endDate)) : null;
+      if (end) end.setHours(23, 59, 59, 999);
+      const inRange = (d: Date) => (!start || d >= start) && (!end || d <= end);
+
+      const rows = new Map<string, { fund: string; pcoCents: number; webCents: number; count: number }>();
+      const add = (fund: string, cents: number, source: "pco" | "web") => {
+        const row = rows.get(fund) || { fund, pcoCents: 0, webCents: 0, count: 0 };
+        if (source === "pco") row.pcoCents += cents; else row.webCents += cents;
+        row.count += 1;
+        rows.set(fund, row);
+      };
+
+      const funds = await storage.getDonationFunds();
+      const fundNameById = new Map(funds.map((f) => [f.id, f.name]));
+      for (const d of await storage.getDonations()) {
+        if (d.status !== "completed") continue;
+        const dt = new Date((d.donationDate || d.createdAt) as any);
+        if (!inRange(dt)) continue;
+        add(d.fundId ? fundNameById.get(d.fundId) || "Unknown fund" : "General (no fund)", d.amountCents, "web");
+      }
+      for (const d of await storage.getPcoDonations()) {
+        const dt = new Date((d.receivedAt || d.createdAt) as any);
+        if (!inRange(dt)) continue;
+        add(d.fundName || "General (no fund)", d.amountCents, "pco");
+      }
+
+      const result = Array.from(rows.values())
+        .map((r) => ({ ...r, totalCents: r.pcoCents + r.webCents }))
+        .sort((a, b) => b.totalCents - a.totalCents);
+      const totals = result.reduce(
+        (acc, r) => ({ pcoCents: acc.pcoCents + r.pcoCents, webCents: acc.webCents + r.webCents, totalCents: acc.totalCents + r.totalCents, count: acc.count + r.count }),
+        { pcoCents: 0, webCents: 0, totalCents: 0, count: 0 },
+      );
+      res.json({ funds: result, totals });
+    } catch (err) {
+      console.error("Fund report error:", err);
+      res.status(500).json({ message: "Error building fund report" });
     }
   });
 
@@ -2342,7 +2524,7 @@ export async function registerRoutes(
   });
 
   // Public: submit signup form
-  app.post("/api/city-groups/signup", async (req, res) => {
+  app.post("/api/city-groups/signup", publicFormGuard(), async (req, res) => {
     try {
       const { cityGroupSignupFormSchema } = await import("@shared/schema");
       const parsed = cityGroupSignupFormSchema.safeParse(req.body);

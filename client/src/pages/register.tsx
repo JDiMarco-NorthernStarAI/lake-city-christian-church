@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import SocialAuthButtons from "@/components/social-auth-buttons";
 import AddressAutocomplete from "@/components/address-autocomplete";
 import { usePageContent } from "@/hooks/use-page-content";
+import { useSpamGuard } from "@/components/spam-guard";
 
 export default function Register() {
   const content = usePageContent("register", {
@@ -22,6 +23,7 @@ export default function Register() {
   const [, navigate] = useLocation();
   const { register } = useAuth();
   const { toast } = useToast();
+  const spamGuard = useSpamGuard();
   const [loading, setLoading] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
   const [otherGroup, setOtherGroup] = useState("");
@@ -68,6 +70,7 @@ export default function Register() {
     }
     setLoading(true);
     const result = await register({
+      ...(spamGuard.values() as any),
       name: form.name,
       email: form.email,
       phone: form.phone,
@@ -112,6 +115,7 @@ export default function Register() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {spamGuard.field}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-white/80">Full Name *</Label>
                 <Input

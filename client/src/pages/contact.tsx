@@ -14,6 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { usePageContent } from "@/hooks/use-page-content";
+import { useSpamGuard } from "@/components/spam-guard";
 
 const contactFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -57,9 +58,10 @@ export default function Contact() {
   });
 
   const { toast } = useToast();
+  const spamGuard = useSpamGuard();
   const mutation = useMutation({
     mutationFn: async (data: ContactFormValues) => {
-      await apiRequest("POST", "/api/contact", data);
+      await apiRequest("POST", "/api/contact", { ...data, ...spamGuard.values() });
     },
     onSuccess: () => {
       setSuccessMessage(true);
@@ -269,6 +271,7 @@ export default function Contact() {
 
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        {spamGuard.field}
                         {/* Name Field */}
                         <FormField
                           control={form.control}
