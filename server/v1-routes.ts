@@ -18,6 +18,7 @@ import {
 import { z } from "zod";
 import crypto from "crypto";
 import { publicFormGuard } from "./spam-guard";
+import { isLikelySpamRegistration } from "@shared/spam-heuristics";
 
 const objectStorage = new ObjectStorageService();
 
@@ -74,8 +75,14 @@ function sanitizeUser(user: any) {
   return safe;
 }
 
-v1Router.post("/auth/register", publicFormGuard({ limit: 3, fakeSuccess: { success: false, data: null, error: "Registration could not be completed. Please contact the church office." } }), async (req, res) => {
+v1Router.post("/auth/register", publicFormGuard({ limit: 3, requireTimestamp: true, fakeSuccess: { success: false, data: null, error: "Registration could not be completed. Please contact the church office." } }), async (req, res) => {
   try {
+    // Bot-pattern registrations (gibberish names, dotted-gmail variants) are
+    // rejected with a generic message before an account is ever created.
+    if (isLikelySpamRegistration(req.body || {})) {
+      console.log(`Blocked likely-spam registration from ${req.body?.email}`);
+      return apiResponse(res, 400, null, "Registration could not be completed. Please contact the church office.");
+    }
     const parsed = registerUserSchema.safeParse(req.body);
     if (!parsed.success) {
       return apiResponse(res, 400, null, parsed.error.errors.map((e) => e.message).join(", "));

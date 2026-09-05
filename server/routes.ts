@@ -23,6 +23,7 @@ import { XMLParser } from "fast-xml-parser";
 import v1Router from "./v1-routes";
 import { verifyAccessToken } from "./jwt";
 import { publicFormGuard } from "./spam-guard";
+import { isLikelySpamConnectCard } from "@shared/spam-heuristics";
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -430,7 +431,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/contact", publicFormGuard(), async (req, res) => {
+  app.post("/api/contact", publicFormGuard({ requireTimestamp: true }), async (req, res) => {
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
     const submission = await storage.createContactSubmission(parsed.data);
@@ -522,9 +523,15 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/connect", publicFormGuard(), async (req, res) => {
+  app.post("/api/connect", publicFormGuard({ requireTimestamp: true }), async (req, res) => {
     const parsed = insertConnectCardSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    // Bot-written content (gibberish names, random-token prayer requests) is
+    // silently dropped: the bot sees success, nothing is stored.
+    if (isLikelySpamConnectCard(parsed.data)) {
+      console.log(`Dropped likely-spam connect card from ${(parsed.data as any).email}`);
+      return res.status(201).json({ id: 0, ...parsed.data });
+    }
     const card = await storage.createConnectCard(parsed.data);
 
     if (parsed.data.email) {
@@ -1774,7 +1781,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/public/forms/:slug/submit", publicFormGuard({ fakeSuccess: { message: "Thank you for your submission!" } }), async (req, res) => {
+  app.post("/api/public/forms/:slug/submit", publicFormGuard({ requireTimestamp: true, fakeSuccess: { message: "Thank you for your submission!" } }), async (req, res) => {
     try {
       const form = await storage.getFormBySlug(String(req.params.slug));
       if (!form || form.status !== "published") return res.status(404).json({ message: "Form not found" });
@@ -2024,7 +2031,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/public/signups/:slug/submit", publicFormGuard({ fakeSuccess: { submission: null, status: "confirmed", waitlistPosition: null, postSubmissionSettings: {} } }), async (req, res) => {
+  app.post("/api/public/signups/:slug/submit", publicFormGuard({ requireTimestamp: true, fakeSuccess: { submission: null, status: "confirmed", waitlistPosition: null, postSubmissionSettings: {} } }), async (req, res) => {
     try {
       const event = await storage.getSignupEventBySlug(String(req.params.slug));
       if (!event || (event.status !== "published" && event.status !== "closed")) {
@@ -2633,7 +2640,7 @@ export async function registerRoutes(
   });
 
   // Public: submit signup form
-  app.post("/api/city-groups/signup", publicFormGuard(), async (req, res) => {
+  app.post("/api/city-groups/signup", publicFormGuard({ requireTimestamp: true }), async (req, res) => {
     try {
       const { cityGroupSignupFormSchema } = await import("@shared/schema");
       const parsed = cityGroupSignupFormSchema.safeParse(req.body);

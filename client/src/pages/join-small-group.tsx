@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
+import { useSpamGuard } from "@/components/spam-guard";
 
 interface CityGroup {
   id: number;
@@ -35,6 +36,7 @@ export default function JoinSmallGroup() {
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const spamGuard = useSpamGuard();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -66,7 +68,7 @@ export default function JoinSmallGroup() {
       const res = await fetch("/api/city-groups/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, groupIds: selectedGroups }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), phone: phone.trim() || undefined, groupIds: selectedGroups, ...spamGuard.values() }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -160,6 +162,7 @@ export default function JoinSmallGroup() {
           <Card className="hover-elevate">
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="space-y-6">
+                {spamGuard.field}
                 <div>
                   <Label htmlFor="name" className="text-base font-semibold">Name (First, Last)</Label>
                   <Input

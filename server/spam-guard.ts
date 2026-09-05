@@ -18,7 +18,7 @@ function clientIp(req: Request): string {
   return req.socket?.remoteAddress || "unknown";
 }
 
-export function publicFormGuard(options: { limit?: number; fakeSuccess?: any } = {}): RequestHandler {
+export function publicFormGuard(options: { limit?: number; fakeSuccess?: any; requireTimestamp?: boolean } = {}): RequestHandler {
   const limit = options.limit ?? 8;
   return (req, res, next) => {
     const body = req.body || {};
@@ -26,11 +26,19 @@ export function publicFormGuard(options: { limit?: number; fakeSuccess?: any } =
     const honeypotFilled = typeof body.website === "string" && body.website.trim() !== "";
     const started = Number(body.formStartedAt);
     const tooFast = body.formStartedAt !== undefined && Number.isFinite(started) && Date.now() - started < MIN_FILL_MS;
+    // Our own forms always stamp formStartedAt, so on endpoints only they use,
+    // a submission without it came from a bot posting straight to the API —
+    // or from a tab loaded before this deploy, so ask for a refresh rather
+    // than silently dropping anything.
+    const missingTimestamp = options.requireTimestamp === true && body.formStartedAt === undefined;
     // Strip guard fields so they never reach validation or storage
     delete body.website;
     delete body.formStartedAt;
     if (honeypotFilled || tooFast) {
       return res.status(201).json(options.fakeSuccess ?? { message: "Thank you!" });
+    }
+    if (missingTimestamp) {
+      return res.status(400).json({ message: "Please refresh the page and try again." });
     }
 
     const key = `${req.path}|${clientIp(req)}`;

@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, MapPin, Users, DollarSign, Mail, Phone, CheckCircle, Clock, AlertCircle, Loader2, ClipboardList, ArrowLeft } from "lucide-react";
 import type { SignupEvent, FormField } from "@shared/schema";
 import { SIGNUP_CATEGORY_LABELS } from "@shared/schema";
+import { useSpamGuard } from "@/components/spam-guard";
 
 function getImageSrc(path: string | null | undefined) {
   if (!path) return undefined;
@@ -122,6 +123,7 @@ export default function SignupDetail() {
   const [submitted, setSubmitted] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResponse | null>(null);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const spamGuard = useSpamGuard();
   const [guestCount, setGuestCount] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [autoFilled, setAutoFilled] = useState(false);
@@ -173,7 +175,7 @@ export default function SignupDetail() {
 
   const submitMutation = useMutation({
     mutationFn: async (payload: { formData: Record<string, any>; guestCount: number }) => {
-      const res = await apiRequest("POST", `/api/public/signups/${slug}/submit`, payload);
+      const res = await apiRequest("POST", `/api/public/signups/${slug}/submit`, { ...payload, ...spamGuard.values() });
       return res.json();
     },
     onSuccess: (result: SubmitResponse) => {
@@ -830,6 +832,7 @@ export default function SignupDetail() {
                     Register
                   </h2>
                   <form onSubmit={handleSubmit} className="space-y-6" data-testid="form-signup">
+                    {spamGuard.field}
                     {fields.map((field) => (
                       field.fieldType === "hidden" ? (
                         <div key={field.id}>{renderField(field)}</div>

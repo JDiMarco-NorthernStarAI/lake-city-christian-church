@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CheckCircle, Loader2 } from "lucide-react";
 import AddressAutocomplete from "@/components/address-autocomplete";
 import type { FormField } from "@shared/schema";
+import { useSpamGuard } from "@/components/spam-guard";
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -89,6 +90,7 @@ export default function PublicForm() {
   const { user: authUser } = useAuth();
   const [submitted, setSubmitted] = useState(false);
   const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const spamGuard = useSpamGuard();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [autoFilled, setAutoFilled] = useState(false);
 
@@ -128,7 +130,7 @@ export default function PublicForm() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: Record<string, any>) => {
-      const res = await apiRequest("POST", `/api/public/forms/${slug}/submit`, data);
+      const res = await apiRequest("POST", `/api/public/forms/${slug}/submit`, { ...data, ...spamGuard.values() });
       return res.json();
     },
     onSuccess: (result) => {
@@ -464,6 +466,7 @@ export default function PublicForm() {
               <Card data-testid="card-form">
                 <CardContent className="pt-6">
                   <form onSubmit={handleSubmit} className="space-y-6" data-testid="form-public">
+                    {spamGuard.field}
                     {formData.fields.map((field) => (
                       <div key={field.id} className="space-y-2" data-testid={`form-field-${field.id}`}>
                         <Label className="text-sm font-medium">
