@@ -152,6 +152,20 @@ function requireFeature(feature: string) {
   };
 }
 
+// Ministry-scoped access: full admins see everything; other staff who were
+// granted a feature (ministry leaders) can only see and manage records they
+// created themselves.
+function isFullAdmin(req: Request): boolean {
+  const roles = req.session?.roles || [];
+  return roles.includes("admin") || roles.includes("super_admin");
+}
+
+function ownsRecord(req: Request, createdBy: number | null | undefined): boolean {
+  return isFullAdmin(req) || (createdBy != null && createdBy === req.session?.userId);
+}
+
+const SCOPE_DENIED = "This was created by another leader — you can only manage sign ups and forms you created.";
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -445,11 +459,47 @@ export async function registerRoutes(
       const formSubsNew = since ? formSubsAll.filter(s => s.submittedAt && new Date(s.submittedAt) > since).length : 0;
       const signupSubsNew = since ? signupSubsAll.filter(s => s.createdAt && new Date(s.createdAt) > since).length : 0;
       const messagesNew = since ? messagesAll.filter(m => m.createdAt && new Date(m.createdAt) > since).length : 0;
+
+      // Recent activity feed: latest items across all sources
+      const [allForms, allSignupEvents] = await Promise.all([storage.getForms(), storage.getSignupEvents()]);
+      const formTitleById = new Map(allForms.map((f) => [f.id, f.title]));
+      const signupTitleById = new Map(allSignupEvents.map((s) => [s.id, s.title]));
+      const recent = [
+        ...connectCardsAll.map((c) => ({
+          type: "connect" as const,
+          title: `${c.firstName} ${c.lastName}`.trim() || "Connect card",
+          subtitle: "New connect card",
+          date: c.createdAt,
+        })),
+        ...messagesAll.map((m) => ({
+          type: "message" as const,
+          title: m.name || m.email || "Message",
+          subtitle: (m.message || "").slice(0, 80),
+          date: m.createdAt,
+        })),
+        ...signupSubsAll.map((s) => ({
+          type: "signup" as const,
+          title: signupTitleById.get(s.signupEventId) || "Sign up",
+          subtitle: `New signup${s.status === "waitlisted" ? " (waitlisted)" : ""}`,
+          date: s.createdAt,
+        })),
+        ...formSubsAll.map((s) => ({
+          type: "form" as const,
+          title: formTitleById.get(s.formId) || "Form",
+          subtitle: "New response",
+          date: s.submittedAt,
+        })),
+      ]
+        .filter((r) => r.date)
+        .sort((a, b) => new Date(b.date as any).getTime() - new Date(a.date as any).getTime())
+        .slice(0, 10);
+
       res.json({
         connectCards: { total: connectCardsAll.length, new: connectNew },
         formSubmissions: { total: formSubsAll.length, new: formSubsNew },
         signupSubmissions: { total: signupSubsAll.length, new: signupSubsNew },
         messages: { total: messagesAll.length, new: messagesNew },
+        recent,
       });
     } catch (err) {
       res.status(500).json({ message: "Error fetching dashboard stats" });
@@ -459,6 +509,17 @@ export async function registerRoutes(
   app.get("/api/contact", requireFeature("messages"), async (_req, res) => {
     const data = await storage.getContactSubmissions();
     res.json(data);
+  });
+
+  app.delete("/api/contact/:id", requireFeature("messages"), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+      await storage.deleteContactSubmission(id);
+      res.json({ message: "Deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete message" });
+    }
   });
 
   app.post("/api/connect", publicFormGuard(), async (req, res) => {
@@ -860,9 +921,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/forms", requireFeature("forms"), async (_req, res) => {
+  app.get("/api/forms", requireFeature("forms"), async (req, res) => {
     try {
-      const data = await storage.getForms();
+      const all = await storage.getForms();
+      const data = all.filter((f) => ownsRecord(req, f.createdBy));
       const formsWithCounts = await Promise.all(
         data.map(async (form) => ({
           ...form,
@@ -880,6 +942,7 @@ export async function registerRoutes(
     try {
       const form = await storage.getForm(Number(req.params.id));
       if (!form) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, form.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const fields = await storage.getFormFields(form.id);
       res.json({ ...form, fields });
     } catch (err) {
@@ -905,6 +968,7 @@ export async function registerRoutes(
       const formId = Number(req.params.id);
       const form = await storage.getForm(formId);
       if (!form) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, form.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const parsed = createFormSchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid form data" });
       if (parsed.data.slug && parsed.data.slug !== form.slug) {
@@ -920,7 +984,10 @@ export async function registerRoutes(
 
   app.delete("/api/forms/:id", requireFeature("forms"), async (req, res) => {
     try {
-      await storage.deleteForm(Number(req.params.id));
+      const form = await storage.getForm(Number(req.params.id));
+      if (!form) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, form.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
+      await storage.deleteForm(form.id);
       res.json({ message: "Form deleted" });
     } catch (err) {
       res.status(500).json({ message: "Error deleting form" });
@@ -931,6 +998,7 @@ export async function registerRoutes(
     try {
       const original = await storage.getForm(Number(req.params.id));
       if (!original) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, original.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const fields = await storage.getFormFields(original.id);
       const newForm = await storage.createForm({
         title: `${original.title} (Copy)`,
@@ -964,6 +1032,9 @@ export async function registerRoutes(
 
   app.get("/api/forms/:id/fields", requireFeature("forms"), async (req, res) => {
     try {
+      const parent = await storage.getForm(Number(req.params.id));
+      if (!parent) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, parent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const fields = await storage.getFormFields(Number(req.params.id));
       res.json(fields);
     } catch (err) {
@@ -976,6 +1047,7 @@ export async function registerRoutes(
       const formId = Number(req.params.id);
       const form = await storage.getForm(formId);
       if (!form) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, form.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const parsed = createFormFieldSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid field data" });
       const existingFields = await storage.getFormFields(formId);
@@ -989,6 +1061,9 @@ export async function registerRoutes(
 
   app.patch("/api/forms/:formId/fields/:fieldId", requireFeature("forms"), async (req, res) => {
     try {
+      const parent = await storage.getForm(Number(req.params.formId));
+      if (!parent) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, parent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const parsed = createFormFieldSchema.partial().safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid field data" });
       const updated = await storage.updateFormField(Number(req.params.fieldId), parsed.data);
@@ -1001,6 +1076,9 @@ export async function registerRoutes(
 
   app.delete("/api/forms/:formId/fields/:fieldId", requireFeature("forms"), async (req, res) => {
     try {
+      const parent = await storage.getForm(Number(req.params.formId));
+      if (!parent) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, parent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       await storage.deleteFormField(Number(req.params.fieldId));
       res.json({ message: "Field deleted" });
     } catch (err) {
@@ -1010,6 +1088,9 @@ export async function registerRoutes(
 
   app.put("/api/forms/:id/fields/reorder", requireFeature("forms"), async (req, res) => {
     try {
+      const parent = await storage.getForm(Number(req.params.id));
+      if (!parent) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, parent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const { fieldIds } = req.body;
       if (!Array.isArray(fieldIds)) return res.status(400).json({ message: "fieldIds array required" });
       for (let i = 0; i < fieldIds.length; i++) {
@@ -1024,6 +1105,9 @@ export async function registerRoutes(
 
   app.get("/api/forms/:id/submissions", requireFeature("forms"), async (req, res) => {
     try {
+      const parent = await storage.getForm(Number(req.params.id));
+      if (!parent) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, parent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const submissions = await storage.getFormSubmissions(Number(req.params.id));
       res.json(submissions);
     } catch (err) {
@@ -1033,6 +1117,9 @@ export async function registerRoutes(
 
   app.delete("/api/forms/:formId/submissions/:subId", requireFeature("forms"), async (req, res) => {
     try {
+      const parent = await storage.getForm(Number(req.params.formId));
+      if (!parent) return res.status(404).json({ message: "Form not found" });
+      if (!ownsRecord(req, parent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       await storage.deleteFormSubmission(Number(req.params.subId));
       res.json({ message: "Submission deleted" });
     } catch (err) {
@@ -2119,10 +2206,10 @@ export async function registerRoutes(
   // SIGN UPS - Admin Endpoints
   // ============================================================
 
-  app.get("/api/signups", requireFeature("signups"), async (_req, res) => {
+  app.get("/api/signups", requireFeature("signups"), async (req, res) => {
     try {
       const events = await storage.getSignupEvents();
-      res.json(events);
+      res.json(events.filter((e) => ownsRecord(req, e.createdBy)));
     } catch (err) {
       res.status(500).json({ message: "Error fetching signup events" });
     }
@@ -2132,6 +2219,7 @@ export async function registerRoutes(
     try {
       const event = await storage.getSignupEvent(Number(req.params.id));
       if (!event) return res.status(404).json({ message: "Signup event not found" });
+      if (!ownsRecord(req, event.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       res.json(event);
     } catch (err) {
       res.status(500).json({ message: "Error fetching signup event" });
@@ -2181,6 +2269,9 @@ export async function registerRoutes(
         if (body[key] && typeof body[key] === "string") body[key] = new Date(body[key]);
         else if (body[key] === "") body[key] = null;
       }
+      const existingEvent = await storage.getSignupEvent(Number(req.params.id));
+      if (!existingEvent) return res.status(404).json({ message: "Signup event not found" });
+      if (!ownsRecord(req, existingEvent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const event = await storage.updateSignupEvent(Number(req.params.id), body);
       if (!event) return res.status(404).json({ message: "Signup event not found" });
       res.json(event);
@@ -2195,6 +2286,9 @@ export async function registerRoutes(
 
   app.delete("/api/signups/:id", requireFeature("signups"), async (req, res) => {
     try {
+      const event = await storage.getSignupEvent(Number(req.params.id));
+      if (!event) return res.status(404).json({ message: "Signup event not found" });
+      if (!ownsRecord(req, event.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       await storage.deleteSignupEvent(Number(req.params.id));
       res.json({ message: "Deleted" });
     } catch (err) {
@@ -2204,6 +2298,9 @@ export async function registerRoutes(
 
   app.get("/api/signups/:id/submissions", requireFeature("signups"), async (req, res) => {
     try {
+      const event = await storage.getSignupEvent(Number(req.params.id));
+      if (!event) return res.status(404).json({ message: "Signup event not found" });
+      if (!ownsRecord(req, event.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const submissions = await storage.getSignupSubmissions(Number(req.params.id));
       res.json(submissions);
     } catch (err) {
@@ -2213,6 +2310,10 @@ export async function registerRoutes(
 
   app.patch("/api/signups/submissions/:id", requireFeature("signups"), async (req, res) => {
     try {
+      const sub = await storage.getSignupSubmission(Number(req.params.id));
+      if (!sub) return res.status(404).json({ message: "Submission not found" });
+      const parentEvent = await storage.getSignupEvent(sub.signupEventId);
+      if (parentEvent && !ownsRecord(req, parentEvent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const submission = await storage.updateSignupSubmission(Number(req.params.id), req.body);
       if (!submission) return res.status(404).json({ message: "Submission not found" });
       res.json(submission);
@@ -2223,6 +2324,10 @@ export async function registerRoutes(
 
   app.post("/api/signups/submissions/:id/checkin", requireFeature("signups"), async (req, res) => {
     try {
+      const sub = await storage.getSignupSubmission(Number(req.params.id));
+      if (!sub) return res.status(404).json({ message: "Submission not found" });
+      const parentEvent = await storage.getSignupEvent(sub.signupEventId);
+      if (parentEvent && !ownsRecord(req, parentEvent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       const submission = await storage.updateSignupSubmission(Number(req.params.id), {
         checkedIn: true,
         checkedInAt: new Date(),
@@ -2237,6 +2342,10 @@ export async function registerRoutes(
 
   app.delete("/api/signups/submissions/:id", requireFeature("signups"), async (req, res) => {
     try {
+      const sub = await storage.getSignupSubmission(Number(req.params.id));
+      if (!sub) return res.status(404).json({ message: "Submission not found" });
+      const parentEvent = await storage.getSignupEvent(sub.signupEventId);
+      if (parentEvent && !ownsRecord(req, parentEvent.createdBy)) return res.status(403).json({ message: SCOPE_DENIED });
       await storage.deleteSignupSubmission(Number(req.params.id));
       res.json({ message: "Deleted" });
     } catch (err) {

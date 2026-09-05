@@ -26,6 +26,8 @@ import GiveSuccess from "@/pages/give-success";
 import PlanVisit from "@/pages/plan-visit";
 import Contact from "@/pages/contact";
 import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Register from "@/pages/register";
 import Account from "@/pages/account";
 import AdminLogin from "@/pages/admin-login";
@@ -63,6 +65,8 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/sms-terms" component={SmsTerms} />
       <Route path="/login" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/register" component={Register} />
       <Route path="/account" component={Account} />
       <Route path="/signups/:slug" component={SignupDetail} />

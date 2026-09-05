@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -36,6 +36,7 @@ import AdminMediaTab from "@/pages/admin-media";
 import ImagePickerModal from "@/components/image-picker-modal";
 import ConfirmDelete from "@/components/confirm-delete";
 import { getUnsaved, setUnsaved } from "@/lib/unsaved-guard";
+import { isLikelySpamConnectCard, isLikelySpamUser } from "@/lib/spam-detect";
 import { useSidebar } from "@/components/ui/sidebar";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -245,7 +246,7 @@ export default function AdminDashboard() {
             </span>
           </header>
           <div className="flex-1 p-6">
-          {activeTab === "dashboard" && <DashboardTab />}
+          {activeTab === "dashboard" && <DashboardTab onNavigate={setActiveTab} />}
           {activeTab === "analytics" && <AnalyticsTab />}
           {activeTab === "sermons" && <SermonsTab />}
           {activeTab === "events" && <EventsTab />}
@@ -329,7 +330,7 @@ function AdminSidebarNav({
   );
 }
 
-function DashboardTab() {
+function DashboardTab({ onNavigate }: { onNavigate: (tab: Tab) => void }) {
   const { data: sermons } = useQuery<Sermon[]>({ queryKey: ["/api/sermons"] });
   const { data: events } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: team } = useQuery<TeamMember[]>({ queryKey: ["/api/team"] });
@@ -341,6 +342,7 @@ function DashboardTab() {
     formSubmissions: { total: number; new: number };
     signupSubmissions: { total: number; new: number };
     messages: { total: number; new: number };
+    recent?: { type: "connect" | "message" | "signup" | "form"; title: string; subtitle: string; date: string }[];
   }>({
     queryKey: ["/api/admin/dashboard-stats", lastSeen],
     queryFn: async () => {
@@ -354,62 +356,133 @@ function DashboardTab() {
     localStorage.setItem("admin_dashboard_last_seen", new Date().toISOString());
   }, []);
 
-  const contentStats = [
-    { label: "Sermons", count: sermons?.length ?? 0, icon: Play },
-    { label: "Events", count: events?.length ?? 0, icon: Calendar },
-    { label: "Team Members", count: team?.length ?? 0, icon: Users },
+  const quickActions: { label: string; icon: any; tab: Tab }[] = [
+    { label: "New Sign Up", icon: UserPlus, tab: "signups" },
+    { label: "Add Sermon", icon: Play, tab: "sermons" },
+    { label: "Add Event", icon: Calendar, tab: "events" },
+    { label: "Send a Text", icon: MessageSquare, tab: "sms" },
   ];
 
-  const activityItems = [
-    { label: "Messages", total: dashStats?.messages.total ?? 0, newCount: dashStats?.messages.new ?? 0, icon: Mail },
-    { label: "Connect Cards", total: dashStats?.connectCards.total ?? 0, newCount: dashStats?.connectCards.new ?? 0, icon: FileText },
-    { label: "Sign Ups", total: dashStats?.signupSubmissions.total ?? 0, newCount: dashStats?.signupSubmissions.new ?? 0, icon: UserPlus },
-    { label: "Form Submissions", total: dashStats?.formSubmissions.total ?? 0, newCount: dashStats?.formSubmissions.new ?? 0, icon: ClipboardList },
+  const contentStats: { label: string; count: number; icon: any; tab: Tab }[] = [
+    { label: "Sermons", count: sermons?.length ?? 0, icon: Play, tab: "sermons" },
+    { label: "Events", count: events?.length ?? 0, icon: Calendar, tab: "events" },
+    { label: "Team Members", count: team?.length ?? 0, icon: Users, tab: "team" },
   ];
+
+  const activityItems: { label: string; total: number; newCount: number; icon: any; tab: Tab }[] = [
+    { label: "Messages", total: dashStats?.messages.total ?? 0, newCount: dashStats?.messages.new ?? 0, icon: Mail, tab: "messages" },
+    { label: "Connect Cards", total: dashStats?.connectCards.total ?? 0, newCount: dashStats?.connectCards.new ?? 0, icon: FileText, tab: "connect" },
+    { label: "Sign Ups", total: dashStats?.signupSubmissions.total ?? 0, newCount: dashStats?.signupSubmissions.new ?? 0, icon: UserPlus, tab: "signups" },
+    { label: "Form Responses", total: dashStats?.formSubmissions.total ?? 0, newCount: dashStats?.formSubmissions.new ?? 0, icon: ClipboardList, tab: "submissions" },
+  ];
+
+  const recentTabFor: Record<string, Tab> = { connect: "connect", message: "messages", signup: "submissions", form: "submissions" };
+  const recentIconFor: Record<string, any> = { connect: FileText, message: Mail, signup: UserPlus, form: ClipboardList };
 
   return (
     <div data-testid="tab-dashboard">
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
-      <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Content</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        {contentStats.map((stat) => (
-          <Card key={stat.label} data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
-              <stat.icon className="w-4 h-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid={`count-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}>
-                {stat.count}
-              </div>
-            </CardContent>
-          </Card>
+      <div className="flex gap-2 flex-wrap mb-8">
+        {quickActions.map((qa) => (
+          <Button key={qa.label} variant="outline" onClick={() => onNavigate(qa.tab)} data-testid={`quick-action-${qa.tab}`}>
+            <qa.icon className="w-4 h-4 mr-2" /> {qa.label}
+          </Button>
         ))}
       </div>
 
-      <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Recent Activity</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {activityItems.map((item) => (
-          <Card key={item.label} data-testid={`stat-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{item.label}</CardTitle>
-              <item.icon className="w-4 h-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-2xl font-bold" data-testid={`count-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
-                  {item.total}
-                </span>
-                {item.newCount > 0 && (
-                  <Badge variant="default" data-testid={`badge-new-${item.label.toLowerCase().replace(/\s+/g, "-")}`}>
-                    {item.newCount} new
-                  </Badge>
-                )}
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-8">
+          <div>
+            <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Activity</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activityItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => onNavigate(item.tab)}
+                  className="text-left"
+                  data-testid={`stat-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                    <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">{item.label}</CardTitle>
+                      <item.icon className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-2xl font-bold">{item.total}</span>
+                        {item.newCount > 0 && (
+                          <Badge variant="default">{item.newCount} new</Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Content</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {contentStats.map((stat) => (
+                <button
+                  key={stat.label}
+                  type="button"
+                  onClick={() => onNavigate(stat.tab)}
+                  className="text-left"
+                  data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                    <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
+                      <stat.icon className="w-4 h-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stat.count}</div>
+                    </CardContent>
+                  </Card>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-3 text-muted-foreground">Latest</h2>
+          <Card>
+            <CardContent className="p-0">
+              {!dashStats?.recent?.length ? (
+                <p className="text-sm text-muted-foreground p-4">No activity yet.</p>
+              ) : (
+                <div className="divide-y">
+                  {dashStats.recent.map((r, i) => {
+                    const Icon = recentIconFor[r.type] || Inbox;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => onNavigate(recentTabFor[r.type] || "dashboard")}
+                        className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-muted/50 transition-colors"
+                        data-testid={`recent-item-${i}`}
+                      >
+                        <Icon className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{r.title}</div>
+                          <div className="text-xs text-muted-foreground truncate">{r.subtitle}</div>
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {r.date ? new Date(r.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -999,6 +1072,7 @@ function LoginActivitySection() {
 function SermonsTab() {
   const { toast } = useToast();
   const { data: sermons, isLoading } = useQuery<Sermon[]>({ queryKey: ["/api/sermons"] });
+  const [sermonSearch, setSermonSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Sermon | null>(null);
   const [form, setForm] = useState({ title: "", youtubeUrl: "", date: "", series: "", description: "" });
@@ -1074,6 +1148,19 @@ function SermonsTab() {
         </Button>
       </div>
 
+      {!!sermons?.length && (
+        <div className="relative mb-4">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={sermonSearch}
+            onChange={(e) => setSermonSearch(e.target.value)}
+            placeholder="Search title or series..."
+            className="pl-9 w-[280px]"
+            data-testid="input-sermon-search"
+          />
+        </div>
+      )}
+
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
       ) : !sermons?.length ? (
@@ -1096,7 +1183,11 @@ function SermonsTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sermons?.map((sermon) => (
+            {sermons?.filter((s) => {
+              if (!sermonSearch.trim()) return true;
+              const q = sermonSearch.trim().toLowerCase();
+              return [s.title, s.series, s.description].filter(Boolean).join(" ").toLowerCase().includes(q);
+            }).map((sermon) => (
               <TableRow key={sermon.id} data-testid={`row-sermon-${sermon.id}`}>
                 <TableCell>{sermon.title}</TableCell>
                 <TableCell>{sermon.date}</TableCell>
@@ -1652,14 +1743,31 @@ function TeamTab() {
 }
 
 function MessagesTab() {
+  const { toast } = useToast();
   const { data: messages, isLoading } = useQuery<ContactSubmission[]>({ queryKey: ["/api/contact"] });
+  const [selectedMessage, setSelectedMessage] = useState<ContactSubmission | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/contact/${id}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contact"] });
+      setSelectedMessage(null);
+      toast({ title: "Message deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   return (
     <div data-testid="tab-messages">
-      <h1 className="text-2xl font-bold mb-6">Messages</h1>
+      <h1 className="text-2xl font-bold mb-2">Messages</h1>
+      <p className="text-muted-foreground mb-6">Sent through the Contact page. Click a message to read it in full and reply.</p>
 
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : !messages?.length ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">No messages yet.</CardContent>
+        </Card>
       ) : (
         <Table data-testid="table-messages">
           <TableHeader>
@@ -1671,17 +1779,58 @@ function MessagesTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {messages?.map((msg) => (
-              <TableRow key={msg.id} data-testid={`row-message-${msg.id}`}>
-                <TableCell>{msg.name}</TableCell>
+            {messages.map((msg) => (
+              <TableRow
+                key={msg.id}
+                className="cursor-pointer"
+                onClick={() => setSelectedMessage(msg)}
+                data-testid={`row-message-${msg.id}`}
+              >
+                <TableCell className="font-medium">{msg.name}</TableCell>
                 <TableCell>{msg.email}</TableCell>
                 <TableCell className="max-w-[300px] truncate">{msg.message}</TableCell>
-                <TableCell>{msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ""}</TableCell>
+                <TableCell className="whitespace-nowrap">{msg.createdAt ? new Date(msg.createdAt).toLocaleDateString() : ""}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
+
+      <Dialog open={!!selectedMessage} onOpenChange={(v) => { if (!v) setSelectedMessage(null); }}>
+        <DialogContent data-testid="dialog-message-detail">
+          {selectedMessage && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Message from {selectedMessage.name}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  {selectedMessage.email} · {selectedMessage.createdAt ? new Date(selectedMessage.createdAt).toLocaleString() : ""}
+                </div>
+                <p className="text-sm whitespace-pre-wrap border rounded-md p-4 bg-muted/30 max-h-[50vh] overflow-y-auto">
+                  {selectedMessage.message}
+                </p>
+                <div className="flex gap-2 pt-2">
+                  <a href={`mailto:${selectedMessage.email}?subject=${encodeURIComponent("Re: your message to Lake City Christian Church")}`}>
+                    <Button data-testid="button-reply-message">
+                      <Mail className="w-4 h-4 mr-2" /> Reply by Email
+                    </Button>
+                  </a>
+                  <ConfirmDelete
+                    title="Delete this message?"
+                    description="This permanently deletes the message. This cannot be undone."
+                    onConfirm={() => deleteMutation.mutate(selectedMessage.id)}
+                  >
+                    <Button variant="destructive" data-testid="button-delete-message">
+                      <Trash2 className="w-4 h-4 mr-2" /> Delete
+                    </Button>
+                  </ConfirmDelete>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1753,6 +1902,23 @@ function ConnectCardsTab() {
     <div data-testid="tab-connect">
       <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
         <h1 className="text-2xl font-bold">Connect Cards</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+        {!!cards?.length && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const flagged = cards.filter(isLikelySpamConnectCard).map((c) => c.id);
+              setSelectedIds(new Set(flagged));
+              toast(flagged.length
+                ? { title: `${flagged.length} likely spam card${flagged.length === 1 ? "" : "s"} selected`, description: "Look them over, then click Delete Selected." }
+                : { title: "No likely spam found" });
+            }}
+            data-testid="button-select-spam-connect"
+          >
+            Select Likely Spam
+          </Button>
+        )}
         {selectedIds.size > 0 && (
           <ConfirmDelete
             title={`Delete ${selectedIds.size} connect card${selectedIds.size === 1 ? "" : "s"}?`}
@@ -1765,6 +1931,7 @@ function ConnectCardsTab() {
             </Button>
           </ConfirmDelete>
         )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -2747,6 +2914,22 @@ function UsersTab({ currentUser }: { currentUser: { id: number; username: string
         {(filterRole !== "all" || filterGroup !== "all" || searchText) && (
           <Button variant="ghost" size="sm" onClick={() => { setFilterRole("all"); setFilterGroup("all"); setSearchText(""); }}>
             Clear Filters
+          </Button>
+        )}
+        {!!users?.length && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const flagged = selectableUsers.filter(isLikelySpamUser).map((u) => u.id);
+              setSelectedIds(new Set(flagged));
+              toast(flagged.length
+                ? { title: `${flagged.length} likely spam account${flagged.length === 1 ? "" : "s"} selected`, description: "Look them over, then click Delete Selected." }
+                : { title: "No likely spam found" });
+            }}
+            data-testid="button-select-spam-users"
+          >
+            Select Likely Spam
           </Button>
         )}
         {selectedIds.size > 0 && (
@@ -4317,11 +4500,18 @@ function NotificationsTab() {
     },
   });
 
+  const [reviewOpen, setReviewOpen] = useState(false);
+
   function handleSend() {
     if (!title.trim() || !body.trim()) {
       toast({ title: "Error", description: "Title and message are required", variant: "destructive" });
       return;
     }
+    setReviewOpen(true);
+  }
+
+  function confirmSend() {
+    setReviewOpen(false);
     sendMutation.mutate({ title: title.trim(), body: body.trim(), type, url: url.trim() || undefined });
   }
 
@@ -4419,10 +4609,32 @@ function NotificationsTab() {
             data-testid="button-send-notification"
           >
             <Send className="mr-2 h-4 w-4" />
-            {sendMutation.isPending ? "Sending..." : "Send Notification"}
+            {sendMutation.isPending ? "Sending..." : "Review & Send"}
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent data-testid="dialog-notification-review">
+          <DialogHeader>
+            <DialogTitle>Send to {stats?.subscriberCount || 0} phone{(stats?.subscriberCount || 0) === 1 ? "" : "s"}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="border rounded-md p-4 bg-muted/30 space-y-1">
+              <p className="font-semibold">{title}</p>
+              <p>{body}</p>
+              {url && <p className="text-xs text-muted-foreground">Opens: {url}</p>}
+            </div>
+            <p className="text-xs text-muted-foreground">This pops up on every subscribed device immediately and can't be recalled.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewOpen(false)}>Go Back</Button>
+            <Button onClick={confirmSend} disabled={sendMutation.isPending} data-testid="button-confirm-send-notification">
+              <Send className="mr-2 h-4 w-4" /> Send Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>

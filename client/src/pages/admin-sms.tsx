@@ -18,6 +18,8 @@ import {
   Phone, Clock, TrendingUp, AlertTriangle, CheckCircle2, XCircle, ArrowUpRight,
 } from "lucide-react";
 import type { SmsGroup, SmsTemplate, SmsMessage, SmsSettings, SmsIncomingMessage, SmsOptOut } from "@shared/schema";
+import { AVAILABLE_ROLES, ROLE_LABELS } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 import ConfirmDelete from "@/components/confirm-delete";
 
 export default function AdminSmsTab() {
@@ -164,6 +166,9 @@ function SmsCompose() {
   const [personalize, setPersonalize] = useState(true);
   const [respectQuietHours, setRespectQuietHours] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   const { data: groups } = useQuery<SmsGroup[]>({ queryKey: ["/api/sms/groups"] });
   const { data: templates } = useQuery<SmsTemplate[]>({ queryKey: ["/api/sms/templates"] });
@@ -209,15 +214,38 @@ function SmsCompose() {
       toast({ title: "Select a group", variant: "destructive" });
       return;
     }
+    // Review step before anything goes out
+    setReviewOpen(true);
+  };
+
+  const confirmSend = () => {
+    setReviewOpen(false);
     sendMutation.mutate({
       groupId: Number(groupId),
       messageBody: body,
       deliveryChannel: channel,
       personalize,
       respectQuietHours,
-      templateId: selectedTemplate ? Number(selectedTemplate) : undefined,
+      templateId: selectedTemplate && selectedTemplate !== "none" ? Number(selectedTemplate) : undefined,
     });
   };
+
+  async function sendTest() {
+    if (!testPhone.trim() || !body.trim()) return;
+    setTestSending(true);
+    try {
+      await apiRequest("POST", "/api/sms/settings/test", { phone: testPhone.trim(), message: body });
+      toast({ title: "Test sent", description: `Check ${testPhone.trim()} for the message.` });
+    } catch (e: any) {
+      toast({ title: "Test failed", description: e.message, variant: "destructive" });
+    } finally {
+      setTestSending(false);
+    }
+  }
+
+  const recipientCount = preview?.canReceiveSms || 0;
+  const estCost = (segmentCount * recipientCount * 0.0079).toFixed(2);
+  const selectedGroupName = groups?.find((g) => String(g.id) === groupId)?.name || "";
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -300,12 +328,53 @@ function SmsCompose() {
               </div>
             </div>
 
+            <div className="flex items-end gap-2 flex-wrap border rounded-md p-3 bg-muted/30">
+              <div className="space-y-1">
+                <Label className="text-xs">Send a test to yourself first</Label>
+                <Input
+                  type="tel"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  placeholder="Your phone number"
+                  className="w-[180px] h-9"
+                  data-testid="input-test-phone"
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={sendTest} disabled={testSending || !body.trim() || !testPhone.trim()} data-testid="button-send-test">
+                {testSending ? "Sending..." : "Send Test"}
+              </Button>
+            </div>
+
             <Button onClick={handleSend} disabled={sendMutation.isPending || !body.trim()} className="w-full" data-testid="button-send-sms">
               <Send className="w-4 h-4 mr-2" />
-              {sendMutation.isPending ? "Sending..." : "Send Message"}
+              {sendMutation.isPending ? "Sending..." : "Review & Send"}
             </Button>
           </CardContent>
         </Card>
+
+        <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+          <DialogContent data-testid="dialog-sms-review">
+            <DialogHeader>
+              <DialogTitle>Ready to send?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">To</span><span className="font-medium">{selectedGroupName}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">People who will get it</span><span className="font-medium">{recipientCount}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Message parts</span><span className="font-medium">{segmentCount}</span></div>
+              {channel !== "push" && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Estimated cost</span><span className="font-medium">${estCost}</span></div>
+              )}
+              <p className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap">{body}</p>
+              <p className="text-xs text-muted-foreground">Once sent, a text message can't be recalled.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReviewOpen(false)}>Go Back</Button>
+              <Button onClick={confirmSend} disabled={sendMutation.isPending} data-testid="button-confirm-send-sms">
+                <Send className="w-4 h-4 mr-2" /> Send to {recipientCount} {recipientCount === 1 ? "person" : "people"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="space-y-4">
@@ -492,7 +561,7 @@ function SmsGroups() {
   const { data: groups, isLoading } = useQuery<SmsGroup[]>({ queryKey: ["/api/sms/groups"] });
   const [showCreate, setShowCreate] = useState(false);
   const [editGroup, setEditGroup] = useState<SmsGroup | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", groupType: "custom" as string, filterCriteria: "" });
+  const [form, setForm] = useState({ name: "", description: "", groupType: "custom" as string, filterRoles: [] as string[], filterTags: "", phoneVerifiedOnly: false });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -532,7 +601,9 @@ function SmsGroups() {
       name: group.name,
       description: group.description || "",
       groupType: group.groupType,
-      filterCriteria: group.filterCriteria ? JSON.stringify(group.filterCriteria, null, 2) : "",
+      filterRoles: Array.isArray((group.filterCriteria as any)?.roles) ? (group.filterCriteria as any).roles : [],
+      filterTags: Array.isArray((group.filterCriteria as any)?.tags) ? (group.filterCriteria as any).tags.join(", ") : "",
+      phoneVerifiedOnly: !!(group.filterCriteria as any)?.phoneVerifiedOnly,
     });
     setShowCreate(true);
   }
@@ -540,13 +611,19 @@ function SmsGroups() {
   function closeDialog() {
     setShowCreate(false);
     setEditGroup(null);
-    setForm({ name: "", description: "", groupType: "custom", filterCriteria: "" });
+    setForm({ name: "", description: "", groupType: "custom", filterRoles: [], filterTags: "", phoneVerifiedOnly: false });
   }
 
   const handleSave = () => {
-    let filterCriteria = null;
-    if (form.filterCriteria.trim()) {
-      try { filterCriteria = JSON.parse(form.filterCriteria); } catch { toast({ title: "Invalid filter JSON", variant: "destructive" }); return; }
+    // Build filter criteria from the friendly controls
+    let filterCriteria: any = null;
+    if (form.groupType === "role") {
+      filterCriteria = { roles: form.filterRoles, ...(form.phoneVerifiedOnly ? { phoneVerifiedOnly: true } : {}) };
+    } else if (form.groupType === "ministry" || form.groupType === "tag") {
+      const tags = form.filterTags.split(",").map((t) => t.trim()).filter(Boolean);
+      filterCriteria = { tags, ...(form.phoneVerifiedOnly ? { phoneVerifiedOnly: true } : {}) };
+    } else if (form.groupType === "all" && form.phoneVerifiedOnly) {
+      filterCriteria = { phoneVerifiedOnly: true };
     }
     const data = { name: form.name, description: form.description, groupType: form.groupType, filterCriteria };
     if (editGroup) {
@@ -640,19 +717,49 @@ function SmsGroups() {
                 </SelectContent>
               </Select>
             </div>
-            {form.groupType !== "custom" && (
+            {form.groupType === "role" && (
               <div className="space-y-2">
-                <Label>Filter Criteria (JSON)</Label>
-                <Textarea
-                  value={form.filterCriteria}
-                  onChange={e => setForm({ ...form, filterCriteria: e.target.value })}
-                  placeholder='{"roles": ["member"], "phoneVerifiedOnly": true}'
-                  className="font-mono text-xs min-h-[80px]"
-                  data-testid="input-group-filter"
+                <Label>Include people with these roles</Label>
+                <div className="grid grid-cols-2 gap-2 border rounded-md p-3">
+                  {AVAILABLE_ROLES.map((r) => (
+                    <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={form.filterRoles.includes(r)}
+                        onCheckedChange={(checked) => {
+                          setForm({
+                            ...form,
+                            filterRoles: checked === true
+                              ? [...form.filterRoles, r]
+                              : form.filterRoles.filter((x) => x !== r),
+                          });
+                        }}
+                        data-testid={`checkbox-group-role-${r}`}
+                      />
+                      {ROLE_LABELS[r] || r}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(form.groupType === "ministry" || form.groupType === "tag") && (
+              <div className="space-y-2">
+                <Label>Tags <span className="text-muted-foreground font-normal">(separate with commas)</span></Label>
+                <Input
+                  value={form.filterTags}
+                  onChange={(e) => setForm({ ...form, filterTags: e.target.value })}
+                  placeholder="e.g. kids, volunteers"
+                  data-testid="input-group-tags"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Options: roles, tags, hasChildren, includeUserIds, excludeUserIds, phoneVerifiedOnly
-                </p>
+              </div>
+            )}
+            {form.groupType !== "custom" && (
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.phoneVerifiedOnly}
+                  onCheckedChange={(v) => setForm({ ...form, phoneVerifiedOnly: v })}
+                  data-testid="switch-phone-verified"
+                />
+                <Label className="text-sm">Only include people with a verified phone number</Label>
               </div>
             )}
           </div>

@@ -170,9 +170,13 @@ export function registerSmsRoutes(app: any): void {
     const session = req.session as any;
     const user = await storage.getUser(session.userId);
     if (!user) return res.status(401).json({ message: "User not found" });
-    const phone = user.phone;
+    // Optional overrides so Compose can test a draft against any number
+    const phone = (typeof req.body?.phone === "string" && req.body.phone.trim()) || user.phone;
     if (!phone) return res.status(400).json({ message: "No phone number on your account" });
-    const result = await sendSingleSms(phone, "This is a test message from Lake City Christian Church SMS system.");
+    const message = (typeof req.body?.message === "string" && req.body.message.trim())
+      ? `[TEST] ${req.body.message.trim()}`
+      : "This is a test message from Lake City Christian Church SMS system.";
+    const result = await sendSingleSms(phone, message);
     if (result.success) {
       res.json({ message: "Test message sent", sid: result.sid });
     } else {

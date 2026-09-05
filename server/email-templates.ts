@@ -131,6 +131,19 @@ export function eventSignupConfirmationEmail(
   };
 }
 
+export function passwordResetEmail(name: string | null, resetUrl: string): { subject: string; html: string } {
+  return {
+    subject: `Reset your password - ${CHURCH_NAME}`,
+    html: baseLayout("Password Reset", `
+      ${heading("Reset Your Password")}
+      ${paragraph(`Hi ${name || "there"}, we received a request to reset the password for your ${CHURCH_NAME} account.`)}
+      ${paragraph("Click the button below to choose a new password. This link works for 30 minutes.")}
+      ${button("Choose a New Password", resetUrl)}
+      ${paragraph("If you didn't ask for this, you can safely ignore this email — your password won't change.")}
+    `),
+  };
+}
+
 export function signupConfirmationEmail(
   name: string | null,
   eventTitle: string,

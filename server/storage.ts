@@ -103,6 +103,7 @@ export interface IStorage {
 
   createContactSubmission(contact: InsertContact): Promise<ContactSubmission>;
   getContactSubmissions(): Promise<ContactSubmission[]>;
+  deleteContactSubmission(id: number): Promise<void>;
 
   createConnectCard(card: InsertConnectCard): Promise<ConnectCard>;
   getConnectCards(): Promise<ConnectCard[]>;
@@ -543,6 +544,10 @@ export class DatabaseStorage implements IStorage {
 
   async getContactSubmissions(): Promise<ContactSubmission[]> {
     return db.select().from(contactSubmissions).orderBy(desc(contactSubmissions.createdAt));
+  }
+
+  async deleteContactSubmission(id: number): Promise<void> {
+    await db.delete(contactSubmissions).where(eq(contactSubmissions.id, id));
   }
 
   async createConnectCard(card: InsertConnectCard): Promise<ConnectCard> {

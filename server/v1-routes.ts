@@ -13,6 +13,7 @@ import {
 import {
   generateAccessToken, verifyAccessToken, generateRefreshToken,
   hashRefreshToken, getRefreshTokenExpiry,
+  generatePasswordResetToken, decodePasswordResetToken, matchesPasswordFingerprint,
 } from "./jwt";
 import { z } from "zod";
 import crypto from "crypto";
@@ -167,6 +168,55 @@ v1Router.post("/auth/register", publicFormGuard({ limit: 3, fakeSuccess: { succe
     }
     console.error("Registration error:", err);
     return apiResponse(res, 500, null, "Server error");
+  }
+});
+
+// Password reset: request a link by email. Always responds the same way so
+// the endpoint can't be used to probe which emails have accounts.
+v1Router.post("/auth/forgot-password", publicFormGuard({ limit: 5 }), async (req, res) => {
+  try {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+    if (email) {
+      const user = await storage.getUserByEmail(email);
+      if (user && user.email && user.password) {
+        const token = generatePasswordResetToken(user.id, user.password);
+        const appUrl = process.env.APP_URL || "https://www.lakecitycc.com";
+        const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+        const { sendEmail } = await import("./email-service");
+        const { passwordResetEmail } = await import("./email-templates");
+        sendEmail({ to: user.email, ...passwordResetEmail(user.name, resetUrl) }).catch(() => {});
+      }
+    }
+    return apiResponse(res, 200, { message: "If that email has an account, a reset link is on its way." });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    return apiResponse(res, 200, { message: "If that email has an account, a reset link is on its way." });
+  }
+});
+
+v1Router.post("/auth/reset-password", async (req, res) => {
+  try {
+    const { token, password } = req.body || {};
+    if (typeof token !== "string" || typeof password !== "string") {
+      return apiResponse(res, 400, null, "Reset link and new password are required");
+    }
+    if (password.length < 8) {
+      return apiResponse(res, 400, null, "Password must be at least 8 characters");
+    }
+    const decoded = decodePasswordResetToken(token);
+    if (!decoded) {
+      return apiResponse(res, 400, null, "This reset link is invalid or has expired. Please request a new one.");
+    }
+    const user = await storage.getUser(decoded.userId);
+    if (!user || !user.password || !matchesPasswordFingerprint(decoded.pwd, user.password)) {
+      return apiResponse(res, 400, null, "This reset link has already been used or is no longer valid. Please request a new one.");
+    }
+    const hashed = await bcrypt.hash(password, 10);
+    await storage.updateUser(user.id, { password: hashed } as any);
+    return apiResponse(res, 200, { message: "Password updated. You can now log in with your new password." });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    return apiResponse(res, 500, null, "Something went wrong. Please try again.");
   }
 });
 

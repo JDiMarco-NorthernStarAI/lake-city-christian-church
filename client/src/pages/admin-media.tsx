@@ -39,6 +39,7 @@ export default function AdminMediaTab() {
 
   // State
   const [currentFolder, setCurrentFolder] = useState<string>("all");
+  const [searchText, setSearchText] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [detailItem, setDetailItem] = useState<Media | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -72,9 +73,12 @@ export default function AdminMediaTab() {
   });
 
   // Derived
-  const filteredMedia = currentFolder === "all"
+  const folderMedia = currentFolder === "all"
     ? allMedia
     : allMedia.filter(m => m.folder === currentFolder || m.folder.startsWith(currentFolder + "/"));
+  const filteredMedia = searchText.trim()
+    ? folderMedia.filter(m => m.filename.toLowerCase().includes(searchText.trim().toLowerCase()))
+    : folderMedia;
 
   // Build folder tree
   const folderTree = buildFolderTree(folders);
@@ -222,7 +226,14 @@ export default function AdminMediaTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 className="text-2xl font-bold">Media Library</h2>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <Input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search filenames..."
+            className="w-[200px] h-9"
+            data-testid="input-media-search"
+          />
           <Button size="sm" variant="outline" onClick={() => setNewFolderOpen(true)}>
             <FolderPlus className="w-4 h-4 mr-1" /> New Folder
           </Button>
