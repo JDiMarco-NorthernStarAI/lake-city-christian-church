@@ -1829,10 +1829,15 @@ export async function registerRoutes(
   // SIGN UPS - Public Endpoints
   // ============================================================
 
-  app.get("/api/public/signups", async (_req, res) => {
+  app.get("/api/public/signups", async (req, res) => {
     try {
       const events = await storage.getPublishedSignupEvents();
-      res.json(events);
+      // Unlisted signups are reachable by direct link only; members-only
+      // signups are listed only for logged-in visitors.
+      const loggedIn = !!req.session?.userId;
+      res.json(events.filter((e) =>
+        e.visibility === "public" || (e.visibility === "members_only" && loggedIn)
+      ));
     } catch (err) {
       res.status(500).json({ message: "Error fetching signup events" });
     }
@@ -1841,8 +1846,12 @@ export async function registerRoutes(
   app.get("/api/public/signups/:slug", async (req, res) => {
     try {
       const event = await storage.getSignupEventBySlug(req.params.slug);
-      if (!event || event.status !== "published") {
+      // Closed sign ups stay viewable by direct link; submissions are rejected.
+      if (!event || (event.status !== "published" && event.status !== "closed")) {
         return res.status(404).json({ message: "Signup event not found" });
+      }
+      if (event.visibility === "members_only" && !req.session?.userId) {
+        return res.status(401).json({ message: "Please log in to view this sign up." });
       }
       let form = null;
       let fields: any[] = [];
@@ -1863,8 +1872,14 @@ export async function registerRoutes(
   app.post("/api/public/signups/:slug/submit", async (req, res) => {
     try {
       const event = await storage.getSignupEventBySlug(req.params.slug);
-      if (!event || event.status !== "published") {
+      if (!event || (event.status !== "published" && event.status !== "closed")) {
         return res.status(404).json({ message: "Signup event not found" });
+      }
+      if (event.status === "closed") {
+        return res.status(400).json({ message: "This sign up is closed and no longer accepting responses." });
+      }
+      if (event.visibility === "members_only" && !req.session?.userId) {
+        return res.status(401).json({ message: "Please log in to sign up." });
       }
       const now = new Date();
       if (event.signupStartDate && now < new Date(event.signupStartDate)) {

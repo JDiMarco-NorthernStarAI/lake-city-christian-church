@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarTrigger,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard, Play, Calendar, Users, Mail, FileText, Settings, LogOut,
@@ -64,27 +64,56 @@ function toDatetimeLocal(value: string | Date | null | undefined): string {
 
 type Tab = "dashboard" | "analytics" | "sermons" | "events" | "team" | "messages" | "connect" | "forms" | "donations" | "notifications" | "sms" | "signups" | "media" | "pages" | "settings" | "users" | "roles" | "submissions" | "small_groups";
 
-const allNavItems: { id: Tab; label: string; icon: any; feature: string }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
-  { id: "analytics", label: "Analytics", icon: BarChart3, feature: "analytics" },
-  { id: "connect", label: "Connect Cards", icon: FileText, feature: "connect" },
-  { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
-  { id: "events", label: "Events", icon: Calendar, feature: "events" },
-  { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
-  { id: "media", label: "Media Library", icon: ImageIcon, feature: "media" },
-  { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
-  { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
-  { id: "pages", label: "Page Content", icon: FileEdit, feature: "pages" },
-  { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
-  { id: "sermons", label: "Sermons", icon: Play, feature: "sermons" },
-  { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
-  { id: "signups", label: "Sign Ups", icon: UserPlus, feature: "signups" },
-  { id: "small_groups", label: "Small Groups", icon: UsersRound, feature: "signups" },
-  { id: "sms", label: "SMS Messaging", icon: MessageSquare, feature: "sms" },
-  { id: "submissions", label: "Submissions", icon: Inbox, feature: "forms" },
-  { id: "team", label: "Team", icon: Users, feature: "team" },
-  { id: "users", label: "Users", icon: UserCog, feature: "users" },
+// Sidebar sections are grouped by task, not alphabetically, so related
+// screens (build a sign up → read its responses) sit next to each other.
+const NAV_GROUPS: { label: string | null; items: { id: Tab; label: string; icon: any; feature: string }[] }[] = [
+  {
+    label: null,
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, feature: "dashboard" },
+      { id: "analytics", label: "Analytics", icon: BarChart3, feature: "analytics" },
+    ],
+  },
+  {
+    label: "People & Sign-Ups",
+    items: [
+      { id: "signups", label: "Sign Ups", icon: UserPlus, feature: "signups" },
+      { id: "forms", label: "Form Builder", icon: ClipboardList, feature: "forms" },
+      { id: "submissions", label: "Responses", icon: Inbox, feature: "forms" },
+      { id: "connect", label: "Connect Cards", icon: FileText, feature: "connect" },
+      { id: "messages", label: "Messages", icon: Mail, feature: "messages" },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { id: "pages", label: "Page Content", icon: FileEdit, feature: "pages" },
+      { id: "sermons", label: "Sermons", icon: Play, feature: "sermons" },
+      { id: "events", label: "Events", icon: Calendar, feature: "events" },
+      { id: "media", label: "Media Library", icon: ImageIcon, feature: "media" },
+      { id: "team", label: "Team", icon: Users, feature: "team" },
+    ],
+  },
+  {
+    label: "Communication",
+    items: [
+      { id: "sms", label: "SMS Messaging", icon: MessageSquare, feature: "sms" },
+      { id: "notifications", label: "Notifications", icon: Bell, feature: "notifications" },
+    ],
+  },
+  {
+    label: "Church",
+    items: [
+      { id: "donations", label: "Donations", icon: Heart, feature: "donations" },
+      { id: "small_groups", label: "Small Groups", icon: UsersRound, feature: "signups" },
+      { id: "users", label: "Users", icon: UserCog, feature: "users" },
+      { id: "roles", label: "Role Permissions", icon: Shield, feature: "roles" },
+      { id: "settings", label: "Settings", icon: Settings, feature: "settings" },
+    ],
+  },
 ];
+
+const allNavItems = NAV_GROUPS.flatMap((g) => g.items);
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -153,22 +182,18 @@ export default function AdminDashboard() {
             </a>
           </SidebarHeader>
           <SidebarContent>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <AdminSidebarNav
-                  navItems={navItems}
-                  activeTab={activeTab}
-                  onNavigate={(tab) => {
-                    if (getUnsaved() && tab !== activeTab) {
-                      setPendingTab(tab);
-                      return;
-                    }
-                    setActiveTab(tab);
-                  }}
-                  onLogout={handleLogout}
-                />
-              </SidebarGroupContent>
-            </SidebarGroup>
+            <AdminSidebarNav
+              userFeatures={userFeatures}
+              activeTab={activeTab}
+              onNavigate={(tab) => {
+                if (getUnsaved() && tab !== activeTab) {
+                  setPendingTab(tab);
+                  return;
+                }
+                setActiveTab(tab);
+              }}
+              onLogout={handleLogout}
+            />
           </SidebarContent>
         </Sidebar>
 
@@ -233,42 +258,60 @@ export default function AdminDashboard() {
 }
 
 function AdminSidebarNav({
-  navItems,
+  userFeatures,
   activeTab,
   onNavigate,
   onLogout,
 }: {
-  navItems: typeof allNavItems;
+  userFeatures: string[];
   activeTab: Tab;
   onNavigate: (tab: Tab) => void;
   onLogout: () => void;
 }) {
   // Close the mobile drawer after picking a section so the page is visible
   const { setOpenMobile } = useSidebar();
+  const groups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((item) => userFeatures.includes(item.feature)) }))
+    .filter((g) => g.items.length > 0);
   return (
-    <SidebarMenu>
-      {navItems.map((item) => (
-        <SidebarMenuItem key={item.id}>
-          <SidebarMenuButton
-            isActive={activeTab === item.id}
-            onClick={() => {
-              onNavigate(item.id as Tab);
-              setOpenMobile(false);
-            }}
-            data-testid={`nav-${item.id}`}
-          >
-            <item.icon className="w-4 h-4" />
-            <span>{item.label}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+    <>
+      {groups.map((group, gi) => (
+        <SidebarGroup key={group.label ?? gi}>
+          {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {group.items.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    isActive={activeTab === item.id}
+                    onClick={() => {
+                      onNavigate(item.id);
+                      setOpenMobile(false);
+                    }}
+                    data-testid={`nav-${item.id}`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       ))}
-      <SidebarMenuItem>
-        <SidebarMenuButton onClick={onLogout} data-testid="nav-logout">
-          <LogOut className="w-4 h-4" />
-          <span>Logout</span>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    </SidebarMenu>
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={onLogout} data-testid="nav-logout">
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </>
   );
 }
 
@@ -3302,6 +3345,372 @@ function FormListView({ onCreate, onEdit, onViewSubmissions }: { onCreate: () =>
   );
 }
 
+// Reusable questions/fields editor for a form — used by both the Form
+// Builder and the Sign Up wizard so staff never have to leave their flow.
+function FormFieldsEditor({ formId, title = "Fields" }: { formId: number; title?: string }) {
+  const { toast } = useToast();
+  const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+  const [editingField, setEditingField] = useState<FormField | null>(null);
+  const [fieldForm, setFieldForm] = useState({
+    label: "",
+    fieldType: "text",
+    required: false,
+    placeholder: "",
+    helpText: "",
+    options: "",
+    optionItems: [{ label: "", capacity: "" }] as { label: string; capacity: string }[],
+  });
+
+  const { data: formWithFields } = useQuery<Form & { fields: FormField[] }>({
+    queryKey: ["/api/forms", formId],
+  });
+
+  const createFieldMutation = useMutation({
+    mutationFn: async (data: any) => { await apiRequest("POST", `/api/forms/${formId}/fields`, data); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Question added" });
+      setFieldDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateFieldMutation = useMutation({
+    mutationFn: async ({ fieldId, data }: { fieldId: number; data: any }) => {
+      await apiRequest("PATCH", `/api/forms/${formId}/fields/${fieldId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Question updated" });
+      setFieldDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteFieldMutation = useMutation({
+    mutationFn: async (fieldId: number) => { await apiRequest("DELETE", `/api/forms/${formId}/fields/${fieldId}`); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+      toast({ title: "Question deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const reorderFieldsMutation = useMutation({
+    mutationFn: async (fieldIds: number[]) => {
+      await apiRequest("PUT", `/api/forms/${formId}/fields/reorder`, { fieldIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  function openAddField() {
+    setEditingField(null);
+    setFieldForm({ label: "", fieldType: "text", required: false, placeholder: "", helpText: "", options: "", optionItems: [{ label: "", capacity: "" }] });
+    setFieldDialogOpen(true);
+  }
+
+  function openEditField(field: FormField) {
+    setEditingField(field);
+    let opts = "";
+    const items: { label: string; capacity: string }[] = [];
+    if (Array.isArray(field.options)) {
+      for (const o of field.options as any[]) {
+        if (typeof o === "string") {
+          items.push({ label: o, capacity: "" });
+        } else if (o && typeof o === "object" && o.label) {
+          items.push({ label: o.label, capacity: o.capacity ? String(o.capacity) : "" });
+        }
+      }
+      opts = items.map((i) => i.label).join("\n");
+    }
+    if (items.length === 0) items.push({ label: "", capacity: "" });
+    setFieldForm({
+      label: field.label,
+      fieldType: field.fieldType,
+      required: field.required,
+      placeholder: field.placeholder || "",
+      helpText: field.helpText || "",
+      options: opts,
+      optionItems: items,
+    });
+    setFieldDialogOpen(true);
+  }
+
+  function handleFieldSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const optionTypes = ["select", "radio", "checkbox_group"];
+    let parsedOptions: any = null;
+    if (optionTypes.includes(fieldForm.fieldType)) {
+      if (fieldForm.fieldType === "checkbox_group") {
+        parsedOptions = fieldForm.optionItems
+          .filter((item) => item.label.trim())
+          .map((item) => {
+            const cap = parseInt(item.capacity, 10);
+            return item.capacity && !isNaN(cap) && cap > 0
+              ? { label: item.label.trim(), capacity: cap }
+              : { label: item.label.trim() };
+          });
+      } else {
+        parsedOptions = fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean).map((line) => {
+          return { label: line };
+        });
+      }
+    }
+    const data: any = {
+      label: fieldForm.label,
+      fieldType: fieldForm.fieldType,
+      required: fieldForm.required,
+      placeholder: fieldForm.placeholder || null,
+      helpText: fieldForm.helpText || null,
+      options: parsedOptions,
+    };
+
+    if (editingField) {
+      updateFieldMutation.mutate({ fieldId: editingField.id, data });
+    } else {
+      const existing = formWithFields?.fields || [];
+      data.sortOrder = existing.length;
+      createFieldMutation.mutate(data);
+    }
+  }
+
+  function moveField(fieldId: number, direction: "up" | "down") {
+    const all = formWithFields?.fields || [];
+    const sorted = [...all].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((f) => f.id === fieldId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const newOrder = sorted.map((f) => f.id);
+    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
+    reorderFieldsMutation.mutate(newOrder);
+  }
+
+  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
+  const showOptionsField = ["select", "radio", "checkbox_group"].includes(fieldForm.fieldType);
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle>{title}</CardTitle>
+          <Button size="sm" onClick={openAddField} data-testid="button-add-field">
+            <Plus className="w-4 h-4 mr-2" /> Add Question
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {fields.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              No questions yet. Click "Add Question" — at minimum you'll usually want Name and Email.
+              To make a list of items people can claim (food, supplies, time slots), choose the
+              "Limited Items Signup" question type.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {fields.map((field, idx) => (
+                <div
+                  key={field.id}
+                  className="flex items-center gap-2 p-3 border rounded-md"
+                  data-testid={`field-row-${field.id}`}
+                >
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => moveField(field.id, "up")}
+                      disabled={idx === 0}
+                      data-testid={`button-move-up-${field.id}`}
+                    >
+                      <ArrowUp className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => moveField(field.id, "down")}
+                      disabled={idx === fields.length - 1}
+                      data-testid={`button-move-down-${field.id}`}
+                    >
+                      <ArrowDown className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{field.label}</div>
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                      <Badge variant="secondary">{FORM_FIELD_TYPE_LABELS[field.fieldType] || field.fieldType}</Badge>
+                      {field.required && <Badge variant="outline">Required</Badge>}
+                      {Array.isArray(field.options) && (field.options as any[]).some((o: any) => typeof o === "object" && o?.capacity) && (
+                        <Badge variant="outline">Has Limits</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openEditField(field)} data-testid={`button-edit-field-${field.id}`}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <ConfirmDelete
+                      title={`Delete the "${field.label}" question?`}
+                      description="Answers people already gave for this question will no longer be shown with their submissions. This cannot be undone."
+                      onConfirm={() => deleteFieldMutation.mutate(field.id)}
+                    >
+                      <Button size="icon" variant="ghost" aria-label="Delete question" data-testid={`button-delete-field-${field.id}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ConfirmDelete>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={fieldDialogOpen} onOpenChange={setFieldDialogOpen}>
+        <DialogContent data-testid="dialog-field">
+          <DialogHeader>
+            <DialogTitle>{editingField ? "Edit Question" : "Add Question"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleFieldSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Question / Label</Label>
+              <Input
+                value={fieldForm.label}
+                onChange={(e) => setFieldForm({ ...fieldForm, label: e.target.value })}
+                placeholder="e.g. Full Name"
+                required
+                data-testid="input-field-label"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Answer Type</Label>
+              <Select value={fieldForm.fieldType} onValueChange={(v) => setFieldForm({ ...fieldForm, fieldType: v })}>
+                <SelectTrigger data-testid="select-field-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORM_FIELD_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{FORM_FIELD_TYPE_LABELS[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldForm.fieldType === "checkbox_group" && (
+                <p className="text-xs text-muted-foreground">
+                  A list of items people can claim — great for potlucks and donation sign-up sheets.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={fieldForm.required}
+                onCheckedChange={(v) => setFieldForm({ ...fieldForm, required: !!v })}
+                data-testid="checkbox-field-required"
+              />
+              <Label>Required</Label>
+            </div>
+            <div className="space-y-2">
+              <Label>Placeholder <span className="text-muted-foreground font-normal">(optional — example text shown inside the empty box)</span></Label>
+              <Input
+                value={fieldForm.placeholder}
+                onChange={(e) => setFieldForm({ ...fieldForm, placeholder: e.target.value })}
+                data-testid="input-field-placeholder"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Help Text <span className="text-muted-foreground font-normal">(optional — shown under the question)</span></Label>
+              <Input
+                value={fieldForm.helpText}
+                onChange={(e) => setFieldForm({ ...fieldForm, helpText: e.target.value })}
+                data-testid="input-field-help-text"
+              />
+            </div>
+            {showOptionsField && fieldForm.fieldType === "checkbox_group" && (
+              <div className="space-y-2">
+                <Label>Items</Label>
+                <p className="text-xs text-muted-foreground">
+                  Add items people can sign up for. Set a quantity limit or leave blank for unlimited.
+                </p>
+                <div className="space-y-2">
+                  {fieldForm.optionItems.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2" data-testid={`option-item-${idx}`}>
+                      <Input
+                        value={item.label}
+                        onChange={(e) => {
+                          const updated = [...fieldForm.optionItems];
+                          updated[idx] = { ...updated[idx], label: e.target.value };
+                          setFieldForm({ ...fieldForm, optionItems: updated });
+                        }}
+                        placeholder="Item name (e.g., Milk)"
+                        className="flex-1"
+                        data-testid={`input-option-label-${idx}`}
+                      />
+                      <Input
+                        value={item.capacity}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, "");
+                          const updated = [...fieldForm.optionItems];
+                          updated[idx] = { ...updated[idx], capacity: val };
+                          setFieldForm({ ...fieldForm, optionItems: updated });
+                        }}
+                        placeholder="Qty"
+                        className="w-20"
+                        data-testid={`input-option-capacity-${idx}`}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          const updated = fieldForm.optionItems.filter((_, i) => i !== idx);
+                          if (updated.length === 0) updated.push({ label: "", capacity: "" });
+                          setFieldForm({ ...fieldForm, optionItems: updated });
+                        }}
+                        disabled={fieldForm.optionItems.length <= 1}
+                        data-testid={`button-remove-option-${idx}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFieldForm({ ...fieldForm, optionItems: [...fieldForm.optionItems, { label: "", capacity: "" }] })}
+                    data-testid="button-add-option-item"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Add Item
+                  </Button>
+                </div>
+              </div>
+            )}
+            {showOptionsField && fieldForm.fieldType !== "checkbox_group" && (
+              <div className="space-y-2">
+                <Label>Options (one per line)</Label>
+                <Textarea
+                  value={fieldForm.options}
+                  onChange={(e) => setFieldForm({ ...fieldForm, options: e.target.value })}
+                  placeholder={"Option 1\nOption 2\nOption 3"}
+                  data-testid="input-field-options"
+                />
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createFieldMutation.isPending || updateFieldMutation.isPending}
+              data-testid="button-submit-field"
+            >
+              {editingField ? "Update Question" : "Add Question"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function FormEditor({ formId, onBack, onCreated }: { formId: number | null; onBack: () => void; onCreated?: (id: number) => void }) {
   const { toast } = useToast();
   const isNew = formId === null;
@@ -3315,17 +3724,6 @@ function FormEditor({ formId, onBack, onCreated }: { formId: number | null; onBa
     requireAuth: false,
     allowMultiple: true,
     notificationEmail: "",
-  });
-  const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
-  const [editingField, setEditingField] = useState<FormField | null>(null);
-  const [fieldForm, setFieldForm] = useState({
-    label: "",
-    fieldType: "text",
-    required: false,
-    placeholder: "",
-    helpText: "",
-    options: "",
-    optionItems: [{ label: "", capacity: "" }] as { label: string; capacity: string }[],
   });
 
   const { data: formWithFields, isLoading } = useQuery<Form & { fields: FormField[] }>({
@@ -3389,47 +3787,6 @@ function FormEditor({ formId, onBack, onCreated }: { formId: number | null; onBa
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const createFieldMutation = useMutation({
-    mutationFn: async (data: any) => { await apiRequest("POST", `/api/forms/${formId}/fields`, data); },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
-      toast({ title: "Field added" });
-      setFieldDialogOpen(false);
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const updateFieldMutation = useMutation({
-    mutationFn: async ({ fieldId, data }: { fieldId: number; data: any }) => {
-      await apiRequest("PATCH", `/api/forms/${formId}/fields/${fieldId}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
-      toast({ title: "Field updated" });
-      setFieldDialogOpen(false);
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const deleteFieldMutation = useMutation({
-    mutationFn: async (fieldId: number) => { await apiRequest("DELETE", `/api/forms/${formId}/fields/${fieldId}`); },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
-      toast({ title: "Field deleted" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const reorderFieldsMutation = useMutation({
-    mutationFn: async (fieldIds: number[]) => {
-      await apiRequest("PUT", `/api/forms/${formId}/fields/reorder`, { fieldIds });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId] });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
   function handleSaveForm() {
     const payload = {
       ...formData,
@@ -3441,92 +3798,6 @@ function FormEditor({ formId, onBack, onCreated }: { formId: number | null; onBa
       updateFormMutation.mutate(payload);
     }
   }
-
-  function openAddField() {
-    setEditingField(null);
-    setFieldForm({ label: "", fieldType: "text", required: false, placeholder: "", helpText: "", options: "", optionItems: [{ label: "", capacity: "" }] });
-    setFieldDialogOpen(true);
-  }
-
-  function openEditField(field: FormField) {
-    setEditingField(field);
-    let opts = "";
-    const items: { label: string; capacity: string }[] = [];
-    if (Array.isArray(field.options)) {
-      for (const o of field.options as any[]) {
-        if (typeof o === "string") {
-          items.push({ label: o, capacity: "" });
-        } else if (o && typeof o === "object" && o.label) {
-          items.push({ label: o.label, capacity: o.capacity ? String(o.capacity) : "" });
-        }
-      }
-      opts = items.map((i) => i.capacity ? `${i.label}|${i.capacity}` : i.label).join("\n");
-    }
-    if (items.length === 0) items.push({ label: "", capacity: "" });
-    setFieldForm({
-      label: field.label,
-      fieldType: field.fieldType,
-      required: field.required,
-      placeholder: field.placeholder || "",
-      helpText: field.helpText || "",
-      options: opts,
-      optionItems: items,
-    });
-    setFieldDialogOpen(true);
-  }
-
-  function handleFieldSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const optionTypes = ["select", "radio", "checkbox_group"];
-    let parsedOptions: any = null;
-    if (optionTypes.includes(fieldForm.fieldType)) {
-      if (fieldForm.fieldType === "checkbox_group") {
-        parsedOptions = fieldForm.optionItems
-          .filter((item) => item.label.trim())
-          .map((item) => {
-            const cap = parseInt(item.capacity, 10);
-            return item.capacity && !isNaN(cap) && cap > 0
-              ? { label: item.label.trim(), capacity: cap }
-              : { label: item.label.trim() };
-          });
-      } else {
-        parsedOptions = fieldForm.options.split("\n").map((o) => o.trim()).filter(Boolean).map((line) => {
-          return { label: line };
-        });
-      }
-    }
-    const data: any = {
-      label: fieldForm.label,
-      fieldType: fieldForm.fieldType,
-      required: fieldForm.required,
-      placeholder: fieldForm.placeholder || null,
-      helpText: fieldForm.helpText || null,
-      options: parsedOptions,
-    };
-
-    if (editingField) {
-      updateFieldMutation.mutate({ fieldId: editingField.id, data });
-    } else {
-      const fields = formWithFields?.fields || [];
-      data.sortOrder = fields.length;
-      createFieldMutation.mutate(data);
-    }
-  }
-
-  function moveField(fieldId: number, direction: "up" | "down") {
-    const fields = formWithFields?.fields || [];
-    const sorted = [...fields].sort((a, b) => a.sortOrder - b.sortOrder);
-    const idx = sorted.findIndex((f) => f.id === fieldId);
-    if (idx < 0) return;
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sorted.length) return;
-    const newOrder = sorted.map((f) => f.id);
-    [newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]];
-    reorderFieldsMutation.mutate(newOrder);
-  }
-
-  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
-  const showOptionsField = ["select", "radio", "checkbox_group"].includes(fieldForm.fieldType);
 
   if (!isNew && isLoading) {
     return <p className="text-muted-foreground">Loading form...</p>;
@@ -3653,359 +3924,121 @@ function FormEditor({ formId, onBack, onCreated }: { formId: number | null; onBa
           </CardContent>
         </Card>
 
-        {!isNew && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-              <CardTitle>Fields</CardTitle>
-              <Button size="sm" onClick={openAddField} data-testid="button-add-field">
-                <Plus className="w-4 h-4 mr-2" /> Add Field
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {fields.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No fields yet. Add fields to build your form.</p>
-              ) : (
-                <div className="space-y-2">
-                  {fields.map((field, idx) => (
-                    <div
-                      key={field.id}
-                      className="flex items-center gap-2 p-3 border rounded-md"
-                      data-testid={`field-row-${field.id}`}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => moveField(field.id, "up")}
-                          disabled={idx === 0}
-                          data-testid={`button-move-up-${field.id}`}
-                        >
-                          <ArrowUp className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => moveField(field.id, "down")}
-                          disabled={idx === fields.length - 1}
-                          data-testid={`button-move-down-${field.id}`}
-                        >
-                          <ArrowDown className="w-3 h-3" />
-                        </Button>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{field.label}</div>
-                        <div className="flex items-center gap-2 flex-wrap mt-1">
-                          <Badge variant="secondary">{FORM_FIELD_TYPE_LABELS[field.fieldType] || field.fieldType}</Badge>
-                          {field.required && <Badge variant="outline">Required</Badge>}
-                          {Array.isArray(field.options) && (field.options as any[]).some((o: any) => typeof o === "object" && o?.capacity) && (
-                            <Badge variant="outline">Has Limits</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => openEditField(field)} data-testid={`button-edit-field-${field.id}`}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <ConfirmDelete
-                          title={`Delete the "${field.label}" question?`}
-                          description="Answers people already gave for this question will no longer be shown with their submissions. This cannot be undone."
-                          onConfirm={() => deleteFieldMutation.mutate(field.id)}
-                        >
-                          <Button size="icon" variant="ghost" aria-label="Delete question" data-testid={`button-delete-field-${field.id}`}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </ConfirmDelete>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {!isNew && formId !== null && <FormFieldsEditor formId={formId} />}
       </div>
-
-      <Dialog open={fieldDialogOpen} onOpenChange={setFieldDialogOpen}>
-        <DialogContent data-testid="dialog-field">
-          <DialogHeader>
-            <DialogTitle>{editingField ? "Edit Field" : "Add Field"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleFieldSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Label</Label>
-              <Input
-                value={fieldForm.label}
-                onChange={(e) => setFieldForm({ ...fieldForm, label: e.target.value })}
-                required
-                data-testid="input-field-label"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Field Type</Label>
-              <Select value={fieldForm.fieldType} onValueChange={(v) => setFieldForm({ ...fieldForm, fieldType: v })}>
-                <SelectTrigger data-testid="select-field-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FORM_FIELD_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{FORM_FIELD_TYPE_LABELS[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-3">
-              <Checkbox
-                checked={fieldForm.required}
-                onCheckedChange={(v) => setFieldForm({ ...fieldForm, required: !!v })}
-                data-testid="checkbox-field-required"
-              />
-              <Label>Required</Label>
-            </div>
-            <div className="space-y-2">
-              <Label>Placeholder</Label>
-              <Input
-                value={fieldForm.placeholder}
-                onChange={(e) => setFieldForm({ ...fieldForm, placeholder: e.target.value })}
-                data-testid="input-field-placeholder"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Help Text</Label>
-              <Input
-                value={fieldForm.helpText}
-                onChange={(e) => setFieldForm({ ...fieldForm, helpText: e.target.value })}
-                data-testid="input-field-help-text"
-              />
-            </div>
-            {showOptionsField && fieldForm.fieldType === "checkbox_group" && (
-              <div className="space-y-2">
-                <Label>Items</Label>
-                <p className="text-xs text-muted-foreground">
-                  Add items people can sign up for. Set a quantity limit or leave blank for unlimited.
-                </p>
-                <div className="space-y-2">
-                  {fieldForm.optionItems.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2" data-testid={`option-item-${idx}`}>
-                      <Input
-                        value={item.label}
-                        onChange={(e) => {
-                          const updated = [...fieldForm.optionItems];
-                          updated[idx] = { ...updated[idx], label: e.target.value };
-                          setFieldForm({ ...fieldForm, optionItems: updated });
-                        }}
-                        placeholder="Item name (e.g., Milk)"
-                        className="flex-1"
-                        data-testid={`input-option-label-${idx}`}
-                      />
-                      <Input
-                        value={item.capacity}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, "");
-                          const updated = [...fieldForm.optionItems];
-                          updated[idx] = { ...updated[idx], capacity: val };
-                          setFieldForm({ ...fieldForm, optionItems: updated });
-                        }}
-                        placeholder="Qty"
-                        className="w-20"
-                        data-testid={`input-option-capacity-${idx}`}
-                      />
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          const updated = fieldForm.optionItems.filter((_, i) => i !== idx);
-                          if (updated.length === 0) updated.push({ label: "", capacity: "" });
-                          setFieldForm({ ...fieldForm, optionItems: updated });
-                        }}
-                        disabled={fieldForm.optionItems.length <= 1}
-                        data-testid={`button-remove-option-${idx}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setFieldForm({ ...fieldForm, optionItems: [...fieldForm.optionItems, { label: "", capacity: "" }] })}
-                    data-testid="button-add-option-item"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Add Item
-                  </Button>
-                </div>
-              </div>
-            )}
-            {showOptionsField && fieldForm.fieldType !== "checkbox_group" && (
-              <div className="space-y-2">
-                <Label>Options (one per line)</Label>
-                <Textarea
-                  value={fieldForm.options}
-                  onChange={(e) => setFieldForm({ ...fieldForm, options: e.target.value })}
-                  placeholder={"Option 1\nOption 2\nOption 3"}
-                  data-testid="input-field-options"
-                />
-              </div>
-            )}
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={createFieldMutation.isPending || updateFieldMutation.isPending}
-              data-testid="button-submit-field"
-            >
-              {editingField ? "Update Field" : "Add Field"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
 function SubmissionsTab() {
-  const { toast } = useToast();
-  const [selectedFormId, setSelectedFormId] = useState<string>("");
+  const [view, setView] = useState<"list" | "form" | "signup">("list");
+  const [selectedFormId, setSelectedFormId] = useState<number | null>(null);
+  const [selectedSignup, setSelectedSignup] = useState<SignupEvent | null>(null);
 
   const { data: forms, isLoading: formsLoading } = useQuery<(Form & { submissionCount: number; fieldCount: number })[]>({
     queryKey: ["/api/forms"],
   });
+  const { data: signups, isLoading: signupsLoading } = useQuery<SignupEvent[]>({ queryKey: ["/api/signups"] });
 
-  const formId = selectedFormId ? Number(selectedFormId) : null;
+  if (view === "form" && selectedFormId !== null) {
+    return <FormSubmissionsView formId={selectedFormId} onBack={() => setView("list")} />;
+  }
+  if (view === "signup" && selectedSignup) {
+    return <SubmissionsView event={selectedSignup} onBack={() => setView("list")} />;
+  }
 
-  const { data: formWithFields } = useQuery<Form & { fields: FormField[] }>({
-    queryKey: ["/api/forms", formId],
-    enabled: formId !== null,
-  });
-
-  const { data: submissions, isLoading: subsLoading } = useQuery<FormSubmission[]>({
-    queryKey: ["/api/forms", formId, "submissions"],
-    queryFn: async () => {
-      const res = await fetch(`/api/forms/${formId}/submissions`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch submissions");
-      return res.json();
-    },
-    enabled: formId !== null,
-  });
-
-  const deleteSubmissionMutation = useMutation({
-    mutationFn: async (subId: number) => { await apiRequest("DELETE", `/api/forms/${formId}/submissions/${subId}`); },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/forms", formId, "submissions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
-      toast({ title: "Submission deleted" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
-
-  const publishedForms = (forms || []).filter((f) => f.submissionCount > 0 || f.status === "published");
+  const signupFormIds = new Set((signups || []).map((s) => s.formId).filter(Boolean));
+  const standaloneForms = (forms || []).filter((f) => !signupFormIds.has(f.id));
+  const loading = formsLoading || signupsLoading;
 
   return (
     <div data-testid="tab-submissions">
-      <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Submissions</h1>
-      <p className="text-muted-foreground mb-6">View and manage responses collected from your forms.</p>
+      <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: "Montserrat, sans-serif" }}>Responses</h1>
+      <p className="text-muted-foreground mb-6">Everything people have submitted — sign ups and forms — in one place.</p>
 
-      <div className="flex items-end gap-4 flex-wrap mb-6">
-        <div className="w-full max-w-sm space-y-2">
-          <Label>Select a Form</Label>
-          <Select value={selectedFormId} onValueChange={setSelectedFormId}>
-            <SelectTrigger data-testid="select-submission-form">
-              <SelectValue placeholder={formsLoading ? "Loading forms..." : "Choose a form to view"} />
-            </SelectTrigger>
-            <SelectContent>
-              {publishedForms.map((form) => (
-                <SelectItem key={form.id} value={form.id.toString()} data-testid={`option-form-${form.id}`}>
-                  {form.title} ({form.submissionCount ?? 0})
-                </SelectItem>
-              ))}
-              {publishedForms.length === 0 && !formsLoading && (
-                <SelectItem value="__none" disabled>No forms with submissions</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {!formId && (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <Inbox className="w-12 h-12 mx-auto mb-4 opacity-40" />
-            <p>Select a form above to view its submissions.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {formId && subsLoading && (
-        <p className="text-muted-foreground">Loading submissions...</p>
-      )}
-
-      {formId && !subsLoading && (!submissions || submissions.length === 0) && (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            No submissions yet for this form.
-          </CardContent>
-        </Card>
-      )}
-
-      {formId && submissions && submissions.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
-            <p className="text-sm text-muted-foreground">
-              {submissions.length} submission{submissions.length !== 1 ? "s" : ""}
-            </p>
-            <Badge variant="outline">{formWithFields?.title}</Badge>
-          </div>
-          <div className="overflow-x-auto">
-            <Table data-testid="table-submissions">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">#</TableHead>
-                  {fields.map((f) => (
-                    <TableHead key={f.id}>{f.label}</TableHead>
-                  ))}
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {submissions.map((sub, idx) => {
-                  const data = (sub.data || {}) as Record<string, any>;
-                  return (
-                    <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
-                      <TableCell className="text-muted-foreground text-sm">{idx + 1}</TableCell>
-                      {fields.map((f) => (
-                        <TableCell key={f.id}>
-                          {data[f.id.toString()] !== undefined
-                            ? Array.isArray(data[f.id.toString()])
-                              ? (data[f.id.toString()] as string[]).join(", ")
-                              : String(data[f.id.toString()])
-                            : data[f.label] !== undefined
-                              ? String(data[f.label])
-                              : ""}
-                        </TableCell>
-                      ))}
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : ""}
-                      </TableCell>
-                      <TableCell>
-                        <ConfirmDelete
-                          title="Delete this submission?"
-                          description="This permanently deletes this person's response. This cannot be undone."
-                          onConfirm={() => deleteSubmissionMutation.mutate(sub.id)}
-                        >
-                          <Button size="icon" variant="ghost" aria-label="Delete submission" data-testid={`button-delete-submission-${sub.id}`}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </ConfirmDelete>
-                      </TableCell>
+      {loading ? (
+        <p className="text-muted-foreground">Loading...</p>
+      ) : (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sign Ups</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {!signups?.length ? (
+                <p className="text-muted-foreground text-sm px-6 pb-6">No sign ups yet. Create one in the Sign Ups section.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sign Up</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Responses</TableHead>
+                      <TableHead>Event Date</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {signups.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.title}</TableCell>
+                        <TableCell><Badge variant={s.status === "published" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
+                        <TableCell>
+                          {s.currentSignupCount}{s.maxSignups != null ? ` of ${s.maxSignups}` : ""}
+                          {s.waitlistCount > 0 ? ` (+${s.waitlistCount} waitlisted)` : ""}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {s.eventDate ? new Date(s.eventDate).toLocaleDateString() : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => { setSelectedSignup(s); setView("signup"); }} data-testid={`button-view-roster-${s.id}`}>
+                            View Roster
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Forms</CardTitle>
+              <p className="text-sm text-muted-foreground font-normal">Standalone forms not attached to a sign up (contact-style forms, volunteer interest, etc.).</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              {!standaloneForms.length ? (
+                <p className="text-muted-foreground text-sm px-6 pb-6">No standalone forms.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Form</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Responses</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {standaloneForms.map((f) => (
+                      <TableRow key={f.id}>
+                        <TableCell className="font-medium">{f.title}</TableCell>
+                        <TableCell><Badge variant={f.status === "published" ? "default" : "secondary"}>{f.status}</Badge></TableCell>
+                        <TableCell>{f.submissionCount ?? 0}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => { setSelectedFormId(f.id); setView("form"); }} data-testid={`button-view-responses-${f.id}`}>
+                            View Responses
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
@@ -5215,6 +5248,75 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  // Pull the linked form's questions and answers so the roster shows WHO
+  // signed up and what they're bringing.
+  const formId = event.formId;
+  const { data: formWithFields } = useQuery<Form & { fields: FormField[] }>({
+    queryKey: ["/api/forms", formId],
+    enabled: !!formId,
+  });
+  const { data: formSubs } = useQuery<FormSubmission[]>({
+    queryKey: ["/api/forms", formId, "submissions"],
+    queryFn: async () => {
+      const res = await fetch(`/api/forms/${formId}/submissions`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch answers");
+      return res.json();
+    },
+    enabled: !!formId,
+  });
+
+  const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
+  const answerCols = fields.filter((f) => f.fieldType !== "checkbox_group").slice(0, 3);
+  const subDataById = new Map((formSubs || []).map((fs) => [fs.id, (fs.data || {}) as Record<string, any>]));
+
+  function fmtVal(v: any): string {
+    if (v == null || v === "") return "";
+    if (Array.isArray(v)) return v.join(", ");
+    if (typeof v === "object") return [v.address, v.city, v.state, v.zip].filter(Boolean).join(", ");
+    return String(v);
+  }
+
+  function answerFor(sub: SignupSubmission, field: FormField): string {
+    if (!sub.formSubmissionId) return "";
+    const data = subDataById.get(sub.formSubmissionId);
+    if (!data) return "";
+    return fmtVal(data[field.id] ?? data[String(field.id)] ?? data[field.label]);
+  }
+
+  // Item claim counts for "Limited Items Signup" questions (potluck sheets)
+  const itemFields = fields.filter((f) => f.fieldType === "checkbox_group" && Array.isArray(f.options));
+  const itemUsage = itemFields.map((field) => {
+    const opts = (field.options as any[]).map((o) =>
+      typeof o === "string" ? { label: o, capacity: undefined } : { label: o.label, capacity: o.capacity }
+    );
+    const counts: Record<string, number> = {};
+    for (const opt of opts) counts[opt.label] = 0;
+    for (const fs of formSubs || []) {
+      const val = (fs.data as any)?.[field.id] ?? (fs.data as any)?.[String(field.id)];
+      const vals = Array.isArray(val) ? val : typeof val === "string" ? [val] : [];
+      for (const v of vals) if (counts[v] !== undefined) counts[v]++;
+    }
+    return { field, items: opts.map((o) => ({ ...o, claimed: counts[o.label] || 0 })) };
+  });
+
+  function printItems() {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const rows = itemUsage.flatMap(({ field, items }) =>
+      [`<tr><th colspan="3" style="text-align:left;padding:12px 8px 4px;font-size:15px">${field.label}</th></tr>`].concat(
+        items.map((it) => {
+          const status = it.capacity
+            ? it.claimed >= it.capacity ? "FULL" : `${it.capacity - it.claimed} still needed`
+            : `${it.claimed} claimed`;
+          return `<tr><td style="padding:4px 8px;border-bottom:1px solid #ddd">${it.label}</td><td style="padding:4px 8px;border-bottom:1px solid #ddd">${it.claimed}${it.capacity ? ` of ${it.capacity}` : ""}</td><td style="padding:4px 8px;border-bottom:1px solid #ddd">${status}</td></tr>`;
+        })
+      )
+    ).join("");
+    w.document.write(`<html><head><title>${event.title} — Items</title></head><body style="font-family:sans-serif;padding:24px"><h1 style="font-size:20px">${event.title}</h1><p style="color:#555">Item sign-up status as of ${new Date().toLocaleString()}</p><table style="border-collapse:collapse;width:100%"><tr><th style="text-align:left;padding:4px 8px">Item</th><th style="text-align:left;padding:4px 8px">Claimed</th><th style="text-align:left;padding:4px 8px">Status</th></tr>${rows}</table></body></html>`);
+    w.document.close();
+    w.print();
+  }
+
   const confirmed = submissions?.filter(s => s.status === "confirmed") || [];
   const waitlisted = submissions?.filter(s => s.status === "waitlisted") || [];
   const cancelled = submissions?.filter(s => s.status === "cancelled") || [];
@@ -5259,6 +5361,43 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
         </Card>
       </div>
 
+      {itemUsage.length > 0 && (
+        <Card className="mb-6" data-testid="card-items-needed">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle>What's Still Needed</CardTitle>
+            <Button variant="outline" size="sm" onClick={printItems} data-testid="button-print-items">
+              Print for the lobby table
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {itemUsage.map(({ field, items }) => (
+              <div key={field.id}>
+                {itemUsage.length > 1 && <p className="font-medium text-sm mb-2">{field.label}</p>}
+                <div className="space-y-2">
+                  {items.map((it) => {
+                    const full = !!it.capacity && it.claimed >= it.capacity;
+                    const pct = it.capacity ? Math.min(100, (it.claimed / it.capacity) * 100) : it.claimed > 0 ? 100 : 0;
+                    return (
+                      <div key={it.label} className="flex items-center gap-3">
+                        <span className="text-sm w-40 truncate" title={it.label}>{it.label}</span>
+                        <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${full ? "bg-green-600" : "bg-primary"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-sm w-32 text-right tabular-nums">
+                          {it.capacity
+                            ? full ? `${it.claimed} of ${it.capacity} — full` : `${it.claimed} of ${it.capacity}`
+                            : `${it.claimed} claimed`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <p className="text-muted-foreground">Loading submissions...</p>
       ) : !submissions?.length ? (
@@ -5268,10 +5407,15 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
           </CardContent>
         </Card>
       ) : (
+        <div className="overflow-x-auto">
         <Table data-testid="table-submissions">
           <TableHeader>
             <TableRow>
               <TableHead>#</TableHead>
+              {answerCols.map((f) => (
+                <TableHead key={f.id}>{f.label}</TableHead>
+              ))}
+              {itemFields.length > 0 && <TableHead>Bringing</TableHead>}
               <TableHead>Status</TableHead>
               <TableHead>Checked In</TableHead>
               <TableHead>Guests</TableHead>
@@ -5283,6 +5427,16 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
             {submissions.map((sub) => (
               <TableRow key={sub.id} data-testid={`row-submission-${sub.id}`}>
                 <TableCell data-testid={`text-sub-number-${sub.id}`}>#{sub.signupNumber}</TableCell>
+                {answerCols.map((f) => (
+                  <TableCell key={f.id} className="max-w-[200px] truncate" title={answerFor(sub, f)}>
+                    {answerFor(sub, f)}
+                  </TableCell>
+                ))}
+                {itemFields.length > 0 && (
+                  <TableCell className="max-w-[220px]">
+                    {itemFields.map((f) => answerFor(sub, f)).filter(Boolean).join("; ")}
+                  </TableCell>
+                )}
                 <TableCell data-testid={`text-sub-status-${sub.id}`}>
                   <Badge variant={sub.status === "confirmed" ? "default" : sub.status === "waitlisted" ? "secondary" : "outline"}>
                     {sub.status}
@@ -5328,16 +5482,39 @@ function SubmissionsView({ event, onBack }: { event: SignupEvent; onBack: () => 
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
     </div>
   );
 }
+
+// Plain-language labels for the sign-up wizard
+const SIGNUP_STATUS_OPTIONS = [
+  { value: "draft", label: "Draft — only admins can see it" },
+  { value: "published", label: "Published — live on the website" },
+  { value: "closed", label: "Closed — reachable by link, but no longer accepting signups" },
+  { value: "archived", label: "Archived — hidden everywhere" },
+];
+const SIGNUP_VISIBILITY_OPTIONS = [
+  { value: "public", label: "Public — listed on the Sign Ups page" },
+  { value: "members_only", label: "Members only — visitors must log in to see it" },
+  { value: "unlisted", label: "Hidden — only people with the link or QR code" },
+];
+const DISPLAY_TYPE_OPTIONS = [
+  { value: "thank_you", label: "Show a thank-you message" },
+  { value: "summary_own", label: "Show them their own signup" },
+  { value: "summary_all", label: "Show everyone's signups (with names)" },
+  { value: "summary_all_anonymous", label: "Show what's been claimed (no names)" },
+  { value: "redirect", label: "Send them to another web page" },
+  { value: "custom", label: "Custom" },
+];
 
 function SignupsTab() {
   const { toast } = useToast();
   const { data: signups, isLoading } = useQuery<SignupEvent[]>({ queryKey: ["/api/signups"] });
   const { data: formsList } = useQuery<Form[]>({ queryKey: ["/api/forms"] });
   const [view, setView] = useState<"list" | "editor" | "submissions">("list");
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [editing, setEditing] = useState<SignupEvent | null>(null);
   const [viewingSubmissions, setViewingSubmissions] = useState<SignupEvent | null>(null);
   const [displayType, setDisplayType] = useState("thank_you");
@@ -5369,6 +5546,7 @@ function SignupsTab() {
   const [signupImagePickerOpen, setSignupImagePickerOpen] = useState(false);
   const [qrLogoUrl, setQrLogoUrl] = useState("");
   const [qrLogoPickerOpen, setQrLogoPickerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
   const downloadQrCode = useCallback(() => {
@@ -5408,6 +5586,8 @@ function SignupsTab() {
       successMessage: "", redirectUrl: "", externalUrl: "",
     });
     setDisplayType("thank_you");
+    setQrLogoUrl("");
+    setStep(1);
     setView("editor");
   }
 
@@ -5422,7 +5602,7 @@ function SignupsTab() {
       category: signup.category,
       status: signup.status,
       visibility: signup.visibility,
-      formId: signup.formId,
+      formId: signup.formId ?? 0,
       imageUrl: signup.imageUrl || "",
       thumbnailUrl: signup.thumbnailUrl || "",
       signupStartDate: toDatetimeLocal(signup.signupStartDate),
@@ -5443,38 +5623,20 @@ function SignupsTab() {
     setDisplayType(pss.displayType || "thank_you");
     const settings = (signup.settings || {}) as any;
     setQrLogoUrl(settings.qrLogoUrl || "");
+    setStep(1);
     setView("editor");
   }
 
   function closeEditor() {
     setView("list");
     setEditing(null);
+    setStep(1);
   }
 
   function openSubmissions(signup: SignupEvent) {
     setViewingSubmissions(signup);
     setView("submissions");
   }
-
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => { await apiRequest("POST", "/api/signups", data); },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
-      toast({ title: "Sign up created" });
-      closeEditor();
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => { await apiRequest("PATCH", `/api/signups/${id}`, data); },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
-      toast({ title: "Sign up updated" });
-      closeEditor();
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/signups/${id}`); },
@@ -5485,17 +5647,8 @@ function SignupsTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      toast({ title: "Title is required", variant: "destructive" });
-      return;
-    }
-    if (!form.formId && !form.externalUrl) {
-      toast({ title: "Please select a form or provide an external form URL", variant: "destructive" });
-      return;
-    }
-    const payload: any = {
+  function buildPayload(overrides: Record<string, any> = {}) {
+    return {
       title: form.title,
       slug: form.slug || generateSlug(form.title),
       description: form.description || null,
@@ -5512,7 +5665,7 @@ function SignupsTab() {
       eventEndDate: form.eventEndDate ? new Date(form.eventEndDate).toISOString() : null,
       location: form.location || null,
       cost: form.cost || null,
-      maxSignups: form.maxSignups ? parseInt(form.maxSignups) : null,
+      maxSignups: form.maxSignups ? parseInt(form.maxSignups, 10) : null,
       waitlistEnabled: form.waitlistEnabled,
       contactName: form.contactName || null,
       contactEmail: form.contactEmail || null,
@@ -5525,11 +5678,85 @@ function SignupsTab() {
       settings: {
         qrLogoUrl: qrLogoUrl || null,
       },
+      ...overrides,
     };
-    if (editing) {
-      updateMutation.mutate({ id: editing.id, data: payload });
-    } else {
-      createMutation.mutate(payload);
+  }
+
+  // Step 1 "Continue": create the record (plus its form) or save edits, then move on.
+  async function saveDetailsAndContinue() {
+    if (!form.title.trim()) {
+      toast({ title: "Please give the sign up a title", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        const res = await apiRequest("PATCH", `/api/signups/${editing.id}`, buildPayload());
+        setEditing(await res.json());
+      } else {
+        // Build the sign up's own form automatically so staff never have to
+        // visit Form Builder first. (An existing/external form can still be
+        // chosen in step 2 under Advanced.)
+        let formId = form.formId || 0;
+        if (!formId && !form.externalUrl) {
+          const slugBase = form.slug || generateSlug(form.title);
+          const formRes = await apiRequest("POST", "/api/forms", {
+            title: form.title,
+            slug: `${slugBase}-form`,
+            status: "published",
+            submitButtonText: "Sign Up",
+            successMessage: "Thank you for signing up!",
+            requireAuth: false,
+            allowMultiple: true,
+          });
+          formId = (await formRes.json()).id;
+          skipDirtyRef.current = 1;
+          setForm((f) => ({ ...f, formId }));
+          queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+        }
+        const res = await apiRequest("POST", "/api/signups", buildPayload({ formId: formId || null, status: "draft" }));
+        setEditing(await res.json());
+        toast({ title: "Draft saved", description: "Now add the questions and items people can sign up for." });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      setUnsaved(null);
+      setStep(2);
+    } catch (e: any) {
+      toast({ title: "Couldn't save", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Final save from step 3
+  async function saveAndFinish() {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await apiRequest("PATCH", `/api/signups/${editing.id}`, buildPayload());
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      setUnsaved(null);
+      toast({
+        title: "Sign up saved",
+        description: form.status === "draft" ? "It's still a draft — set it to Published when you're ready." : undefined,
+      });
+      closeEditor();
+    } catch (e: any) {
+      toast({ title: "Couldn't save", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Persist a form/external switch from step 2 right away so the sign up
+  // never points at a stale form.
+  async function patchQuietly(data: Record<string, any>) {
+    if (!editing) return;
+    try {
+      await apiRequest("PATCH", `/api/signups/${editing.id}`, data);
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+    } catch (e: any) {
+      toast({ title: "Couldn't save", description: e.message, variant: "destructive" });
     }
   }
 
@@ -5538,18 +5765,50 @@ function SignupsTab() {
   }
 
   if (view === "editor") {
+    const activeFormId = form.formId || editing?.formId || null;
+    const shareSlug = form.slug || editing?.slug || "";
+    const steps = [
+      { n: 1 as const, label: "Details" },
+      { n: 2 as const, label: "Questions & Items" },
+      { n: 3 as const, label: "Publish & Share" },
+    ];
     return (
       <div data-testid="tab-signups-editor">
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
-          <h1 className="text-2xl font-bold">{editing ? "Edit Sign Up" : "Create Sign Up"}</h1>
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+          <h1 className="text-2xl font-bold">{editing ? `Edit: ${editing.title}` : "Create Sign Up"}</h1>
           <Button variant="outline" onClick={closeEditor} data-testid="button-cancel-signup">
             Back to List
           </Button>
         </div>
-        <Card>
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div className="flex items-center gap-2 mb-6 flex-wrap" data-testid="signup-wizard-steps">
+          {steps.map((s, i) => (
+            <div key={s.n} className="flex items-center gap-2">
+              {i > 0 && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+              <button
+                type="button"
+                onClick={() => { if (editing || s.n === 1) setStep(s.n); }}
+                disabled={!editing && s.n > 1}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  step === s.n
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : editing || s.n === 1
+                      ? "hover:bg-muted"
+                      : "opacity-50 cursor-not-allowed"
+                }`}
+                data-testid={`wizard-step-${s.n}`}
+              >
+                <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center ${step === s.n ? "bg-primary-foreground text-primary" : "bg-muted"}`}>{s.n}</span>
+                {s.label}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {step === 1 && (
+          <Card>
+            <CardContent className="pt-6">
+              <form onSubmit={(e) => { e.preventDefault(); saveDetailsAndContinue(); }} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Title *</Label>
                   <Input
@@ -5558,109 +5817,84 @@ function SignupsTab() {
                       const title = e.target.value;
                       setForm({ ...form, title, slug: editing ? form.slug : generateSlug(title) });
                     }}
+                    placeholder="e.g. Fall Tailgate Party"
                     required
                     data-testid="input-signup-title"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Slug</Label>
+                  <Label>Web Address</Label>
                   <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} data-testid="input-signup-slug" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} data-testid="input-signup-description" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                    <SelectTrigger data-testid="select-signup-category">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SIGNUP_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{SIGNUP_CATEGORY_LABELS[cat] || cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                    <SelectTrigger data-testid="select-signup-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SIGNUP_EVENT_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Visibility</Label>
-                  <Select value={form.visibility} onValueChange={(v) => setForm({ ...form, visibility: v })}>
-                    <SelectTrigger data-testid="select-signup-visibility">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SIGNUP_VISIBILITY.map((v) => (
-                        <SelectItem key={v} value={v}>{v.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>External Form URL (Google Forms, etc.)</Label>
-                <Input
-                  value={form.externalUrl}
-                  onChange={(e) => setForm({ ...form, externalUrl: e.target.value })}
-                  placeholder="https://docs.google.com/forms/d/e/..."
-                  data-testid="input-signup-external-url"
-                />
-                <p className="text-xs text-muted-foreground">
-                  If set, clicking "Sign Up" will show this form embedded on the page instead of the built-in form.
-                </p>
-              </div>
-
-              {!form.externalUrl && (
-              <div className="space-y-2">
-                <Label>Form *</Label>
-                {!formsList?.length ? (
-                  <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
-                    No forms exist yet. Go to the <strong>Form Builder</strong> section in the sidebar to
-                    create the form people will fill out, then come back here to attach it.
+                  <p className="text-xs text-muted-foreground">
+                    People will sign up at lakecitycc.com/signups/<strong>{form.slug || "your-sign-up"}</strong> — filled in automatically from the title.
                   </p>
-                ) : (
-                  <>
-                    <Select value={form.formId ? String(form.formId) : ""} onValueChange={(v) => setForm({ ...form, formId: parseInt(v, 10) })}>
-                      <SelectTrigger data-testid="select-signup-form">
-                        <SelectValue placeholder="Select a form" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="What is this, who is it for, and anything people should know before signing up."
+                    rows={4}
+                    data-testid="input-signup-description"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                      <SelectTrigger data-testid="select-signup-category">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {formsList.map((f) => (
-                          <SelectItem key={f.id} value={String(f.id)}>
-                            {f.title}{f.status !== "published" ? ` (${f.status})` : ""}
-                          </SelectItem>
+                        {SIGNUP_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{SIGNUP_CATEGORY_LABELS[cat] || cat}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
-                      The questions people answer when they sign up. Build or edit forms in the Form Builder section.
-                    </p>
-                  </>
-                )}
-              </div>
-              )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Location</Label>
+                    <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Church parking lot" data-testid="input-signup-location" />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Event Date & Time</Label>
+                    <Input type="datetime-local" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} data-testid="input-signup-event-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Event End <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input type="datetime-local" value={form.eventEndDate} onChange={(e) => setForm({ ...form, eventEndDate: e.target.value })} data-testid="input-signup-event-end-date" />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Image</Label>
+                  <Label>Cost <span className="text-muted-foreground font-normal">(optional — shown to people signing up, e.g. "$10 for the book")</span></Label>
+                  <Input value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} data-testid="input-signup-cost" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Contact Name</Label>
+                    <Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} placeholder="Who runs this?" data-testid="input-signup-contact-name" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Email</Label>
+                    <Input type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} data-testid="input-signup-contact-email" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Phone</Label>
+                    <Input type="tel" value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} data-testid="input-signup-contact-phone" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Image <span className="text-muted-foreground font-normal">(optional — shown at the top of the sign up page)</span></Label>
                   <div className="flex items-center gap-2">
                     <Button type="button" variant="outline" className="gap-2" onClick={() => setSignupImagePickerOpen(true)}>
                       <ImageIcon className="w-4 h-4" /> {form.imageUrl ? "Change Image" : "Choose Image"}
@@ -5681,169 +5915,274 @@ function SignupsTab() {
                     defaultFolder="events"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Thumbnail URL</Label>
-                  <Input value={form.thumbnailUrl} onChange={(e) => setForm({ ...form, thumbnailUrl: e.target.value })} data-testid="input-signup-thumbnail-url" />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Signup Start Date</Label>
-                  <Input type="datetime-local" value={form.signupStartDate} onChange={(e) => setForm({ ...form, signupStartDate: e.target.value })} data-testid="input-signup-start-date" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Signup End Date</Label>
-                  <Input type="datetime-local" value={form.signupEndDate} onChange={(e) => setForm({ ...form, signupEndDate: e.target.value })} data-testid="input-signup-end-date" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Event Date</Label>
-                  <Input type="datetime-local" value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} data-testid="input-signup-event-date" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Event End Date</Label>
-                  <Input type="datetime-local" value={form.eventEndDate} onChange={(e) => setForm({ ...form, eventEndDate: e.target.value })} data-testid="input-signup-event-end-date" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} data-testid="input-signup-location" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cost</Label>
-                  <Input value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} data-testid="input-signup-cost" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Max Signups</Label>
-                  <Input type="number" value={form.maxSignups} onChange={(e) => setForm({ ...form, maxSignups: e.target.value })} data-testid="input-signup-max" />
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <Checkbox
-                    id="waitlist-enabled"
-                    checked={form.waitlistEnabled}
-                    onCheckedChange={(checked) => setForm({ ...form, waitlistEnabled: !!checked })}
-                    data-testid="checkbox-signup-waitlist"
-                  />
-                  <Label htmlFor="waitlist-enabled">Waitlist Enabled</Label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Contact Name</Label>
-                  <Input value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} data-testid="input-signup-contact-name" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Contact Email</Label>
-                  <Input value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} data-testid="input-signup-contact-email" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Contact Phone</Label>
-                  <Input value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} data-testid="input-signup-contact-phone" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Post-Submission Display Type</Label>
-                <Select value={displayType} onValueChange={(v) => setDisplayType(v)}>
-                  <SelectTrigger data-testid="select-signup-display-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SIGNUP_DISPLAY_TYPES.map((dt) => (
-                      <SelectItem key={dt} value={dt}>{dt.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Post-Submission Success Message</Label>
-                <Textarea value={form.successMessage} onChange={(e) => setForm({ ...form, successMessage: e.target.value })} data-testid="input-signup-success-message" />
-              </div>
-
-              {displayType === "redirect" && (
-                <div className="space-y-2">
-                  <Label>Post-Submission Redirect URL</Label>
-                  <Input value={form.redirectUrl} onChange={(e) => setForm({ ...form, redirectUrl: e.target.value })} data-testid="input-signup-redirect-url" />
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-signup">
-                {editing ? "Update Sign Up" : "Create Sign Up"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {(editing || form.slug) && (
-          <Card className="mt-6">
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <QrCode className="w-5 h-5" /> QR Code Generator
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Sign Up URL</Label>
-                    <Input
-                      value={`https://www.lakecitycc.com/signups/${form.slug || editing?.slug || ""}`}
-                      readOnly
-                      className="bg-muted"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Center Logo (optional)</Label>
-                    <div className="flex items-center gap-2">
-                      <Button type="button" variant="outline" className="gap-2" onClick={() => setQrLogoPickerOpen(true)}>
-                        <ImageIcon className="w-4 h-4" /> {qrLogoUrl ? "Change Logo" : "Choose Logo"}
-                      </Button>
-                      {qrLogoUrl && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setQrLogoUrl("")}>
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                    {qrLogoUrl && (
-                      <img src={getImageSrc(qrLogoUrl)} alt="QR Logo" className="w-16 h-16 object-contain rounded mt-1" />
-                    )}
-                    <ImagePickerModal
-                      open={qrLogoPickerOpen}
-                      onClose={() => setQrLogoPickerOpen(false)}
-                      onSelect={(path) => setQrLogoUrl(path)}
-                      defaultFolder="general"
-                    />
-                  </div>
-                  <Button type="button" className="gap-2" onClick={downloadQrCode}>
-                    <Download className="w-4 h-4" /> Download QR Code
-                  </Button>
-                </div>
-                <div className="flex items-center justify-center">
-                  <div ref={qrRef} className="bg-white p-4 rounded-lg inline-block">
-                    <QRCodeCanvas
-                      value={`https://www.lakecitycc.com/signups/${form.slug || editing?.slug || ""}`}
-                      size={256}
-                      level="H"
-                      imageSettings={qrLogoUrl ? {
-                        src: getImageSrc(qrLogoUrl) || "",
-                        height: 60,
-                        width: 60,
-                        excavate: true,
-                      } : undefined}
-                    />
-                  </div>
-                </div>
-              </div>
+                <Button type="submit" className="w-full" disabled={saving} data-testid="button-signup-continue">
+                  {saving ? "Saving..." : editing ? "Save & Continue" : "Continue — Add Questions"}
+                  {!saving && <ChevronRight className="w-4 h-4 ml-1" />}
+                </Button>
+              </form>
             </CardContent>
           </Card>
+        )}
+
+        {step === 2 && editing && (
+          <div className="space-y-4">
+            {form.externalUrl ? (
+              <Card>
+                <CardContent className="pt-6 space-y-2">
+                  <p className="text-sm">
+                    This sign up uses an <strong>external form</strong> — the page embeds it instead of the built-in questions.
+                  </p>
+                  <code className="text-xs bg-muted px-2 py-1 rounded block truncate">{form.externalUrl}</code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setForm({ ...form, externalUrl: "" }); patchQuietly({ externalUrl: null }); }}
+                  >
+                    Remove external form and use built-in questions
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : activeFormId ? (
+              <FormFieldsEditor formId={activeFormId} title="Questions & Items" />
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">No form is attached yet. Choose one under Advanced below.</p>
+                </CardContent>
+              </Card>
+            )}
+
+            <details className="border rounded-md px-4 py-3">
+              <summary className="cursor-pointer text-sm font-medium">Advanced — use an existing form or an external form (Google Forms)</summary>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Use an existing form</Label>
+                  <Select
+                    value={form.formId ? String(form.formId) : ""}
+                    onValueChange={(v) => {
+                      const id = parseInt(v, 10);
+                      setForm({ ...form, formId: id });
+                      patchQuietly({ formId: id });
+                    }}
+                  >
+                    <SelectTrigger data-testid="select-signup-form">
+                      <SelectValue placeholder="Select a form" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formsList?.map((f) => (
+                        <SelectItem key={f.id} value={String(f.id)}>
+                          {f.title}{f.status !== "published" ? ` (${f.status})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Careful: switching forms changes which questions people answer. Edits above apply to the selected form.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>External Form URL (Google Forms, etc.)</Label>
+                  <Input
+                    value={form.externalUrl}
+                    onChange={(e) => setForm({ ...form, externalUrl: e.target.value })}
+                    onBlur={() => { if (form.externalUrl) patchQuietly({ externalUrl: form.externalUrl }); }}
+                    placeholder="https://docs.google.com/forms/d/e/..."
+                    data-testid="input-signup-external-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    If set, the sign up page shows this form instead of the built-in questions.
+                  </p>
+                </div>
+              </div>
+            </details>
+
+            <div className="flex justify-between gap-2">
+              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+              <Button onClick={() => setStep(3)} data-testid="button-signup-to-publish">
+                Continue — Publish & Share <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && editing && (
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                      <SelectTrigger data-testid="select-signup-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SIGNUP_STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Who can see it</Label>
+                    <Select value={form.visibility} onValueChange={(v) => setForm({ ...form, visibility: v })}>
+                      <SelectTrigger data-testid="select-signup-visibility">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SIGNUP_VISIBILITY_OPTIONS.map((v) => (
+                          <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Signups open <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input type="datetime-local" value={form.signupStartDate} onChange={(e) => setForm({ ...form, signupStartDate: e.target.value })} data-testid="input-signup-start-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Signups close <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input type="datetime-local" value={form.signupEndDate} onChange={(e) => setForm({ ...form, signupEndDate: e.target.value })} data-testid="input-signup-end-date" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Maximum signups <span className="text-muted-foreground font-normal">(leave blank for unlimited)</span></Label>
+                    <Input type="number" min="1" value={form.maxSignups} onChange={(e) => setForm({ ...form, maxSignups: e.target.value })} data-testid="input-signup-max" />
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Checkbox
+                      id="waitlist-enabled"
+                      checked={form.waitlistEnabled}
+                      onCheckedChange={(checked) => setForm({ ...form, waitlistEnabled: !!checked })}
+                      data-testid="checkbox-signup-waitlist"
+                    />
+                    <Label htmlFor="waitlist-enabled">Start a waitlist when full</Label>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>After someone signs up</Label>
+                  <Select value={displayType} onValueChange={(v) => setDisplayType(v)}>
+                    <SelectTrigger data-testid="select-signup-display-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISPLAY_TYPE_OPTIONS.map((dt) => (
+                        <SelectItem key={dt.value} value={dt.value}>{dt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    "Show what's been claimed" works great for potluck-style sign ups — everyone can see which items are still needed.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Thank-you message <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Textarea value={form.successMessage} onChange={(e) => setForm({ ...form, successMessage: e.target.value })} placeholder="Thanks for signing up! We'll see you there." data-testid="input-signup-success-message" />
+                </div>
+
+                {displayType === "redirect" && (
+                  <div className="space-y-2">
+                    <Label>Send them to this web page</Label>
+                    <Input value={form.redirectUrl} onChange={(e) => setForm({ ...form, redirectUrl: e.target.value })} placeholder="https://..." data-testid="input-signup-redirect-url" />
+                  </div>
+                )}
+
+                <div className="flex justify-between gap-2">
+                  <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
+                  <Button onClick={saveAndFinish} disabled={saving} data-testid="button-submit-signup">
+                    {saving ? "Saving..." : "Save & Finish"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <QrCode className="w-5 h-5" /> Share
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Sign Up Link</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={`https://www.lakecitycc.com/signups/${shareSlug}`}
+                          readOnly
+                          className="bg-muted"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          aria-label="Copy link"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://www.lakecitycc.com/signups/${shareSlug}`);
+                            toast({ title: "Link copied" });
+                          }}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {form.status !== "published" && (
+                        <p className="text-xs text-muted-foreground">
+                          Heads up: this link won't work for others until the status is set to Published.
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>QR Code Center Logo <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" className="gap-2" onClick={() => setQrLogoPickerOpen(true)}>
+                          <ImageIcon className="w-4 h-4" /> {qrLogoUrl ? "Change Logo" : "Choose Logo"}
+                        </Button>
+                        {qrLogoUrl && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setQrLogoUrl("")}>
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                      {qrLogoUrl && (
+                        <img src={getImageSrc(qrLogoUrl)} alt="QR Logo" className="w-16 h-16 object-contain rounded mt-1" />
+                      )}
+                      <ImagePickerModal
+                        open={qrLogoPickerOpen}
+                        onClose={() => setQrLogoPickerOpen(false)}
+                        onSelect={(path) => setQrLogoUrl(path)}
+                        defaultFolder="general"
+                      />
+                    </div>
+                    <Button type="button" className="gap-2" onClick={downloadQrCode}>
+                      <Download className="w-4 h-4" /> Download QR Code
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div ref={qrRef} className="bg-white p-4 rounded-lg inline-block">
+                      <QRCodeCanvas
+                        value={`https://www.lakecitycc.com/signups/${shareSlug}`}
+                        size={256}
+                        level="H"
+                        imageSettings={qrLogoUrl ? {
+                          src: getImageSrc(qrLogoUrl) || "",
+                          height: 60,
+                          width: 60,
+                          excavate: true,
+                        } : undefined}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     );
@@ -5864,7 +6203,7 @@ function SignupsTab() {
         <Card>
           <CardContent className="py-12 text-center space-y-3">
             <p className="text-muted-foreground">No sign ups yet.</p>
-            <p className="text-sm text-muted-foreground">Create your first sign up — you'll pick or build the form people fill out, set dates and capacity, and get a shareable link and QR code.</p>
+            <p className="text-sm text-muted-foreground">Create your first sign up — a guided setup walks you through the details, the questions and items people claim, and gives you a shareable link and QR code.</p>
             <Button onClick={openCreate}>
               <Plus className="w-4 h-4 mr-2" /> Create Sign Up
             </Button>
@@ -5900,7 +6239,7 @@ function SignupsTab() {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(signup)} data-testid={`button-edit-signup-${signup.id}`}>
+                    <Button size="icon" variant="ghost" title="Edit" aria-label="Edit sign up" onClick={() => openEdit(signup)} data-testid={`button-edit-signup-${signup.id}`}>
                       <Pencil className="w-4 h-4" />
                     </Button>
                     <Button size="icon" variant="ghost" title="View signups" aria-label="View signups" onClick={() => openSubmissions(signup)} data-testid={`button-submissions-signup-${signup.id}`}>
