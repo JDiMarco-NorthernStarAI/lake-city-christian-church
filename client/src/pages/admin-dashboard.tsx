@@ -2218,6 +2218,8 @@ const pageConfigs: PageConfig[] = [
       { key: "intro_text", label: "Intro Text", type: "textarea", placeholder: "Small group gatherings exist as a way for people to engage in community and develop a closer relationship with Jesus." },
       { key: "cta_heading", label: "Bottom Section - Heading", type: "input", placeholder: "Find Your Group" },
       { key: "cta_description", label: "Bottom Section - Description", type: "textarea", placeholder: "Take the next step and connect with a small group near you." },
+      { key: "cta_button_text", label: "Join Button - Text", type: "input", placeholder: "Join a Small Group" },
+      { key: "cta_button_url", label: "Join Button - Where it goes (paste a Sign Up link here to use a sign up instead of the built-in form)", type: "input", placeholder: "/join-small-group" },
     ],
   },
   {
@@ -6117,6 +6119,15 @@ function SignupsTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const publishMutation = useMutation({
+    mutationFn: async (id: number) => { await apiRequest("PATCH", `/api/signups/${id}`, { status: "published" }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/signups"] });
+      toast({ title: "Published!", description: "The sign up is now live on the website." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   function buildPayload(overrides: Record<string, any> = {}) {
     return {
       title: form.title,
@@ -6716,7 +6727,22 @@ function SignupsTab() {
                   <Badge variant="secondary">{SIGNUP_CATEGORY_LABELS[signup.category] || signup.category}</Badge>
                 </TableCell>
                 <TableCell data-testid={`text-signup-status-${signup.id}`}>
-                  <Badge variant={signup.status === "published" ? "default" : "secondary"}>{signup.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={signup.status === "published" ? "default" : "secondary"}>{signup.status}</Badge>
+                    {signup.status === "draft" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        onClick={() => publishMutation.mutate(signup.id)}
+                        disabled={publishMutation.isPending}
+                        title="Make it live on the website"
+                        data-testid={`button-publish-signup-${signup.id}`}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell data-testid={`text-signup-count-${signup.id}`}>
                   {signup.currentSignupCount}{signup.maxSignups != null ? `/${signup.maxSignups}` : ""}

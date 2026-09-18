@@ -31,7 +31,13 @@ export default function SmallGroups() {
     intro_text: "Small group gatherings exist as a way for people to engage in community and develop a closer relationship with Jesus.",
     cta_heading: "Find Your Group",
     cta_description: "Take the next step and connect with a small group near you.",
+    cta_button_text: "Join a Small Group",
+    cta_button_url: "/join-small-group",
   });
+  // The join button destination is editable in Admin > Page Content, so staff
+  // can point it at a sign up (e.g. /signups/fall-groups) without a code change.
+  const joinUrl = c.cta_button_url || "/join-small-group";
+  const isInternal = joinUrl.startsWith("/");
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -102,17 +108,31 @@ export default function SmallGroups() {
           <p className="text-muted-foreground text-lg mb-8">
             {c.cta_description}
           </p>
-          <Link href="/join-small-group">
-            <Button
-              size="lg"
-              className="text-white border-transparent"
-              style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
-              data-testid="button-groups-join"
-            >
-              Join a Small Group
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
+          {isInternal ? (
+            <Link href={joinUrl}>
+              <Button
+                size="lg"
+                className="text-white border-transparent"
+                style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
+                data-testid="button-groups-join"
+              >
+                {c.cta_button_text}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </Link>
+          ) : (
+            <a href={joinUrl} target="_blank" rel="noopener noreferrer">
+              <Button
+                size="lg"
+                className="text-white border-transparent"
+                style={{ background: "linear-gradient(135deg, #00D4FF, #0088DD, #0033AA)" }}
+                data-testid="button-groups-join"
+              >
+                {c.cta_button_text}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </a>
+          )}
         </FadeInSection>
       </section>
     </div>
