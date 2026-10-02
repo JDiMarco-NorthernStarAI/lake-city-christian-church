@@ -6394,8 +6394,8 @@ function SignupsTab() {
                   </div>
                   <div className="space-y-2">
                     <Label>Contact Email</Label>
-                    <Input type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} data-testid="input-signup-contact-email" />
-                    <p className="text-xs text-muted-foreground">Gets an email each time someone signs up.</p>
+                    <Input type="email" multiple value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} data-testid="input-signup-contact-email" />
+                    <p className="text-xs text-muted-foreground">Gets an email for every signup, no matter which group or option is chosen. List more than one address separated by commas.</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Contact Phone</Label>
@@ -7067,6 +7067,7 @@ function SmallGroupsTab() {
               <Label>Group Leader's Email <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Input
                 type="email"
+                multiple
                 value={groupForm.leaderEmail}
                 onChange={e => setGroupForm(f => ({ ...f, leaderEmail: e.target.value }))}
                 placeholder="e.g. leader@example.com"
@@ -7075,6 +7076,7 @@ function SmallGroupsTab() {
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Gets an email whenever someone chooses this group on a sign up.
+                For co-leaders, list more than one address separated by commas.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
