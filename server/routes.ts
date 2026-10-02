@@ -1776,9 +1776,14 @@ export async function registerRoutes(
     const groupDetails = groups
       .filter((g) => (g.name || "").trim())
       .map((g) => ({ label: (g.name || "").trim(), schedule: schedule(g), description: g.description || null }));
+    const groupNames = new Set(groupOptions.map((o) => o.label.toLowerCase()));
     return fields.map((f) => {
       if (f.fieldType !== "small_groups") return f;
-      const extras = parseFieldOptions(f.options).map((o) => ({ label: o.label }));
+      // Drop extra choices that duplicate a real group name (e.g. leftovers
+      // from a previously hand-typed list) so no group renders twice.
+      const extras = parseFieldOptions(f.options)
+        .map((o) => ({ label: o.label }))
+        .filter((o) => o.label.trim() && !groupNames.has(o.label.trim().toLowerCase()));
       return {
         ...f,
         fieldType: "select",
