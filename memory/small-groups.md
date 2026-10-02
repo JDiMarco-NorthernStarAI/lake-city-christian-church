@@ -72,3 +72,11 @@ All created in `scripts/start.sh` and in `shared/schema.ts`.
 ### Important: Checkbox Implementation
 
 Do NOT use Radix `<Checkbox>` component inside forms — it renders a `<button>` that defaults to `type="submit"`, causing form submission on click. Use custom div checkboxes with SVG checkmark instead.
+
+## Oct 2026 updates (commits a5e4984..ec523fc)
+- Public /small-groups page renders active groups as cards ("Our Groups" section) pulled live from /api/city-groups/active; junk schedule values ("0.00", "0:00", "TBD"-only times) filtered by groupSchedule() in small-groups.tsx.
+- New form field type `small_groups` ("Small Group Picker"): stored as marker, served publicly as `select` with options generated from active groups via resolveSmallGroupFields() in routes.ts; field's own stored options are appended as extra choices (e.g. "I Would Like More Info...") and deduped against real group names. Public pages render it as selectable description cards when `groupDetails` is present (signup-detail.tsx + public-form.tsx select case).
+- city_groups.leader_email column (comma-separated emails OK — nodemailer handles lists natively; inputs use type=email multiple). notifyGroupLeaders() in routes.ts emails the picked group's leader(s) on both signup and form submissions. Leader emails are STRIPPED from the public /api/city-groups/active response.
+- Catch-all for ALL requests = the sign-up's contactEmail (also comma-separated). Jason put Jen Orlosky's email on every group's leader box; Shanna to add Brian & Lori Reneker (CIA) and Les Newlan (Mid-Week Morning).
+- Startup migration pattern: ensureSchema() in server/seed.ts runs idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` on boot — use this for new columns since deploys don't run drizzle migrations and the RDS allowlist has a stale home IP (direct db:push from Jason's machine currently fails until he updates sg-073f06f60248e6e4f).
+- The old /join-small-group page is orphaned (nothing links to it); the Join button on /small-groups points to /signups/join-a-small-group via Page Content cta_button_url.

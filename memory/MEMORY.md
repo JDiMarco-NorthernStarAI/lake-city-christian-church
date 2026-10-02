@@ -62,6 +62,7 @@ See [admin-ux-audit.md](admin-ux-audit.md) — full audit findings, confirmed bu
 <!-- merged from c--Users-jason-OneDrive-Desktop-Claude-Code-Projects-lake-city-christian-church -->
 - [Jason DiMarco](user_jason.md) — Project owner, manages LC3 site for church staff, prefers quick iterations
 - [AWS Deployment Setup](project_deployment.md) — Auto-deploy via GitHub Actions to AWS ECS on push to main
+- [Gmail draft compose-window race](feedback_gmail_draft_race.md) — close open compose windows before/after API draft updates
 - [Commit and push workflow](feedback_commit_push.md) — Jason tests on live site, commit/push promptly
 - [Image paths need getImageSrc](feedback_image_paths.md) — Public pages must use getImageSrc() for /objects/ prefix
 - [Never auto-recreate admin content in seed.ts](feedback_seed_data.md) — cleanupData() runs every deploy; no "ensure X exists" blocks
