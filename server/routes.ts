@@ -2702,7 +2702,8 @@ export async function registerRoutes(
   app.get("/api/city-groups/active", async (_req, res) => {
     try {
       const groups = await storage.getActiveCityGroups();
-      res.json(groups);
+      // Public endpoint — never expose leader contact info
+      res.json(groups.map(({ leaderEmail, ...publicFields }) => publicFields));
     } catch (err) {
       res.status(500).json({ message: "Error fetching groups" });
     }
