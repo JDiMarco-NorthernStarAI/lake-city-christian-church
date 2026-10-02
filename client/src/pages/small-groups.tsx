@@ -1,9 +1,30 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { usePageContent } from "@/hooks/use-page-content";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Users, CheckCircle } from "lucide-react";
+import { ArrowRight, Users, CheckCircle, Clock } from "lucide-react";
+
+interface PublicCityGroup {
+  id: number;
+  name: string;
+  description: string | null;
+  meetingDay: string | null;
+  meetingTime: string | null;
+}
+
+// Staff sometimes leave placeholder values like "0.00" or blank — only show
+// schedule parts that carry real information.
+function groupSchedule(g: PublicCityGroup): string | null {
+  const junk = new Set(["", "0", "0.00", "0:00", "00:00"]);
+  const day = (g.meetingDay || "").trim();
+  const time = (g.meetingTime || "").trim();
+  const parts = [];
+  if (day && !junk.has(day)) parts.push(day);
+  if (time && !junk.has(time)) parts.push(time);
+  return parts.length ? parts.join(" @ ") : null;
+}
 
 function FadeInSection({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   return (
@@ -38,6 +59,16 @@ export default function SmallGroups() {
   // can point it at a sign up (e.g. /signups/fall-groups) without a code change.
   const joinUrl = c.cta_button_url || "/join-small-group";
   const isInternal = joinUrl.startsWith("/");
+
+  // Live list from Admin > Small Groups — edits there show up here instantly
+  const { data: groups = [] } = useQuery<PublicCityGroup[]>({
+    queryKey: ["/api/city-groups/active"],
+    queryFn: async () => {
+      const res = await fetch("/api/city-groups/active");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
   return (
     <div className="min-h-screen">
       <section className="relative flex items-center justify-center min-h-[60vh] bg-black overflow-hidden">
@@ -95,6 +126,50 @@ export default function SmallGroups() {
           </div>
         </FadeInSection>
       </section>
+
+      {groups.length > 0 && (
+        <section className="py-20 md:py-24 px-4 bg-background">
+          <FadeInSection className="max-w-4xl mx-auto">
+            <h2
+              className="text-2xl md:text-3xl font-bold text-foreground text-center mb-12"
+              style={{ fontFamily: "Montserrat, sans-serif" }}
+              data-testid="text-groups-list-heading"
+            >
+              Our Groups
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {groups.map((group, index) => {
+                const schedule = groupSchedule(group);
+                return (
+                  <FadeInSection key={group.id} delay={index * 0.08}>
+                    <Card className="h-full" data-testid={`card-group-${group.id}`}>
+                      <CardContent className="p-6 flex flex-col gap-3 h-full">
+                        <h3
+                          className="text-lg font-bold text-foreground"
+                          style={{ fontFamily: "Montserrat, sans-serif" }}
+                        >
+                          {group.name}
+                        </h3>
+                        {schedule && (
+                          <div className="flex items-center gap-2 text-sm font-medium text-blue-500">
+                            <Clock className="w-4 h-4 shrink-0" />
+                            {schedule}
+                          </div>
+                        )}
+                        {group.description && (
+                          <p className="text-muted-foreground leading-relaxed text-sm">
+                            {group.description}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </FadeInSection>
+                );
+              })}
+            </div>
+          </FadeInSection>
+        </section>
+      )}
 
       <section className="py-20 md:py-24 px-4">
         <FadeInSection className="max-w-xl mx-auto text-center">

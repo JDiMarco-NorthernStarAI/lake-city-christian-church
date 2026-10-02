@@ -3771,7 +3771,7 @@ function FormFieldsEditor({ formId, title = "Fields" }: { formId: number; title?
 
   function handleFieldSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const optionTypes = ["select", "radio", "checkbox_group"];
+    const optionTypes = ["select", "radio", "checkbox_group", "small_groups"];
     let parsedOptions: any = null;
     if (optionTypes.includes(fieldForm.fieldType)) {
       if (fieldForm.fieldType === "checkbox_group") {
@@ -3820,7 +3820,7 @@ function FormFieldsEditor({ formId, title = "Fields" }: { formId: number; title?
   }
 
   const fields = formWithFields?.fields ? [...formWithFields.fields].sort((a, b) => a.sortOrder - b.sortOrder) : [];
-  const showOptionsField = ["select", "radio", "checkbox_group"].includes(fieldForm.fieldType);
+  const showOptionsField = ["select", "radio", "checkbox_group", "small_groups"].includes(fieldForm.fieldType);
 
   return (
     <>
@@ -3930,6 +3930,12 @@ function FormFieldsEditor({ formId, title = "Fields" }: { formId: number; title?
                   A list of items people can claim — great for potlucks and donation sign-up sheets.
                 </p>
               )}
+              {fieldForm.fieldType === "small_groups" && (
+                <p className="text-xs text-muted-foreground">
+                  A dropdown that always matches your active groups in the Small Groups section —
+                  you never have to update this question when groups change.
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <Checkbox
@@ -4017,11 +4023,17 @@ function FormFieldsEditor({ formId, title = "Fields" }: { formId: number; title?
             )}
             {showOptionsField && fieldForm.fieldType !== "checkbox_group" && (
               <div className="space-y-2">
-                <Label>Options (one per line)</Label>
+                <Label>
+                  {fieldForm.fieldType === "small_groups"
+                    ? "Extra choices (optional — shown after your groups, one per line)"
+                    : "Options (one per line)"}
+                </Label>
                 <Textarea
                   value={fieldForm.options}
                   onChange={(e) => setFieldForm({ ...fieldForm, options: e.target.value })}
-                  placeholder={"Option 1\nOption 2\nOption 3"}
+                  placeholder={fieldForm.fieldType === "small_groups"
+                    ? "I'd like more info on upcoming groups"
+                    : "Option 1\nOption 2\nOption 3"}
                   data-testid="input-field-options"
                 />
               </div>

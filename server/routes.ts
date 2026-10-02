@@ -1750,6 +1750,22 @@ export async function registerRoutes(
     return null;
   }
 
+  // "Small Group Picker" fields are stored as a marker type and served to the
+  // public as a plain dropdown whose choices come from the live active-groups
+  // list, so the options can never drift from Admin > Small Groups. Options
+  // stored on the field itself are appended as extra choices (e.g. "I'd like
+  // more info on upcoming groups").
+  async function resolveSmallGroupFields(fields: any[]): Promise<any[]> {
+    if (!fields.some((f) => f.fieldType === "small_groups")) return fields;
+    const groups = await storage.getActiveCityGroups();
+    const groupOptions = groups.map((g) => ({ label: (g.name || "").trim() })).filter((o) => o.label);
+    return fields.map((f) => {
+      if (f.fieldType !== "small_groups") return f;
+      const extras = parseFieldOptions(f.options).map((o) => ({ label: o.label }));
+      return { ...f, fieldType: "select", options: [...groupOptions, ...extras] };
+    });
+  }
+
   function decorateFieldsWithUsage(fields: any[], submissions: any[]): any[] {
     const optionTypes = ["select", "radio", "checkbox_group"];
     return fields.map((field) => {
@@ -1764,7 +1780,7 @@ export async function registerRoutes(
     try {
       const form = await storage.getFormBySlug(req.params.slug);
       if (!form || form.status !== "published") return res.status(404).json({ message: "Form not found" });
-      const fields = await storage.getFormFields(form.id);
+      const fields = await resolveSmallGroupFields(await storage.getFormFields(form.id));
       const submissions = await storage.getFormSubmissions(form.id);
       const optionTypes = ["select", "radio", "checkbox_group"];
       const fieldsWithUsage = fields.map((field) => {
@@ -2020,7 +2036,7 @@ export async function registerRoutes(
       if (event.formId) {
         form = await storage.getForm(event.formId);
         if (form) {
-          fields = await storage.getFormFields(form.id);
+          fields = await resolveSmallGroupFields(await storage.getFormFields(form.id));
           const submissions = await storage.getFormSubmissions(form.id);
           fields = decorateFieldsWithUsage(fields, submissions);
         }

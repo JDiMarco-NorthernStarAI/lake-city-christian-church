@@ -117,6 +117,7 @@ export const FORM_FIELD_TYPES = [
   "checkbox",
   "checkbox_group",
   "address",
+  "small_groups",
 ] as const;
 
 export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
@@ -131,6 +132,7 @@ export const FORM_FIELD_TYPE_LABELS: Record<string, string> = {
   checkbox: "Checkbox (Yes/No)",
   checkbox_group: "Limited Items Signup",
   address: "Address (with autocomplete)",
+  small_groups: "Small Group Picker (auto-updates from your groups)",
 };
 
 export const users = pgTable("users", {
