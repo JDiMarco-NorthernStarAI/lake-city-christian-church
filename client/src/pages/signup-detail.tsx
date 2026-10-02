@@ -361,7 +361,53 @@ export default function SignupDetail() {
             data-testid={`textarea-field-${field.id}`}
           />
         );
-      case "select":
+      case "select": {
+        // Small Group Picker fields arrive with groupDetails — render them as
+        // selectable cards with the group's schedule and description so people
+        // know what they're signing up for.
+        const groupDetails = (field as any).groupDetails as
+          | { label: string; schedule: string | null; description: string | null }[]
+          | undefined;
+        if (groupDetails?.length) {
+          return (
+            <div className="space-y-3" data-testid={`group-cards-${field.id}`}>
+              {groupDetails.map((g) => {
+                const selected = formValues[field.id] === g.label;
+                const full = isOptionFull(field, g.label);
+                return (
+                  <button
+                    type="button"
+                    key={g.label}
+                    disabled={full && !selected}
+                    onClick={() => handleFieldChange(field.id, g.label)}
+                    className={`w-full text-left rounded-lg border p-4 transition-colors ${
+                      selected
+                        ? "border-[#00D4FF] bg-[#00D4FF]/10"
+                        : full
+                          ? "border-white/10 opacity-50 cursor-not-allowed"
+                          : "border-white/15 hover:border-white/40"
+                    }`}
+                    data-testid={`group-card-${field.id}-${g.label}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-white">
+                          {g.label}
+                          {getOptionSuffix(field, g.label)}
+                        </div>
+                        {g.schedule && <div className="text-sm text-[#00D4FF] mt-0.5">{g.schedule}</div>}
+                        {g.description && (
+                          <p className="text-sm text-white/60 mt-2 leading-relaxed">{g.description}</p>
+                        )}
+                      </div>
+                      {selected && <CheckCircle className="w-5 h-5 text-[#00D4FF] shrink-0 mt-1" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        }
         return (
           <Select
             value={formValues[field.id] || ""}
@@ -379,6 +425,7 @@ export default function SignupDetail() {
             </SelectContent>
           </Select>
         );
+      }
       case "radio":
         return (
           <div className="space-y-2" data-testid={`radio-field-${field.id}`}>

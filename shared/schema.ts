@@ -957,6 +957,7 @@ export const cityGroups = pgTable("city_groups", {
   description: text("description"),
   meetingDay: text("meeting_day"),
   meetingTime: text("meeting_time"),
+  leaderEmail: text("leader_email"),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1017,6 +1018,7 @@ export const createCityGroupSchema = z.object({
   description: z.string().optional(),
   meetingDay: z.string().optional(),
   meetingTime: z.string().optional(),
+  leaderEmail: z.string().optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });

@@ -1758,12 +1758,63 @@ export async function registerRoutes(
   async function resolveSmallGroupFields(fields: any[]): Promise<any[]> {
     if (!fields.some((f) => f.fieldType === "small_groups")) return fields;
     const groups = await storage.getActiveCityGroups();
-    const groupOptions = groups.map((g) => ({ label: (g.name || "").trim() })).filter((o) => o.label);
+    const junkTimes = new Set(["", "0", "0.00", "0:00", "00:00"]);
+    const schedule = (g: any): string | null => {
+      const day = (g.meetingDay || "").trim();
+      const time = (g.meetingTime || "").trim();
+      const parts = [];
+      if (day && !junkTimes.has(day)) parts.push(day);
+      if (time && !junkTimes.has(time)) parts.push(time);
+      return parts.length ? parts.join(" @ ") : null;
+    };
+    const groupOptions = groups
+      .map((g) => ({ label: (g.name || "").trim() }))
+      .filter((o) => o.label);
+    // groupDetails lets the public form render rich, selectable cards
+    // (description + day/time) instead of a bare dropdown. Leader emails are
+    // intentionally NOT included — they stay server-side.
+    const groupDetails = groups
+      .filter((g) => (g.name || "").trim())
+      .map((g) => ({ label: (g.name || "").trim(), schedule: schedule(g), description: g.description || null }));
     return fields.map((f) => {
       if (f.fieldType !== "small_groups") return f;
       const extras = parseFieldOptions(f.options).map((o) => ({ label: o.label }));
-      return { ...f, fieldType: "select", options: [...groupOptions, ...extras] };
+      return {
+        ...f,
+        fieldType: "select",
+        options: [...groupOptions, ...extras],
+        groupDetails: [...groupDetails, ...extras.map((e) => ({ label: e.label, schedule: null, description: null }))],
+      };
     });
+  }
+
+  // When a submission picks a small group (via a "Small Group Picker" field),
+  // email that group's leader in addition to the sign up's main contact.
+  async function notifyGroupLeaders(fields: any[], data: Record<string, any>, contextTitle: string, details: Record<string, string>) {
+    try {
+      const sgFields = fields.filter((f) => f.fieldType === "small_groups");
+      if (!sgFields.length) return;
+      const groups = await storage.getCityGroups();
+      const { sendEmail } = await import("./email-service");
+      const { adminNotificationEmail } = await import("./email-templates");
+      const sent = new Set<string>();
+      for (const field of sgFields) {
+        const val = data[field.id] ?? data[String(field.id)];
+        if (typeof val !== "string" || !val.trim()) continue;
+        const group = groups.find((g) => (g.name || "").trim().toLowerCase() === val.trim().toLowerCase());
+        const to = ((group as any)?.leaderEmail || "").trim();
+        if (!group || !to || sent.has(to.toLowerCase())) continue;
+        sent.add(to.toLowerCase());
+        const emailData = adminNotificationEmail(
+          `New ${group.name} Signup`,
+          `Someone just signed up for ${group.name} through "${contextTitle}".`,
+          details,
+        );
+        sendEmail({ to, ...emailData }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("Error notifying group leaders:", err);
+    }
   }
 
   function decorateFieldsWithUsage(fields: any[], submissions: any[]): any[] {
@@ -1830,33 +1881,34 @@ export async function registerRoutes(
         submission = await storage.createFormSubmission({ formId: form.id, data, userId: null });
       }
 
-      // Send notification email if configured
-      if ((form as any).notificationEmail) {
-        try {
-          const { sendEmail } = await import("./email-service");
-          const { adminNotificationEmail } = await import("./email-templates");
-          const details: Record<string, string> = {};
-          for (const field of fields) {
-            const val = data[field.id];
-            if (val !== undefined && val !== null && val !== "") {
-              if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
-                details[field.label] = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
-              } else if (Array.isArray(val)) {
-                details[field.label] = formatClaimValue(val);
-              } else {
-                details[field.label] = String(val);
-              }
+      // Notification emails (form owner + any picked group's leader)
+      try {
+        const details: Record<string, string> = {};
+        for (const field of fields) {
+          const val = data[field.id];
+          if (val !== undefined && val !== null && val !== "") {
+            if (typeof val === "object" && !Array.isArray(val) && val.address !== undefined) {
+              details[field.label] = [val.address, val.city, val.state, val.zip].filter(Boolean).join(", ");
+            } else if (Array.isArray(val)) {
+              details[field.label] = formatClaimValue(val);
+            } else {
+              details[field.label] = String(val);
             }
           }
+        }
+        if ((form as any).notificationEmail) {
+          const { sendEmail } = await import("./email-service");
+          const { adminNotificationEmail } = await import("./email-templates");
           const emailData = adminNotificationEmail(
             `New Submission: ${form.title}`,
             `A new submission was received for "${form.title}".`,
             details,
           );
           sendEmail({ to: (form as any).notificationEmail, ...emailData }).catch(() => {});
-        } catch (emailErr) {
-          console.error("Error sending form notification email:", emailErr);
         }
+        notifyGroupLeaders(fields, data, form.title, details);
+      } catch (emailErr) {
+        console.error("Error sending form notification email:", emailErr);
       }
 
       res.status(201).json({ message: form.successMessage || "Thank you for your submission!", submission });
@@ -2180,6 +2232,7 @@ export async function registerRoutes(
             );
             sendEmail({ to: notifyTo, ...emailData }).catch(() => {});
           }
+          notifyGroupLeaders(fields, formData, event.title, details);
         } catch (err) {
           console.error("Error sending signup emails:", err);
         }

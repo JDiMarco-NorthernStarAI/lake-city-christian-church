@@ -6798,6 +6798,7 @@ interface CityGroup {
   description: string | null;
   meetingDay: string | null;
   meetingTime: string | null;
+  leaderEmail: string | null;
   isActive: boolean;
   sortOrder: number;
 }
@@ -6816,7 +6817,7 @@ function SmallGroupsTab() {
   const [view, setView] = useState<"groups" | "signups">("groups");
   const [editingGroup, setEditingGroup] = useState<CityGroup | null>(null);
   const [showAddGroup, setShowAddGroup] = useState(false);
-  const [groupForm, setGroupForm] = useState({ name: "", description: "", meetingDay: "", meetingTime: "", isActive: true, sortOrder: 0 });
+  const [groupForm, setGroupForm] = useState({ name: "", description: "", meetingDay: "", meetingTime: "", leaderEmail: "", isActive: true, sortOrder: 0 });
 
   const { data: groups = [], isLoading: groupsLoading } = useQuery<CityGroup[]>({
     queryKey: ["/api/city-groups"],
@@ -6842,7 +6843,7 @@ function SmallGroupsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/city-groups"] });
       setShowAddGroup(false);
-      setGroupForm({ name: "", description: "", meetingDay: "", meetingTime: "", isActive: true, sortOrder: 0 });
+      setGroupForm({ name: "", description: "", meetingDay: "", meetingTime: "", leaderEmail: "", isActive: true, sortOrder: 0 });
       toast({ title: "Group created" });
     },
     onError: () => toast({ title: "Error creating group", variant: "destructive" }),
@@ -6894,6 +6895,7 @@ function SmallGroupsTab() {
       description: group.description || "",
       meetingDay: group.meetingDay || "",
       meetingTime: group.meetingTime || "",
+      leaderEmail: group.leaderEmail || "",
       isActive: group.isActive,
       sortOrder: group.sortOrder,
     });
@@ -6901,7 +6903,7 @@ function SmallGroupsTab() {
 
   function openAdd() {
     setShowAddGroup(true);
-    setGroupForm({ name: "", description: "", meetingDay: "", meetingTime: "", isActive: true, sortOrder: groups.length });
+    setGroupForm({ name: "", description: "", meetingDay: "", meetingTime: "", leaderEmail: "", isActive: true, sortOrder: groups.length });
   }
 
   return (
@@ -7060,6 +7062,20 @@ function SmallGroupsTab() {
                 <Label>Meeting Time</Label>
                 <Input value={groupForm.meetingTime} onChange={e => setGroupForm(f => ({ ...f, meetingTime: e.target.value }))} placeholder="e.g. 7:30 PM" className="mt-1" />
               </div>
+            </div>
+            <div>
+              <Label>Group Leader's Email <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                type="email"
+                value={groupForm.leaderEmail}
+                onChange={e => setGroupForm(f => ({ ...f, leaderEmail: e.target.value }))}
+                placeholder="e.g. leader@example.com"
+                className="mt-1"
+                data-testid="input-group-leader-email"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Gets an email whenever someone chooses this group on a sign up.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

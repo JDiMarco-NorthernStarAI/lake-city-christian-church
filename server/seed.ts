@@ -2,6 +2,14 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { log } from "./index";
 import { AVAILABLE_ROLES, AVAILABLE_FEATURES } from "@shared/schema";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
+
+// Lightweight startup migrations: deploys don't run drizzle migrations, so
+// columns added after launch are created here idempotently on every boot.
+async function ensureSchema() {
+  await db.execute(sql`ALTER TABLE city_groups ADD COLUMN IF NOT EXISTS leader_email text`);
+}
 
 async function seedRolePermissions() {
   const existingPerms = await storage.getRolePermissions();
@@ -471,6 +479,8 @@ async function cleanupData() {
 
 export async function seedDatabase() {
   try {
+    await ensureSchema();
+
     const existingAdmin = await storage.getUserByEmail("trevor@lakecitycc.com");
 
     await seedRolePermissions();
